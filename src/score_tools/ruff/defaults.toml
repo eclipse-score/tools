@@ -1,0 +1,53 @@
+# Eclipse S-CORE Ruff defaults
+
+line-length = 120
+indent-width = 4
+
+[format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true
+
+[lint]
+select = [
+  "E",  # pycodestyle errors
+  "F",  # pyflakes
+  "I",  # isort
+  "UP", # pyupgrade
+  "B",  # flake8-bugbear
+  "SIM",# flake8-simplify
+  "RUF" # ruff-specific rules
+]
+ignore = [
+  # Allow unused variables prefixed with `_`
+  "F401",  # imported but unused (often managed by tooling)
+]
+
+[lint.isort]
+combine-as-imports = true
+known-first-party = []
+
+[lint.per-file-ignores]
+"tests/**" = [
+  "S101",   # assert used
+]
+
+[lint.pydocstyle]
+convention = "pep257"
+
+[lint.flake8-quotes]
+inline-quotes = "double"
+
+[lint.mccabe]
+max-complexity = 12
+
+[exclude]
+extend = [
+  "**/__pycache__",
+  "**/.venv",
+  "**/.tox",
+  "**/.pytest_cache",
+  "**/build",
+  "**/dist",
+  "**/.git",
+]

@@ -1,0 +1,158 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "score-tools"
+dynamic = ["version"]
+description = "Eclipse S-CORE tool wrappers and defaults (e.g., Ruff) for a consistent developer experience."
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+authors = [
+  { name = "Alexander Lanin" }
+]
+keywords = ["score", "s-core", "eclipse"]
+classifiers = [
+  # Project maturity & audience
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+
+  # License
+  "License :: OSI Approved :: Apache Software License",
+
+  # Environment & OS
+  "Environment :: Console",
+  "Operating System :: OS Independent",
+
+  # Python versions & impls (keep in sync with requires-python)
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: Implementation :: CPython",
+
+  # Topics
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: Software Development :: Quality Assurance",
+  "Topic :: Utilities",
+
+  # Typing
+  "Typing :: Typed",
+]
+# Runtime dependencies for the base package (keep minimal)
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/eclipse-score/tools"
+Repository = "https://github.com/eclipse-score/tools"
+"Bug Tracker" = "https://github.com/eclipse-score/tools/issues"
+"Eclipse S-CORE" = "https://projects.eclipse.org/projects/automotive.score"
+
+[project.optional-dependencies]
+# Install Ruff alongside the wrappers that need it
+ruff = [
+  "ruff>=0.6",
+]
+# Convenience extra to install everything
+all = [
+  "ruff>=0.6",
+]
+# Developer extras for working on this repository
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+]
+
+[project.scripts]
+score-ruff = "score_tools.ruff.cli:main"
+
+[tool.hatch.version]
+path = "src/score_tools/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/score_tools"]
+
+[tool.hatch.build]
+# Include only the src package and essential top-level files
+include = [
+  "src/score_tools/**/*.py",
+  "src/score_tools/py.typed",
+  "src/score_tools/ruff/defaults.toml",
+  "README.md",
+  "LICENSE",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+  "-ra",
+  "--strict-markers",
+  "--strict-config",
+  "--showlocals",
+]
+pythonpath = ["src"]
+filterwarnings = [
+  "error",
+]
+
+[tool.coverage.run]
+source = ["score_tools"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+  "if __name__ == .__main__.:",
+  "raise NotImplementedError",
+  "raise AssertionError",
+  "@abstractmethod",
+]
+
+# Ruff configuration for this repository
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "N",    # pep8-naming
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "SIM",  # flake8-simplify
+  "TCH",  # flake8-type-checking
+  "TID",  # flake8-tidy-imports
+  "RUF",  # ruff-specific rules
+  "PT",   # flake8-pytest-style
+  "PIE",  # flake8-pie
+  "T20",  # flake8-print
+  "RSE",  # flake8-raise
+  "RET",  # flake8-return
+]
+ignore = [
+  "E501",   # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["score_tools"]
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = [
+  "S101",  # assert used
+  "T201",  # print allowed in tests
+  "TCH",   # no TYPE_CHECKING in tests
+]
+
+[tool.uv]
+package = true
