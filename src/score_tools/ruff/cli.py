@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import os
 import sys
 import tempfile
@@ -58,6 +59,9 @@ def _write_temp_config(toml_text: str) -> Path:
 def _run_ruff(argv: Iterable[str]) -> int:
     args = ["ruff", *argv]
     try:
+        # Ensure any prior prints are visible before replacing the process.
+        with contextlib.suppress(Exception):
+            sys.stdout.flush()
         os.execvp("ruff", args)  # type: ignore[attr-defined]
     except FileNotFoundError:
         sys.stderr.write(
@@ -97,12 +101,12 @@ def main(argv: list[str] | None = None) -> int:
     parsed, rest = p.parse_known_args(argv)
 
     if parsed.help:
-        print(p.format_help())  # noqa: T201
-        print("\n--- Ruff help ---\n")  # noqa: T201
+        print(p.format_help())
+        print("\n--- Ruff help ---\n")
         return _run_ruff(["--help"])  # exits
 
     if parsed.version:
-        print(f"score-ruff version {__version__}")  # noqa: T201
+        print(f"score-ruff version {__version__}")
         return _run_ruff(["--version"])  # exits
 
     if parsed.score_config:
@@ -111,7 +115,7 @@ def main(argv: list[str] | None = None) -> int:
         except Exception as exc:
             sys.stderr.write(f"Failed to read bundled defaults: {exc}\n")
             return 1
-        print(defaults_text.strip())  # noqa: T201
+        print(defaults_text.strip())
         return 0
 
     cwd = Path.cwd()
@@ -119,9 +123,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if parsed.print_config:
         if user_cfg_path is None:
-            print("Using Eclipse S-CORE default Ruff configuration (no project config found).")  # noqa: T201
+            print("Using Eclipse S-CORE default Ruff configuration (no project config found).")
         else:
-            print(f"Using project configuration at: {user_cfg_path}")  # noqa: T201
+            print(f"Using project configuration at: {user_cfg_path}")
         return 0
 
     if user_cfg_path is None:
