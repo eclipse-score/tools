@@ -67,6 +67,7 @@ dev = [
 
 [project.scripts]
 score-ruff = "score_tools.ruff.cli:main"
+score-tools = "score_tools.cli:main"
 
 [tool.hatch.version]
 path = "src/score_tools/__init__.py"
@@ -141,6 +142,7 @@ select = [
 ]
 ignore = [
   "E501",   # line too long (handled by formatter)
+  "T201",   # allow print() globally for CLI friendliness
 ]
 
 [tool.ruff.lint.isort]
