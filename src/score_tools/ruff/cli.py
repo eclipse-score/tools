@@ -13,14 +13,20 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-try:
-    from importlib.resources import files as _pkg_files
-except ImportError:  # Python < 3.9
-    from importlib_resources import files as _pkg_files  # type: ignore[import-not-found,no-redef]
+from importlib.resources import files as _pkg_files
 
 from score_tools import __version__
 
 RuffConfigPath = Path | None
+
+
+def _load_bundled_ruff_defaults() -> str:
+    """Load the bundled Eclipse S-CORE Ruff defaults from the package."""
+    try:
+        return _pkg_files("score_tools.ruff").joinpath("defaults.toml").read_text(encoding="utf-8")
+    except Exception as exc:
+        sys.stderr.write(f"Failed to read bundled defaults: {exc}\n")
+        raise
 
 
 def _find_user_ruff_config(start: Path) -> RuffConfigPath:
@@ -110,13 +116,13 @@ def main(argv: list[str] | None = None) -> int:
         return _run_ruff(["--version"])  # exits
 
     if parsed.score_config:
+        # print bundled defaults
         try:
-            defaults_text = _pkg_files("score_tools.ruff").joinpath("defaults.toml").read_text(encoding="utf-8")
-        except Exception as exc:
-            sys.stderr.write(f"Failed to read bundled defaults: {exc}\n")
+            defaults_text = _load_bundled_ruff_defaults()
+            print(defaults_text.strip())
+            return 0
+        except Exception:
             return 1
-        print(defaults_text.strip())
-        return 0
 
     cwd = Path.cwd()
     user_cfg_path: RuffConfigPath = Path(parsed.config) if parsed.config else _find_user_ruff_config(cwd)
@@ -130,12 +136,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if user_cfg_path is None:
         try:
-            defaults_text = _pkg_files("score_tools.ruff").joinpath("defaults.toml").read_text(encoding="utf-8")
-        except Exception as exc:
-            sys.stderr.write(f"Failed to read bundled defaults: {exc}\n")
+            defaults_text = _load_bundled_ruff_defaults()
+            cfg_path = _write_temp_config(defaults_text)
+            return _run_ruff(["--config", str(cfg_path), *rest])
+        except Exception:
             return 1
-        cfg_path = _write_temp_config(defaults_text)
-        return _run_ruff(["--config", str(cfg_path), *rest])
 
     return _run_ruff(["--config", str(user_cfg_path), *rest])
 

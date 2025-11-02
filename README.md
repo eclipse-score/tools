@@ -73,34 +73,10 @@ pipx install 'score-tools[ruff]'
 Clone the repository and set up your development environment:
 
 ```bash
-# Clone the repository
-git clone https://github.com/eclipse-score/tools.git
-cd tools
-
-# Create a virtual environment
 python -m venv .venv
+pip install -e '.[dev,all]'
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install in editable mode with dev dependencies
-pip install -e '.[dev,ruff]'
-
-# Install pre-commit hooks (optional but recommended)
-pip install pre-commit
-pre-commit install
-
-# Run tests
 pytest
-
-# Run tests with coverage
-pytest --cov=score_tools --cov-report=html
-
-# Run linting
-ruff check src/ tests/
-ruff format src/ tests/
-
-# Build the package
-pip install build
-python -m build
 ```
 
 ## License
