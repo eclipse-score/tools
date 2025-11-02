@@ -1,5 +1,7 @@
 # score-tools
 
+[![CI](https://github.com/eclipse-score/tools/actions/workflows/installer-and-tests.yml/badge.svg?branch=main)](https://github.com/eclipse-score/tools/actions/workflows/installer-and-tests.yml)
+
 Eclipse S-CORE tool wrappers and defaults for a consistent, batteries-included developer experience.
 
 Today this includes:
@@ -27,7 +29,7 @@ uv pip install 'score-tools[ruff]'
 uvx --from 'score-tools[ruff]' score-ruff --version
 ```
 
-Python 3.12–3.13 are supported.
+Python 3.10–3.13 are supported.
 
 ## Usage
 
