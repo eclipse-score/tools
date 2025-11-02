@@ -17,7 +17,7 @@ import argparse
 import json
 import shutil
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from typing import Any
 
 from . import __version__
@@ -30,7 +30,7 @@ def _is_cmd_available(cmd: str) -> bool:
 
 
 def _detect_tool_score_ruff() -> ToolStatus:
-    return is_installed("ruff")
+    return is_installed(tool="score-ruff", extra="ruff")
 
 
 def _available_package_managers() -> list[str]:
@@ -88,7 +88,7 @@ def _pretty_print_status(status: dict[str, Any]) -> None:
     print("Embedded tools:")
     for name, data in status["tools"].items():
         installed = "yes" if data.get("installed") else "no"
-        print(f"  - {name:11} installed: {installed:3}")
+        print(f"  - {name} installed: {installed:3}")
 
     print("")
     if status["package_managers"]:

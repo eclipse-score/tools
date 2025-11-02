@@ -62,7 +62,7 @@ class ToolStatus:
     details: dict[str, dict[str, object]]
 
 
-def is_installed(tool: str) -> ToolStatus:
+def is_installed(tool: str, extra: str) -> ToolStatus:
     """Generic check that all requirements for an extra are satisfied.
 
     Returns (all_ok, details) where details maps requirement names to:
@@ -70,7 +70,7 @@ def is_installed(tool: str) -> ToolStatus:
 
     This avoids hard-coding dependency names by reading the installed
     distribution's "Requires-Dist" entries and selecting those tied to the
-    'ruff' extra (respecting environment markers like python_version).
+    given extra (respecting environment markers like python_version).
     """
     try:
         from packaging.markers import default_environment  # type: ignore
@@ -92,7 +92,7 @@ def is_installed(tool: str) -> ToolStatus:
     dist = metadata.distribution("score-tools")
     requires = dist.requires or []
     env: dict[str, str] = {k: str(v) for k, v in default_environment().items()}
-    env["extra"] = str(tool)
+    env["extra"] = str(extra)
 
     selected: list[Requirement] = []
     for req_str in requires:
