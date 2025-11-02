@@ -69,8 +69,8 @@ jobs:
         run: |
           # Prefer uv for speed; the tool was set up in the previous step.
           # Install the built wheel so tests import the installed artifact, not the repo's src/.
-          uv pip install dist/*.whl
-          uv pip install 'pytest>=8' 'ruff>=0.6' 'mypy>=1.10' 'coverage[toml]>=7'
+          uv pip install --system "${{ needs.build.outputs.wheel }}"
+          uv pip install --system 'pytest>=8' 'ruff>=0.6' 'mypy>=1.10' 'coverage[toml]>=7'
 
       - run: python -m ruff check src tests
 
@@ -115,7 +115,7 @@ jobs:
       - name: uvx smoke
         run: |
           # Validate the CLI runs when installed via uvx directly from the wheel.
-          uvx --from dist/*.whl score-tools --help
+          uvx --from "${{ needs.build.outputs.wheel }}" score-tools --help
 
   installer-pipx:
     needs: build
@@ -140,7 +140,7 @@ jobs:
           # Validate the CLI installs and runs via pipx.
           # We invoke pipx via `python -m` to avoid PATH issues.
           python -m pip install -U pip pipx
-          python -m pipx install dist/*.whl
+          python -m pipx install "${{ needs.build.outputs.wheel }}"
           python -m pipx run score-tools --help
 
   installer-pip:
@@ -166,5 +166,5 @@ jobs:
           # Validate the CLI installs and runs via pip.
           # On Windows, invoking the console script can be finicky; calling module main is robust.
           python -m pip install -U pip
-          python -m pip install dist/*.whl
+          python -m pip install "${{ needs.build.outputs.wheel }}"
           python -c "import score_tools.cli as c; import sys; sys.exit(c.main([]))"
