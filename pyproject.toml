@@ -7,7 +7,7 @@ name = "score-tools"
 dynamic = ["version"]
 description = "Eclipse S-CORE tool wrappers and defaults (e.g., Ruff) for a consistent developer experience."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [
   { name = "Alexander Lanin" }
@@ -29,6 +29,8 @@ classifiers = [
   "Programming Language :: Python",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: Implementation :: CPython",
@@ -118,7 +120,7 @@ exclude_lines = [
 [tool.ruff]
 src = ["src", "tests"]
 line-length = 120
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [
