@@ -87,11 +87,7 @@ jobs:
           # Export coverage for upload.
           python -m coverage xml -o reports/coverage.xml
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: reports-${{ matrix.os }}-${{ matrix.python }}
-          path: reports
+          # TODO: do something with reports? run coverage only for one system?
 
   installer-uvx:
     needs: build
@@ -138,11 +134,10 @@ jobs:
 
       - name: pipx smoke
         run: |
-          # Validate the CLI installs and runs via pipx.
-          # We invoke pipx via `python -m` to avoid PATH issues.
+          # Validate the CLI runs via pipx using an ephemeral environment from the built wheel.
+          # This avoids publishing requirements and extra PATH handling.
           python -m pip install -U pip pipx
-          python -m pipx install "${{ needs.build.outputs.wheel }}"
-          python -m pipx run score-tools --help
+          python -m pipx run --spec "${{ needs.build.outputs.wheel }}" score-tools --help
 
   installer-pip:
     needs: build
