@@ -43,11 +43,12 @@ class ToolStatus:
 
 
 def _detect_tool_score_ruff() -> ToolStatus:
-    # This is our wrapper CLI; version matches score-tools package version
+    # Check if the underlying tool (ruff) is available, not just our wrapper.
+    # The wrapper is only useful if ruff itself is installed via the [ruff] extra.
     return ToolStatus(
         name="score-ruff",
-        python=True,  # If this CLI runs, score-tools is importable
-        cli=_is_cmd_available("score-ruff"),
+        python=_pkg_version("ruff") is not None,
+        cli=_is_cmd_available("ruff"),
     )
 
 
