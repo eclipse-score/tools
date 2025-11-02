@@ -18,38 +18,19 @@ import json
 import shutil
 import sys
 from dataclasses import asdict, dataclass
-from importlib import metadata
 from typing import Any
 
 from . import __version__
+from .utils import ToolStatus, is_installed
 
 
 def _is_cmd_available(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
 
-def _pkg_version(dist_name: str) -> str | None:
-    try:
-        return metadata.version(dist_name)
-    except metadata.PackageNotFoundError:
-        return None
-
-
-@dataclass
-class ToolStatus:
-    name: str
-    python: bool
-    cli: bool
-
 
 def _detect_tool_score_ruff() -> ToolStatus:
-    # Check if the underlying tool (ruff) is available, not just our wrapper.
-    # The wrapper is only useful if ruff itself is installed via the [ruff] extra.
-    return ToolStatus(
-        name="score-ruff",
-        python=_pkg_version("ruff") is not None,
-        cli=_is_cmd_available("ruff"),
-    )
+    return is_installed("ruff")
 
 
 def _available_package_managers() -> list[str]:
@@ -106,7 +87,7 @@ def _pretty_print_status(status: dict[str, Any]) -> None:
     print("")
     print("Embedded tools:")
     for name, data in status["tools"].items():
-        installed = "yes" if (data.get("python") or data.get("cli")) else "no"
+        installed = "yes" if data.get("installed") else "no"
         print(f"  - {name:11} installed: {installed:3}")
 
     print("")

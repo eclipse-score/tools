@@ -53,14 +53,26 @@ Repository = "https://github.com/eclipse-score/tools"
 "Eclipse S-CORE" = "https://projects.eclipse.org/projects/automotive.score"
 
 [project.optional-dependencies]
+
 # Install Ruff alongside the wrappers that need it
 ruff = [
-  "ruff>=0.6",
+  "ruff==0.14.3",
+
+  # No need to pin helper libraries
+  "tomli>=2.0.1; python_version < '3.11'",
+  "tomli-w>=1.0.0",
 ]
+
 # Convenience extra to install everything
 all = [
-  "ruff>=0.6",
+  # Exact versions of tools pinned
+  "ruff==0.14.3",
+
+  # No need to pin helper libraries
+  "tomli>=2.0.1; python_version < '3.11'",
+  "tomli-w>=1.0.0",
 ]
+
 # Developer extras for working on this repository
 dev = [
   "pytest>=8.0",
