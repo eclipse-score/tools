@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      sdist: ${{ steps.paths.outputs.sdist }}
+      wheel: ${{ steps.paths.outputs.wheel }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Build
+        run: |
+          # Build sdist and wheel artifacts from the checked-out source.
+          # Keep this job minimal and deterministic.
+          python -m pip install -U pip build
+          python -m build
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/*
+
+      - id: paths
+        run: |
+          # Record artifact paths for downstream jobs (convenience only).
+          echo "sdist=$(ls dist/*.tar.gz | head -n1)" >> "$GITHUB_OUTPUT"
+          echo "wheel=$(ls dist/*.whl    | head -n1)" >> "$GITHUB_OUTPUT"
+
+  tests:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python: ["3.10","3.11","3.12","3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          # Caching will fail if there is nothing to cache
+          #cache: pip
+
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: Install from wheel + dev deps
+        run: |
+          # Prefer uv for speed; the tool was set up in the previous step.
+          # Install the built wheel so tests import the installed artifact, not the repo's src/.
+          uv pip install --system "${{ needs.build.outputs.wheel }}"
+          uv pip install --system 'pytest>=8' 'ruff>=0.6' 'mypy>=1.10' 'coverage[toml]>=7'
+
+      - run: |
+          mkdir -p reports
+
+          # Run tests against the installed wheel, not the source tree's `src`.
+          # `-c /dev/null` ignores repo pytest config (e.g., pythonpath=['src']).
+          python -m coverage run -m pytest -q -c /dev/null tests --junitxml=reports/junit.xml
+
+          # Export coverage for upload.
+          python -m coverage xml -o reports/coverage.xml
+
+          # TODO: do something with reports? run coverage only for one system?
+
+  installer-uvx:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+
+      - uses: astral-sh/setup-uv@v7
+
+      - name: uvx smoke
+        run: |
+          # Validate the CLI runs when installed via uvx directly from the wheel.
+          uvx --from "${{ needs.build.outputs.wheel }}" score-tools --help
+
+  installer-pipx:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+
+      - name: pipx smoke
+        run: |
+          # Validate the CLI runs via pipx using an ephemeral environment from the built wheel.
+          # This avoids publishing requirements and extra PATH handling.
+          python -m pip install -U pip pipx
+          python -m pipx run --spec "${{ needs.build.outputs.wheel }}" score-tools --help
+
+  installer-pip:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/download-artifact@v4
+        with: { name: dist, path: dist }
+
+      - name: pip smoke
+        run: |
+          # Validate the CLI installs and runs via pip.
+          # On Windows, invoking the console script can be finicky; calling module main is robust.
+          python -m pip install -U pip
+          python -m pip install "${{ needs.build.outputs.wheel }}"
+          python -c "import score_tools.cli as c; import sys; sys.exit(c.main([]))"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ruff check src/ tests/
+      - run: ruff format --check src/ tests/
+      - run: mypy src
