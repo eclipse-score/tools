@@ -55,7 +55,9 @@ dev = [
 ]
 
 [project.scripts]
-# score-tools = "score_tools.cli:main"
+ruff = "score_tools.wrappers:ruff"
+pytest = "score_tools.wrappers:pytest"
+basedpyright = "score_tools.wrappers:basedpyright"
 
 [build-system]
 requires = ["hatchling>=1.26", "hatch-vcs>=0.3"]
