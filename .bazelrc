@@ -38,4 +38,3 @@ build:debug --//bazel/rules/rules_score:verbosity=debug
 coverage:coverage --combined_report=lcov
 #coverage:coverage --@rules_rust//rust/settings:extra_rustc_flag=-Clink-dead-code
 #coverage:coverage --@rules_rust//rust/settings:extra_rustc_flag=-Ccodegen-units=1
-

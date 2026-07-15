@@ -10,30 +10,30 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-  integration_tests:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-      actions: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7.0.0
-      - name: Free Disk Space (Ubuntu)
-        uses: eclipse-score/more-disk-space@v1
-        with:
-          level: 4
-      - uses: castler/setup-bazel@cache-optimized
-        with:
-          bazelisk-cache: true
-          disk-cache: integration_tests
-          repository-cache: true
-          cache-optimized: true
-          cache-save: ${{ github.ref == 'refs/heads/main' }}
-      # - name: Run python_basics integration tests
-      #   run: |
-      #     cd python_basics/integration_tests
-      #     bazel test //...
-      - name: Run cr_checker unit tests
-        run: |
-          cd cr_checker/tests
-          bazel test //...
+integration_tests:
+  runs-on: ubuntu-24.04
+  permissions:
+    contents: read
+    actions: write
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7.0.0
+    - name: Free Disk Space (Ubuntu)
+      uses: eclipse-score/more-disk-space@v1
+      with:
+        level: 4
+    - uses: castler/setup-bazel@cache-optimized
+      with:
+        bazelisk-cache: true
+        disk-cache: integration_tests
+        repository-cache: true
+        cache-optimized: true
+        cache-save: ${{ github.ref == 'refs/heads/main' }}
+    # - name: Run python_basics integration tests
+    #   run: |
+    #     cd python_basics/integration_tests
+    #     bazel test //...
+    - name: Run cr_checker unit tests
+      run: |
+        cd cr_checker/tests
+        bazel test //...

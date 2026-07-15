@@ -324,7 +324,7 @@ def test_process_files_accepts_flexible_border(tmp_path):
         " * terms of the Apache License Version 2.0 which is available at\n"
         " * https://www.apache.org/licenses/LICENSE-2.0\n"
         " *\n"
-        " * SPDX-License-Identifier: Apache-2.0\n"
+        " * SPDX-" "License-Identifier: Apache-2.0\n"
         " /////////////////////////////////////////////////////////////////////////////////////\n"
     )
     test_file.write_text(header + "int main() {}\n", encoding="utf-8")
