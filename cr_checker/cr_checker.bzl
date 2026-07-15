@@ -20,7 +20,6 @@ def copyright_checker(
         srcs,
         visibility,
         template,
-        config,
         exclusion = None,
         extensions = [],
         offset = 0,
@@ -40,8 +39,6 @@ def copyright_checker(
                            targets can use this rule.
         template (str, optional): Path to the template resource used for validation.
                                   Defaults to "//tools/cr_checker/resources:templates".
-        config (str, optional): Path to the config resource used for project variables.
-                                Defaults to "//tools/cr_checker/resources:config".
         exclusion (str, optional): Path to a text file listing files to be excluded from the copyright check.
                                    File format: one path per line, relative to the repository root.
         extensions (list, optional): A list of file extensions to filter the source files.
@@ -67,7 +64,6 @@ def copyright_checker(
 
     args = [
         "-t $(location {})".format(template),
-        "-c $(location {})".format(config),
     ]
     if len(extensions):
         args.append("-e {exts}".format(
@@ -97,7 +93,6 @@ def copyright_checker(
 
         data = srcs[:]
         data.append(template)
-        data.append(config)
         if exclusion:
             data.append(exclusion)
 

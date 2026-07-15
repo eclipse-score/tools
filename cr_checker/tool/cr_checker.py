@@ -27,7 +27,6 @@ from datetime import datetime
 from pathlib import Path
 
 BYTES_TO_READ = 4 * 1024
-DEFAULT_AUTHOR = "Contributors to the Eclipse Foundation"
 
 BORDER_FILL_PATTERN = re.compile(r"([/*#'\-=+])\1{4,}")
 FILL_CHARS_REGEX = r"[/*#'\-=+]+"
@@ -108,23 +107,6 @@ class ParamFileAction(argparse.Action):  # pylint: disable=too-few-public-method
             setattr(namespace, self.dest, file_paths)
         else:
             setattr(namespace, self.dest, values)
-
-
-def get_author_from_config(config_path: Path = None) -> str:
-    """
-    Reads the author from a JSON configuration file.
-
-    Args:
-        config_path (Path): Path to the configuration JSON file.
-
-    Returns:
-        str: Author from the configuration file.
-    """
-    if not config_path:
-        return DEFAULT_AUTHOR
-    with config_path.open("r") as file:
-        config = json.load(file)
-    return config.get("author", DEFAULT_AUTHOR)
 
 
 def convert_bre_to_regex(template: str) -> str:
@@ -363,7 +345,7 @@ def load_text_from_file_with_mmap(path, header_length, encoding, offset):
             return fmap[:length].decode(encoding)[offset:]
 
 
-def has_copyright(path, template, use_mmap, encoding, offset, config=None):
+def has_copyright(path, template, use_mmap, encoding, offset):
     """
     Checks if the specified copyright text is present in the beginning of a file.
 
@@ -377,8 +359,6 @@ def has_copyright(path, template, use_mmap, encoding, offset, config=None):
         offset (int): Additional number of characters to read beyond the length
                       of `copyright_text`, used to account for extra content
                       (such as a shebang) before the copyright text.
-        config (Path): Path to the config JSON file where configuration
-                variables are stored (e.g. years for copyright headers).
 
     Returns:
         bool: True if the file contains the copyright text, False if it is missing.
@@ -562,7 +542,7 @@ def remove_old_header(file_path, encoding, num_of_chars):
     shutil.move(temp_file.name, file_path)
 
 
-def fix_copyright(path, copyright_text, encoding, offset, config=None) -> bool:
+def fix_copyright(path, copyright_text, encoding, offset) -> bool:
     """
     Inserts a copyright header into the specified file, ensuring that existing
     content is preserved according to the provided offset.
@@ -575,8 +555,6 @@ def fix_copyright(path, copyright_text, encoding, offset, config=None) -> bool:
                       If 0, the first line is overwritten unless it's empty.
                       For non-zero offsets, ensures the correct number of bytes
                       are preserved.
-        config (Path): Path to the config JSON file where configuration
-                variables are stored (e.g. years for copyright headers).
     Returns:
         bool: True if the copyright header was successfully added, False if there was an error
     """
@@ -598,12 +576,7 @@ def fix_copyright(path, copyright_text, encoding, offset, config=None) -> bool:
             if offset > 0:
                 handle.write(first_line)
                 temp.seek(offset)
-            handle.write(
-                copyright_text.format(
-                    year=datetime.now().year, author=get_author_from_config(config)
-                )
-                + "\n"
-            )
+            handle.write(copyright_text.format(year=datetime.now().year) + "\n")
             for chunk in iter(lambda: temp.read(4096), ""):
                 handle.write(chunk)
     LOGGER.info("Fixed missing header in: %s", path)
@@ -615,7 +588,6 @@ def process_files(
     templates,
     fix,
     exclusion=[],
-    config=None,
     use_mmap=False,
     encoding="utf-8",
     offset=0,
@@ -631,8 +603,6 @@ def process_files(
                           representing the required copyright text.
         exclusion (list): A list of paths to files to be excluded from the copyright
                           check.
-        config (Path): Path to the config JSON file where configuration
-                       variables are stored (e.g. years for copyright headers).
         use_mmap (bool): Flag for using mmap function for reading files
                          (instead of standard option).
         encoding (str): Encoding type to use when reading the file.
@@ -673,7 +643,7 @@ def process_files(
             LOGGER.error("Duplicate copyright header in: %s", item)
             results["duplicate_copyright"] += 1
         elif not has_copyright(
-            item, templates[key], use_mmap, encoding, effective_offset, config
+            item, templates[key], use_mmap, encoding, effective_offset
         ):
             if has_any_copyright(item, use_mmap, encoding, effective_offset):
                 LOGGER.warning(
@@ -683,7 +653,7 @@ def process_files(
                 if remove_offset:
                     remove_old_header(item, encoding, remove_offset)
                 fix_result = fix_copyright(
-                    item, templates[key], encoding, effective_offset, config
+                    item, templates[key], encoding, effective_offset
                 )
                 results["no_copyright"] += 1
                 if fix_result:
@@ -724,14 +694,6 @@ def parse_arguments(argv):
         type=Path,
         required=False,
         help="Path to the file listing file paths excluded from the copyright check.",
-    )
-
-    parser.add_argument(
-        "-c",
-        "--config-file",
-        type=Path,
-        default=None,
-        help="Path to the config file",
     )
 
     parser.add_argument(

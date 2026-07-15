@@ -41,13 +41,6 @@ def load_template(extension: str) -> str:
     return templates[extension]
 
 
-# write the config file here so that the year is always up to date with the year
-# written in the test file
-def write_config(path: Path, author: str) -> Path:
-    config_path = path / "config.json"
-    config_path.write_text(json.dumps({"author": author}), encoding="utf-8")
-    return config_path
-
 
 # test that offset matches the length of the shebang line including trailing newlines
 def test_detect_shebang_offset_counts_trailing_newlines(tmp_path):
@@ -86,7 +79,7 @@ def prepare_test_with_header(request: SubRequest, tmp_path: PosixPath) -> tuple:
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     test_file.write_text(
         header + "some content\n",
         encoding="utf-8",
@@ -161,14 +154,11 @@ def test_process_files_detects_missing_header(prepare_test_no_header):
 def test_process_files_inserts_missing_header(prepare_test_no_header):
     cr_checker = load_cr_checker_module()
     test_file, extension, header_template, tmp_path = prepare_test_no_header
-    author = "Author"
-    config = write_config(tmp_path, author)
 
     results = cr_checker.process_files(
         [test_file],
         {extension: header_template},
         True,
-        config=config,
         use_mmap=False,
         encoding="utf-8",
         offset=0,
@@ -177,7 +167,7 @@ def test_process_files_inserts_missing_header(prepare_test_no_header):
 
     assert results["no_copyright"] == 1
     assert results["fixed"] == 1
-    expected_header = header_template.format(year=datetime.now().year, author="Author")
+    expected_header = header_template.format(year=datetime.now().year)
     assert test_file.read_text(encoding="utf-8").startswith(expected_header)
 
 
@@ -205,7 +195,7 @@ def test_process_files_accepts_header_after_shebang(tmp_path):
     script = tmp_path / "script.py"
     header_template = load_template("py")
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     script.write_text(
         "#!/usr/bin/env python3\n" + header + "print('hi')\n",
         encoding="utf-8",
@@ -234,14 +224,11 @@ def test_process_files_fix_inserts_header_after_shebang(tmp_path):
     )
     header_template = load_template("py")
     current_year = datetime.now().year
-    author = "Author"
-    config = write_config(tmp_path, author)
 
     results = cr_checker.process_files(
         [script],
         {"py": header_template},
         True,
-        config=config,
         use_mmap=False,
         encoding="utf-8",
         offset=0,
@@ -250,7 +237,7 @@ def test_process_files_fix_inserts_header_after_shebang(tmp_path):
 
     assert results["fixed"] == 1
     assert results["no_copyright"] == 1
-    expected_header = header_template.format(year=current_year, author=author)
+    expected_header = header_template.format(year=current_year)
     assert script.read_text(encoding="utf-8") == (
         "#!/usr/bin/env python3\n" + expected_header + "\n" + "print('hi')\n"
     )
@@ -262,7 +249,7 @@ def test_process_files_accepts_header_without_shebang(tmp_path):
     script = tmp_path / "script.py"
     header_template = load_template("py")
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     script.write_text(header + "print('hi')\n", encoding="utf-8")
 
     results = cr_checker.process_files(
@@ -285,14 +272,11 @@ def test_process_files_fix_inserts_header_without_shebang(tmp_path):
     script.write_text("print('hi')\n", encoding="utf-8")
     header_template = load_template("py")
     current_year = datetime.now().year
-    author = "Author"
-    config = write_config(tmp_path, author)
 
     results = cr_checker.process_files(
         [script],
         {"py": header_template},
         True,
-        config=config,
         use_mmap=False,
         encoding="utf-8",
         offset=0,
@@ -301,7 +285,7 @@ def test_process_files_fix_inserts_header_without_shebang(tmp_path):
 
     assert results["fixed"] == 1
     assert results["no_copyright"] == 1
-    expected_header = header_template.format(year=current_year, author=author)
+    expected_header = header_template.format(year=current_year)
     assert (
         script.read_text(encoding="utf-8") == expected_header + "\n" + "print('hi')\n"
     )
@@ -349,7 +333,7 @@ def test_process_files_accepts_header_with_trailing_blank_line(tmp_path):
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     test_file.write_text(header + "\nsome content\n", encoding="utf-8")
 
     results = cr_checker.process_files(
@@ -372,21 +356,18 @@ def test_process_files_fix_inserts_trailing_blank_line(tmp_path):
     test_file.write_text("some content\n", encoding="utf-8")
     header_template = load_template("py")
     current_year = datetime.now().year
-    author = "Author"
-    config = write_config(tmp_path, author)
 
     cr_checker.process_files(
         [test_file],
         {"py": header_template},
         True,
-        config=config,
         use_mmap=False,
         encoding="utf-8",
         offset=0,
         remove_offset=0,
     )
 
-    expected_header = header_template.format(year=current_year, author=author)
+    expected_header = header_template.format(year=current_year)
     assert test_file.read_text(encoding="utf-8").startswith(expected_header + "\n")
 
 
@@ -396,7 +377,7 @@ def test_has_duplicate_copyright_detects_duplicate(tmp_path):
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     test_file.write_text(header + header + "some content\n", encoding="utf-8")
 
     result = cr_checker.has_duplicate_copyright(
@@ -412,7 +393,7 @@ def test_has_duplicate_copyright_single_header(tmp_path):
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     test_file.write_text(header + "some content\n", encoding="utf-8")
 
     result = cr_checker.has_duplicate_copyright(
@@ -428,7 +409,7 @@ def test_process_files_detects_duplicate_header(tmp_path):
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
     current_year = datetime.now().year
-    header = header_template.format(year=current_year, author="Author")
+    header = header_template.format(year=current_year)
     test_file.write_text(header + header + "some content\n", encoding="utf-8")
 
     results = cr_checker.process_files(
@@ -450,8 +431,8 @@ def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
-    header1 = header_template.format(year="2026", author="Author")
-    header2 = header_template.format(year="2024-2026", author="Author")
+    header1 = header_template.format(year="2026")
+    header2 = header_template.format(year="2024-2026")
     test_file.write_text(header1 + header2 + "some content\n", encoding="utf-8")
 
     result = cr_checker.has_duplicate_copyright(

@@ -18,10 +18,6 @@ integration_tests:
   steps:
     - name: Checkout repository
       uses: actions/checkout@v7.0.0
-    - name: Free Disk Space (Ubuntu)
-      uses: eclipse-score/more-disk-space@v1
-      with:
-        level: 4
     - uses: castler/setup-bazel@cache-optimized
       with:
         bazelisk-cache: true
@@ -35,5 +31,4 @@ integration_tests:
     #     bazel test //...
     - name: Run cr_checker unit tests
       run: |
-        cd cr_checker/tests
-        bazel test //...
+        uv run pytest cr_checker/tests/
