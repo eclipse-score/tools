@@ -1,0 +1,41 @@
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# SPDX-License-Identifier: Apache-2.0
+
+common --registry=https://raw.githubusercontent.com/eclipse-score/bazel_registry/main/
+common --registry=https://bcr.bazel.build
+
+#common --extra_toolchains=@score_gcc_x86_64_toolchain//:x86_64-linux
+
+# libclang toolchain for the C/C++ parser used by the score rules. Registered
+# only for score_tooling's own build (its LLVM is a dev dependency); integrating
+# repositories register their own libclang toolchain instead.
+#common --extra_toolchains=//cpp/libclang:score_tooling_libclang_toolchain
+
+build --java_language_version=17
+build --tool_java_language_version=17
+build --java_runtime_version=remotejdk_17
+build --tool_java_runtime_version=remotejdk_17
+
+# Use GNU ld (bfd) as the Rust linker; avoids the deprecation warning that
+# newer Rust emits when it detects the system default linker is gold.
+#build --@rules_rust//rust/settings:extra_rustc_flag=-Clink-arg=-fuse-ld=bfd
+
+# Rust clippy linter
+#build:clippy --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
+#build:clippy --output_groups=+clippy_checks
+
+# Log level configuration for rules_score build output
+# normal build: only errors and warnings (default – no flag needed)
+# info build:   additionally show info messages from all tools
+build:info --//bazel/rules/rules_score:verbosity=info
+# debug build:  complete output including debug/trace from all tools
+build:debug --//bazel/rules/rules_score:verbosity=debug
+
+# Standard combined coverage (Rust + Python, no Ferrocene required)
+# Usage: bazel coverage --config=coverage <targets>
+# Then run: bazel run //coverage:combined_report
+coverage:coverage --combined_report=lcov
+#coverage:coverage --@rules_rust//rust/settings:extra_rustc_flag=-Clink-dead-code
+#coverage:coverage --@rules_rust//rust/settings:extra_rustc_flag=-Ccodegen-units=1
+
