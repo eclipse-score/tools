@@ -15,5 +15,5 @@ module(
     name = "score_tools"
 )
 # CR_CHECKER
-bazel_dep(name = "aspect_rules_py", version = "1.4.0")
+bazel_dep(name = "aspect_rules_py", version = "1.6.3")
 bazel_dep(name = "score_tooling", version = "1.2.0")

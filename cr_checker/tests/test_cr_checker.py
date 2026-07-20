@@ -15,7 +15,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import pytest
 from datetime import datetime
 from pathlib import Path

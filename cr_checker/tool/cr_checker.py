@@ -77,7 +77,6 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
-
 def convert_bre_to_regex(template: str) -> str:
     """
     Convert BRE-style template (literal by default) to standard regex.
@@ -181,20 +180,17 @@ def load_exclusion(path):
     exclusion = []
     valid = True
     with open(path, "r", encoding="utf-8") as file:
-        exclusion_raw = file.read().splitlines()
-        exclusion = exclusion_raw
-        for item in exclusion_raw:
+        for item in file.read().splitlines():
             path = Path(item)
             if not path.exists():
                 LOGGER.error("Excluded file %s does not exist.", item)
-                exclusion.remove(item)
                 valid = False
                 continue
             if not path.is_file():
-                exclusion.remove(item)
                 LOGGER.error("Excluded file %s is not a file.", item)
                 valid = False
                 continue
+            exclusion.append(item)
 
     LOGGER.debug(exclusion)
     return exclusion, valid
@@ -566,7 +562,7 @@ def process_files(
     files,
     templates,
     fix,
-    exclusion:list[str]|None =None,
+    exclusion: list[str] | None = None,
     use_mmap=False,
     encoding="utf-8",
 ):  # pylint: disable=too-many-arguments

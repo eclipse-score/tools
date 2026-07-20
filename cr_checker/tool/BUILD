@@ -12,6 +12,9 @@
 # *******************************************************************************
 load("@aspect_rules_py//py:defs.bzl", "py_library")
 
+# `templates.ini` is inside srcs. 
+# This is because if it would be in the `data` attr we would need to find the actual path of it with a lot of effort
+# So this is a good workaround that does not change the workings of the lib.
 py_library(
     name = "cr_checker_lib",
     srcs = [

@@ -67,14 +67,14 @@ def copyright_checker(
         args.append("-v")
 
     data = []
+    if template:
+        data.append(template)
+    if exclusion:
+        data.append(exclusion)
     for t_name in t_names:
         if t_name == "{}.fix".format(name):
             args.insert(0, "--fix")
 
-        if template:
-            data.append(template)
-        if exclusion:
-            data.append(exclusion)
 
         py_binary(
             name = t_name,
