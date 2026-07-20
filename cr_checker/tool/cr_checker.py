@@ -714,7 +714,7 @@ def parse_arguments(argv):
         "--extensions",
         type=str,
         nargs="+",
-        default=["h", "hpp", "c", "cpp", "rs", "rst", "py", "sh", "bzl", "lni", "yml", "yaml", "trlc", "rsl", "puml", "svg", "BUILD", "bazel"],
+        default=["md","h", "hpp", "c", "cpp", "rs", "rst", "py", "sh", "bzl", "lni", "yml", "yaml", "trlc", "rsl", "puml", "svg", "BUILD", "bazel"],
         help="List of extensions to filter when searching for files, e.g., '.h .cpp'",
     )
 

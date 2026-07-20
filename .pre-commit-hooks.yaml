@@ -12,8 +12,6 @@
 # *******************************************************************************
 - id: copyright
   name: Check and fix copyright headers with cr_checker
-  entry: cr_checker/tool/pre-commit_wrapper --fix
-  # this would be the better language implementation, but struggle with python tooling
-  # language: python
+  entry: cr_checker/tool/cr_checker.py --fix
   language: script
   minimum_pre_commit_version: 3.2.0
