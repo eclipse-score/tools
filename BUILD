@@ -10,3 +10,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
+load("@score_tools//cr_checker:cr_checker.bzl", "copyright_checker")
+
+
+copyright_checker(
+    name = "copyright",
+    visibility = ["//visibility:public"],
+)

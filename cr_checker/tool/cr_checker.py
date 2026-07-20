@@ -21,6 +21,7 @@ import mmap
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from datetime import datetime
@@ -77,37 +78,6 @@ class ColoredFormatter(logging.Formatter):
         return super().format(record)
 
 
-class ParamFileAction(argparse.Action):  # pylint: disable=too-few-public-methods
-    """
-    A custom argparse action to support exclusive parameter files for command-line arguments.
-
-    The `ParamFileAction` class allows users to specify a parameter file (prefixed with '@')
-    containing file paths or other inputs, which will override any additional inputs provided
-    in the command line. If a parameter file is found, its contents are used exclusively,
-    and all other inputs are ignored. If no parameter file is provided, standard inputs are used.
-
-    Attributes:
-        parser (argparse.ArgumentParser): The argument parser instance.
-        namespace (argparse.Namespace): The namespace where arguments are stored.
-        values (list): The list of argument values passed from the command line.
-        option_string (str, optional): The option string that triggered this action, if any.
-
-    Methods:
-        __call__(parser, namespace, values, option_string=None): Processes the arguments.
-            - If any value starts with '@', it reads the parameter file and sets `file_paths`
-              in `namespace`.
-            - If no parameter file is detected, it directly assigns `values` to `namespace`.
-    """
-
-    def __call__(self, parser, namespace, values, option_string=None):
-        paramfile = next((v[1:] for v in values if v.startswith("@")), None)
-        if paramfile:
-            with open(paramfile, "r", encoding="utf-8") as handle:
-                file_paths = [line.strip() for line in handle if line.strip()]
-            setattr(namespace, self.dest, file_paths)
-        else:
-            setattr(namespace, self.dest, values)
-
 
 def convert_bre_to_regex(template: str) -> str:
     """
@@ -146,7 +116,7 @@ def line_to_flexible_regex(line: str) -> str:
     return "".join(result)
 
 
-def load_templates(path):
+def load_templates(path: Path):
     """
     Loads the copyright templates from a configuration file.
 
@@ -158,13 +128,15 @@ def load_templates(path):
               and the value is the template string from the config.
     """
 
-    def add_template_for_extensions(templates: dict, extensions: list, template: str):
+    def add_template_for_extensions(
+        templates: dict[str, str], extensions: list[str], template: str
+    ):
         # Remove trailing lines from template and ensure line end
         template = template.rstrip() + "\n"
         for extension in extensions:
             templates[extension] = template
 
-    templates = {}
+    templates: dict[str, str] = {}
     current_extensions = []
 
     with open(path, "r", encoding="utf-8") as file:
@@ -463,7 +435,7 @@ def get_files_from_dir(directory, exts=None):
     return collected_files
 
 
-def collect_inputs(inputs, exts=None):
+def collect_inputs(inputs: list[str], exts=None):
     """
     Collects files from a list of input paths, optionally filtering by file extensions.
 
@@ -483,8 +455,15 @@ def collect_inputs(inputs, exts=None):
     """
     all_files = []
     LOGGER.debug("Extensions: %s", exts)
+    workspace_dir = Path(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "").strip())
+    if not inputs:
+        cmds = ["git", "ls-files", "--cached", "--other", "--exclude-standard"]
+        found_dirs = subprocess.run(
+            cmds, capture_output=True, text=True, cwd=workspace_dir, check=True
+        )
+        inputs = found_dirs.stdout.splitlines()
     for i in inputs:
-        item = Path(i)
+        item = Path(workspace_dir / i)
         if item.is_dir():
             LOGGER.debug("Processing directory: %s", item)
             all_files.extend(get_files_from_dir(item, exts))
@@ -591,8 +570,6 @@ def process_files(
     exclusion=[],
     use_mmap=False,
     encoding="utf-8",
-    offset=0,
-    remove_offset=0,
 ):  # pylint: disable=too-many-arguments
     """
     Processes a list of files to check for the presence of copyright text.
@@ -607,11 +584,6 @@ def process_files(
         use_mmap (bool): Flag for using mmap function for reading files
                          (instead of standard option).
         encoding (str): Encoding type to use when reading the file.
-        offset (int): Additional number of characters to read beyond the length
-                      of `copyright_text`, used to account for extra content
-                      (such as a shebang) before the copyright text.
-        remove_offset(int): Flag for removing old header from source files
-                             (before applying the new one) in number of chars.
 
     Returns:
         int: The number of files that do not contain the required copyright text.
@@ -636,30 +608,28 @@ def process_files(
 
         # Automatically detect shebang and use its offset if no manual offset provided
         shebang_offset = detect_shebang_offset(item, encoding)
-        effective_offset = offset + shebang_offset if offset == 0 else offset
 
         if has_duplicate_copyright(
-            item, templates[key], use_mmap, encoding, effective_offset
+            item, templates[key], use_mmap, encoding, shebang_offset
         ):
             LOGGER.error("Duplicate copyright header in: %s", item)
             results["duplicate_copyright"] += 1
         elif not has_copyright(
-            item, templates[key], use_mmap, encoding, effective_offset
+            item, templates[key], use_mmap, encoding, shebang_offset
         ):
-            if has_any_copyright(item, use_mmap, encoding, effective_offset):
+            if has_any_copyright(item, use_mmap, encoding, shebang_offset):
                 LOGGER.warning(
                     "Wrong copyright format in: %s, expected format from template", item
                 )
             elif fix:
-                if remove_offset:
-                    remove_old_header(item, encoding, remove_offset)
                 fix_result = fix_copyright(
-                    item, templates[key], encoding, effective_offset
+                    item, templates[key], encoding, shebang_offset
                 )
                 results["no_copyright"] += 1
                 if fix_result:
                     results["fixed"] += 1
             else:
+                # TODO: Clean up error message file name
                 LOGGER.error(
                     "Missing copyright header in: %s, use --fix to introduce it", item
                 )
@@ -686,6 +656,7 @@ def parse_arguments(argv):
         "-t",
         "--template-file",
         type=Path,
+        required=False,
         default=Path(__file__).parent / "templates.ini",
         help="Path to the template file",
     )
@@ -714,7 +685,27 @@ def parse_arguments(argv):
         "--extensions",
         type=str,
         nargs="+",
-        default=["md","h", "hpp", "c", "cpp", "rs", "rst", "py", "sh", "bzl", "lni", "yml", "yaml", "trlc", "rsl", "puml", "svg", "BUILD", "bazel"],
+        default=[
+            "md",
+            "h",
+            "hpp",
+            "c",
+            "cpp",
+            "rs",
+            "rst",
+            "py",
+            "sh",
+            "bzl",
+            "lni",
+            "yml",
+            "yaml",
+            "trlc",
+            "rsl",
+            "puml",
+            "svg",
+            "BUILD",
+            "bazel",
+        ],
         help="List of extensions to filter when searching for files, e.g., '.h .cpp'",
     )
 
@@ -730,26 +721,9 @@ def parse_arguments(argv):
     )
 
     parser.add_argument(
-        "--offset",
-        dest="offset",
-        type=int,
-        default=0,
-        help="Additional length offset to account for characters like a shebang (default is 0)",
-    )
-
-    parser.add_argument(
-        "--remove-offset",
-        dest="remove_offset",
-        type=int,
-        default=0,
-        help="Offset to remove old header from beginning of the file \
-             (supported only with --fix mode)",
-    )
-
-    parser.add_argument(
         "inputs",
-        nargs="+",
-        action=ParamFileAction,
+        nargs="*",
+        default=None,
         help="Directories and/or files to parse.",
     )
 
@@ -798,58 +772,15 @@ def main(argv=None):
 
     LOGGER.debug("Running check on files: %s", files)
 
-    if args.fix and args.remove_offset:
-        LOGGER.info("%s!------DANGER ZONE------!%s", COLORS["RED"], COLORS["ENDC"])
-        LOGGER.info("Remove offset set! This can REMOVE parts of source files!")
-        LOGGER.info(
-            "Use ONLY if invalid copyright header is present that needs to be removed!"
-        )
-        LOGGER.info("%s!-----------------------!%s", COLORS["RED"], COLORS["ENDC"])
-
     results = process_files(
         files=files,
         templates=templates,
         fix=args.fix,
         exclusion=exclusion,
         encoding=args.encoding,
-        offset=args.offset,
-        remove_offset=args.remove_offset,
     )
     total_no = results["no_copyright"]
-    total_fixes = results["fixed"]
     total_duplicates = results["duplicate_copyright"]
-
-    LOGGER.info("=" * 64)
-    LOGGER.info("Process completed.")
-    LOGGER.info(
-        "Total files without copyright: %s%d%s",
-        COLORS["RED"] if total_no > 0 else COLORS["GREEN"],
-        total_no,
-        COLORS["ENDC"],
-    )
-    LOGGER.info(
-        "Total files with duplicate copyright: %s%d%s",
-        COLORS["RED"] if total_duplicates > 0 else COLORS["GREEN"],
-        total_duplicates,
-        COLORS["ENDC"],
-    )
-    if not exclusion_valid:
-        LOGGER.info("The exclusion file contains paths that do not exist.")
-    if args.fix:
-        total_not_fixed = total_no - total_fixes
-        LOGGER.info(
-            "Total files that were fixed: %s%d%s",
-            COLORS["GREEN"],
-            total_fixes,
-            COLORS["ENDC"],
-        )
-        LOGGER.info(
-            "Total files that were NOT fixed: %s%d%s",
-            COLORS["RED"] if total_not_fixed > 0 else COLORS["GREEN"],
-            total_not_fixed,
-            COLORS["ENDC"],
-        )
-    LOGGER.info("=" * 64)
 
     return 0 if (total_no == 0 and total_duplicates == 0 and exclusion_valid) else 1
 

@@ -17,9 +17,8 @@ load("@aspect_rules_py//py:defs.bzl", "py_binary")
 
 def copyright_checker(
         name,
-        srcs,
         visibility,
-        template,
+        template = None,
         exclusion = None,
         extensions = [],
         offset = 0,
@@ -56,10 +55,11 @@ def copyright_checker(
         "{}.check".format(name),
         "{}.fix".format(name),
     ]
-
-    args = [
-        "-t $(location {})".format(template),
-    ]
+    args = []
+    if template:
+        args.append(
+            "-t $(location {})".format(template),
+        )
     if len(extensions):
         args.append("-e {exts}".format(
             exts = " ".join([exts for exts in extensions]),
@@ -74,15 +74,13 @@ def copyright_checker(
     if debug:
         args.append("-v")
 
-    for src in srcs:
-        args.append("$(locations {})".format(src))
-
+    data = []
     for t_name in t_names:
         if t_name == "{}.fix".format(name):
             args.insert(0, "--fix")
 
-        data = srcs[:]
-        data.append(template)
+        if template:
+            data.append(template)
         if exclusion:
             data.append(exclusion)
 
@@ -90,7 +88,7 @@ def copyright_checker(
             name = t_name,
             main = "cr_checker.py",
             srcs = [
-                "@score_tooling//cr_checker/tool:cr_checker_lib",
+                "@score_tools//cr_checker/tool:cr_checker_lib",
             ],
             args = args,
             data = data,
