@@ -21,8 +21,6 @@ def copyright_checker(
         template = None,
         exclusion = None,
         extensions = [],
-        offset = 0,
-        remove_offset = 0,
         debug = False,
         fix = False,
         target_compatible_with = None):
@@ -32,7 +30,6 @@ def copyright_checker(
 
     Args:
         name (str): The name of the rule, used as an identifier in the build system.
-        srcs (list): A list of source file paths to check.
         visibility (list): A list defining the visibility of the rule, specifying which
                            targets can use this rule.
         template (str, optional): Path to the template resource used for validation.
@@ -41,8 +38,6 @@ def copyright_checker(
                                    File format: one path per line, relative to the repository root.
         extensions (list, optional): A list of file extensions to filter the source files.
                                      Defaults to an empty list, meaning all files are checked.
-        offset (int, optional): The line offset for applying checks or modifications.
-                                Defaults to 0.
         debug (bool, optional): Whether to enable debug mode, providing additional logs.
                                 Defaults to False.
         fix (bool, optional): Whether to apply fixes to files instead of just reporting issues.
@@ -67,9 +62,6 @@ def copyright_checker(
 
     if exclusion:
         args.append("--exclusion-file $(location {})".format(exclusion))
-
-    if offset:
-        args.append("--offset {}".format(offset))
 
     if debug:
         args.append("-v")

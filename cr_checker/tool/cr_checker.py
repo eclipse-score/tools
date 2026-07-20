@@ -15,7 +15,6 @@
 """The tool for checking if artifacts have proper copyright."""
 
 import argparse
-import json
 import logging
 import mmap
 import os
@@ -182,9 +181,9 @@ def load_exclusion(path):
     exclusion = []
     valid = True
     with open(path, "r", encoding="utf-8") as file:
-        exclusion = file.read().splitlines()
-
-        for item in exclusion:
+        exclusion_raw = file.read().splitlines()
+        exclusion = exclusion_raw
+        for item in exclusion_raw:
             path = Path(item)
             if not path.exists():
                 LOGGER.error("Excluded file %s does not exist.", item)
@@ -567,7 +566,7 @@ def process_files(
     files,
     templates,
     fix,
-    exclusion=[],
+    exclusion:list[str]|None =None,
     use_mmap=False,
     encoding="utf-8",
 ):  # pylint: disable=too-many-arguments
@@ -588,6 +587,8 @@ def process_files(
     Returns:
         int: The number of files that do not contain the required copyright text.
     """
+    if exclusion is None:
+        exclusion = []
     results = {"no_copyright": 0, "fixed": 0, "duplicate_copyright": 0}
     for item in files:
         name = Path(item).name

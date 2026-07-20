@@ -14,25 +14,26 @@
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-integration_tests:
-  runs-on: ubuntu-24.04
-  permissions:
-    contents: read
-    actions: write
-  steps:
-    - name: Checkout repository
-      uses: actions/checkout@v7.0.0
-    - uses: castler/setup-bazel@cache-optimized
-      with:
-        bazelisk-cache: true
-        disk-cache: integration_tests
-        repository-cache: true
-        cache-optimized: true
-        cache-save: ${{ github.ref == 'refs/heads/main' }}
-    # - name: Run python_basics integration tests
-    #   run: |
-    #     cd python_basics/integration_tests
-    #     bazel test //...
-    - name: Run cr_checker unit tests
-      run: |
-        uv run pytest cr_checker/tests/
+jobs:
+  integration_tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.0
+      - uses: castler/setup-bazel@cache-optimized
+        with:
+          bazelisk-cache: true
+          disk-cache: integration_tests
+          repository-cache: true
+          cache-optimized: true
+          cache-save: ${{ github.ref == 'refs/heads/main' }}
+      # - name: Run python_basics integration tests
+      #   run: |
+      #     cd python_basics/integration_tests
+      #     bazel test //...
+      - name: Run cr_checker unit tests
+        run: |
+          uv run pytest cr_checker/tests/
