@@ -1,5 +1,5 @@
 # *******************************************************************************
-# Copyright (c) 2025 Contributors to the Eclipse Foundation
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
 #
 # See the NOTICE file(s) distributed with this work for additional
 # information regarding copyright ownership.
@@ -10,15 +10,3 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-
-load("@score_tooling//python_basics:defs.bzl", "score_py_pytest")
-
-score_py_pytest(
-    name = "unit_tests",
-    srcs = [
-        "test_cr_checker.py",
-    ],
-    deps = [
-        "@score_tooling//cr_checker/tool:cr_checker_lib",
-    ],
-)

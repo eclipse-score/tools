@@ -432,7 +432,7 @@ def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
     header1 = header_template.format(year="2026")
-    header2 = header_template.format(year="2024-2026")
+    header2 = header_template.format(year="2024-2026"
     test_file.write_text(header1 + header2 + "some content\n", encoding="utf-8")
 
     result = cr_checker.has_duplicate_copyright(
