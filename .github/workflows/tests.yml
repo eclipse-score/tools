@@ -15,7 +15,7 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 jobs:
-  integration_tests:
+  tests:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -30,6 +30,8 @@ jobs:
           repository-cache: true
           cache-optimized: true
           cache-save: ${{ github.ref == 'refs/heads/main' }}
+      - name: ⚙️ Setup uv
+        uses: astral-sh/setup-uv@v7
       # - name: Run python_basics integration tests
       #   run: |
       #     cd python_basics/integration_tests
