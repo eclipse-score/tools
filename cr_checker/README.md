@@ -154,12 +154,12 @@ To integrate copyright verification into your Bazel-based project, you can use t
 #### Usage
 
 ```python
-load("@score_cr_checker//cr_checker:def.bzl", "copyright_checker")
+load("@score_tools//cr_checker:def.bzl", "copyright_checker")
 copyright_checker(
     name = "copyright_check",
     srcs = glob(["src/**/*.cpp", "src/**/*.h"]),
-    config = "@score_cr_checker//tools/cr_checker/resources:config",
-    template = "@score_cr_checker//tools/cr_checker/resources:templates",
+    config = "@score_tools//cr_checker/resources:config",
+    template = "@score_tools//cr_checker/resources:templates",
     visibility = ["//visibility:public"],
 )
 ```

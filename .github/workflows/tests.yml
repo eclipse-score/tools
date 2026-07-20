@@ -10,6 +10,11 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
+#
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
 integration_tests:
   runs-on: ubuntu-24.04
   permissions:
