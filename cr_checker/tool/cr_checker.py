@@ -718,13 +718,6 @@ def parse_arguments(argv):
     )
 
     parser.add_argument(
-        "--use_memory_map",
-        action="store_true",
-        help="Use memory map for reading content of files \
-              (should be used reading gigabyte ranged files).",
-    )
-
-    parser.add_argument(
         "-f",
         "--fix",
         action="store_true",
@@ -818,7 +811,6 @@ def main(argv=None):
         args.fix,
         exclusion,
         args.config_file,
-        args.use_memory_map,
         args.encoding,
         args.offset,
         args.remove_offset,

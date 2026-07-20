@@ -25,7 +25,6 @@ def copyright_checker(
         offset = 0,
         remove_offset = 0,
         debug = False,
-        use_memory_map = False,
         fix = False,
         target_compatible_with = None):
     """
@@ -47,8 +46,6 @@ def copyright_checker(
                                 Defaults to 0.
         debug (bool, optional): Whether to enable debug mode, providing additional logs.
                                 Defaults to False.
-        use_memory_map (bool, optional): Whether to use memory mapping for large files to
-                                         improve performance. Defaults to False.
         fix (bool, optional): Whether to apply fixes to files instead of just reporting issues.
                                          Defaults to False.
 
@@ -76,9 +73,6 @@ def copyright_checker(
 
     if debug:
         args.append("-v")
-
-    if use_memory_map:
-        args.append("--use_memory_map")
 
     for src in srcs:
         args.append("$(locations {})".format(src))

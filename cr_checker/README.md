@@ -48,7 +48,6 @@ python cr_checker.py -t <template_file> [options] <inputs>
 - **-v**, **--verbose**: Enable debug-level logging.
 - **-l**, **--log-file**: Path to a log file where logs will be saved. If not provided, logs will print to the console.
 - **-e**, **--extensions**: List of file extensions to filter, e.g., -e .py .cpp.
-- **--use_memory_map**: Use memory-mapped file reading for large files.
 - **--encoding**: File encoding (default is utf-8).
 - **--offset**: Additional offset for the header length to account for lines like a shebang.
 - **--fix**: Setting script into fix mode where copyright header will be added to the files if it's missing from same.
@@ -64,9 +63,9 @@ python cr_checker.py -t <template_file> [options] <inputs>
 ```sh
 python cr_checker.py -t templates.ini -e py cpp -v -l logs.txt my_random_file.cpp my_random_file.py
 
-python cr_checker.py -t templates.ini -e py cpp --offset 24 --use_memory_map @files_to_check.txt
+python cr_checker.py -t templates.ini -e py cpp --offset 24 @files_to_check.txt
 
-python cr_checker.py -t templates.ini -e py cpp --fix --offset 24 --use_memory_map @files_to_check.txt
+python cr_checker.py -t templates.ini -e py cpp --fix --offset 24 @files_to_check.txt
 
 ```
 
@@ -83,7 +82,7 @@ import os
 and we use following command:
 
 ```sh
-python cr_checker.py -t templates.ini -e py cpp --fix --use_memory_map @files_to_check.txt
+python cr_checker.py -t templates.ini -e py cpp --fix @files_to_check.txt
 ```
 
 The result will be following:
@@ -175,7 +174,6 @@ copyright_checker(
 - **offset** (optional): Line offset for checking/modifying files.
 - **remove_offset** (optional): Number of characters to remove from the beginning of the file.
 - **debug** (optional): Enables verbose logging for debugging.
-- **use_memory_map** (optional): Uses memory-mapped files for performance optimization.
 - **fix** (optional): Automatically applies fixes instead of just reporting issues.
 
 ### Integrate `cr_checker` using Bazel module
