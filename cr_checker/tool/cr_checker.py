@@ -584,6 +584,7 @@ def fix_copyright(path, copyright_text, encoding, offset) -> bool:
 
 
 def process_files(
+    *,
     files,
     templates,
     fix,
@@ -685,7 +686,7 @@ def parse_arguments(argv):
         "-t",
         "--template-file",
         type=Path,
-        required=True,
+        default=Path(__file__).parent / "templates.ini",
         help="Path to the template file",
     )
 
@@ -713,7 +714,7 @@ def parse_arguments(argv):
         "--extensions",
         type=str,
         nargs="+",
-        default=None,
+        default=["h", "hpp", "c", "cpp", "rs", "rst", "py", "sh", "bzl", "lni", "yml", "yaml", "trlc", "rsl", "puml", "svg", "BUILD", "bazel"],
         help="List of extensions to filter when searching for files, e.g., '.h .cpp'",
     )
 
@@ -806,14 +807,13 @@ def main(argv=None):
         LOGGER.info("%s!-----------------------!%s", COLORS["RED"], COLORS["ENDC"])
 
     results = process_files(
-        files,
-        templates,
-        args.fix,
-        exclusion,
-        args.config_file,
-        args.encoding,
-        args.offset,
-        args.remove_offset,
+        files=files,
+        templates=templates,
+        fix=args.fix,
+        exclusion=exclusion,
+        encoding=args.encoding,
+        offset=args.offset,
+        remove_offset=args.remove_offset,
     )
     total_no = results["no_copyright"]
     total_fixes = results["fixed"]

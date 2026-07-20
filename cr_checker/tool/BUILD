@@ -12,10 +12,12 @@
 # *******************************************************************************
 load("@aspect_rules_py//py:defs.bzl", "py_library")
 
+
 py_library(
     name = "cr_checker_lib",
     srcs = [
         "cr_checker.py",
+        "templates.ini",
     ],
     visibility = ["//visibility:public"],
 )
