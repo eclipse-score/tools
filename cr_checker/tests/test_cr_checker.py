@@ -1,0 +1,417 @@
+# *******************************************************************************
+# Copyright (c) 2024 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+# unit tests for the shebang handling in the cr_checker module
+from __future__ import annotations
+
+import importlib.util
+import pytest
+from datetime import datetime
+from pathlib import Path
+
+
+# load the cr_checker module
+def load_cr_checker_module():
+    module_path = Path(__file__).resolve().parents[1] / "tool" / "cr_checker.py"
+    spec = importlib.util.spec_from_file_location("cr_checker_module", module_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Failed to load cr_checker module from {module_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+# load the license template
+def load_template(extension: str) -> str:
+    cr_checker = load_cr_checker_module()
+    template_file = Path(__file__).resolve().parents[1] / "tool" / "templates.ini"
+    templates = cr_checker.load_templates(template_file)
+    return templates[extension]
+
+
+
+# test that offset matches the length of the shebang line including trailing newlines
+def test_detect_shebang_offset_counts_trailing_newlines(tmp_path):
+    cr_checker = load_cr_checker_module()
+    script = tmp_path / "script.py"
+    script.write_text(
+        "#!/usr/bin/env python3\n\nprint('hi')\n",
+        encoding="utf-8",
+    )
+
+    offset = cr_checker.detect_shebang_offset(script, "utf-8")
+
+    assert offset == len("#!/usr/bin/env python3\n\n".encode("utf-8"))
+
+
+@pytest.fixture(
+    params=[
+        "cpp",
+        "c",
+        "h",
+        "hpp",
+        "py",
+        "sh",
+        "bzl",
+        "ini",
+        "yml",
+        "yaml",
+        "BUILD",
+        "bazel",
+        "rs",
+        "rst",
+    ]
+)
+def prepare_test_with_header(request: SubRequest, tmp_path: PosixPath) -> tuple:
+    extension = request.param
+    test_file = tmp_path / ("file." + extension)
+    header_template = load_template(extension)
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    test_file.write_text(
+        header + "some content\n",
+        encoding="utf-8",
+    )
+    return test_file, extension, header_template
+
+
+@pytest.fixture(
+    params=[
+        "cpp",
+        "c",
+        "h",
+        "hpp",
+        "py",
+        "sh",
+        "bzl",
+        "ini",
+        "yml",
+        "yaml",
+        "BUILD",
+        "bazel",
+        "rs",
+        "rst",
+    ]
+)
+def prepare_test_no_header(request: SubRequest, tmp_path: PosixPath) -> tuple:
+    extension = request.param
+    test_file = tmp_path / ("file." + extension)
+    header_template = load_template(extension)
+    current_year = datetime.now().year
+    test_file.write_text(
+        "some content\n",
+        encoding="utf-8",
+    )
+    return test_file, extension, header_template, tmp_path
+
+
+def test_process_files_detects_header(prepare_test_with_header):
+    cr_checker = load_cr_checker_module()
+    test_file, extension, header_template = prepare_test_with_header
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={extension: header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+
+
+def test_process_files_detects_missing_header(prepare_test_no_header):
+    cr_checker = load_cr_checker_module()
+    test_file, extension, header_template, tmp_path = prepare_test_no_header
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={extension: header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 1
+
+
+def test_process_files_inserts_missing_header(prepare_test_no_header):
+    cr_checker = load_cr_checker_module()
+    test_file, extension, header_template, tmp_path = prepare_test_no_header
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={extension: header_template},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 1
+    assert results["fixed"] == 1
+    expected_header = header_template.format(year=datetime.now().year)
+    assert test_file.read_text(encoding="utf-8").startswith(expected_header)
+
+
+def test_process_files_skips_exclusion_with_missing_header(prepare_test_no_header):
+    cr_checker = load_cr_checker_module()
+    test_file, extension, header_template, tmp_path = prepare_test_no_header
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={extension: header_template},
+        fix=False,
+        exclusion=[str(test_file)],
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+
+
+# test that process_files function validates a license header after the shebang line
+def test_process_files_accepts_header_after_shebang(tmp_path):
+    cr_checker = load_cr_checker_module()
+    script = tmp_path / "script.py"
+    header_template = load_template("py")
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    script.write_text(
+        "#!/usr/bin/env python3\n" + header + "print('hi')\n",
+        encoding="utf-8",
+    )
+
+    results = cr_checker.process_files(
+        files=[script],
+        templates={"py": header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+
+
+# test that process_files function fixes a missing license header after the shebang line
+def test_process_files_fix_inserts_header_after_shebang(tmp_path):
+    cr_checker = load_cr_checker_module()
+    script = tmp_path / "script.py"
+    script.write_text(
+        "#!/usr/bin/env python3\nprint('hi')\n",
+        encoding="utf-8",
+    )
+    header_template = load_template("py")
+    current_year = datetime.now().year
+
+    results = cr_checker.process_files(
+        files=[script],
+        templates={"py": header_template},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["fixed"] == 1
+    assert results["no_copyright"] == 1
+    expected_header = header_template.format(year=current_year)
+    assert script.read_text(encoding="utf-8") == (
+        "#!/usr/bin/env python3\n" + expected_header + "\n" + "print('hi')\n"
+    )
+
+
+# test that process_files function validates a license header without the shebang line
+def test_process_files_accepts_header_without_shebang(tmp_path):
+    cr_checker = load_cr_checker_module()
+    script = tmp_path / "script.py"
+    header_template = load_template("py")
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    script.write_text(header + "print('hi')\n", encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[script],
+        templates={"py": header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+
+
+# test that process_files function fixes a missing license header without the shebang
+def test_process_files_fix_inserts_header_without_shebang(tmp_path):
+    cr_checker = load_cr_checker_module()
+    script = tmp_path / "script.py"
+    script.write_text("print('hi')\n", encoding="utf-8")
+    header_template = load_template("py")
+    current_year = datetime.now().year
+
+    results = cr_checker.process_files(
+        files=[script],
+        templates={"py": header_template},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["fixed"] == 1
+    assert results["no_copyright"] == 1
+    expected_header = header_template.format(year=current_year)
+    assert (
+        script.read_text(encoding="utf-8") == expected_header + "\n" + "print('hi')\n"
+    )
+
+
+# test that border lines with different fill characters are accepted (flexible matching)
+def test_process_files_accepts_flexible_border(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.cpp"
+    current_year = datetime.now().year
+    # Use '/' fill chars instead of '*' for border lines
+    header = (
+        "/////////////////////////////////////////////////////////////////////////////////////\n"
+        f" * Copyright (c) {current_year} Author\n"
+        " *\n"
+        " * See the NOTICE file(s) distributed with this work for additional\n"
+        " * information regarding copyright ownership.\n"
+        " *\n"
+        " * This program and the accompanying materials are made available under the\n"
+        " * terms of the Apache License Version 2.0 which is available at\n"
+        " * https://www.apache.org/licenses/LICENSE-2.0\n"
+        " *\n"
+        " * SPDX-" "License-Identifier: Apache-2.0\n"
+        " /////////////////////////////////////////////////////////////////////////////////////\n"
+    )
+    test_file.write_text(header + "int main() {}\n", encoding="utf-8")
+    header_template = load_template("cpp")
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"cpp": header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+
+
+# test that a blank line after the header does not cause a check failure
+def test_process_files_accepts_header_with_trailing_blank_line(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    header_template = load_template("py")
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    test_file.write_text(header + "\nsome content\n", encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"py": header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+
+
+# test that fix_copyright inserts a blank line after the header
+def test_process_files_fix_inserts_trailing_blank_line(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    test_file.write_text("some content\n", encoding="utf-8")
+    header_template = load_template("py")
+    current_year = datetime.now().year
+
+    cr_checker.process_files(
+        files=[test_file],
+        templates={"py": header_template},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    expected_header = header_template.format(year=current_year)
+    assert test_file.read_text(encoding="utf-8").startswith(expected_header + "\n")
+
+
+# test that has_duplicate_copyright detects a header that appears twice
+def test_has_duplicate_copyright_detects_duplicate(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    header_template = load_template("py")
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    test_file.write_text(header + header + "some content\n", encoding="utf-8")
+
+    result = cr_checker.has_duplicate_copyright(
+        test_file, header_template, False, "utf-8", 0
+    )
+
+    assert result is True
+
+
+# test that has_duplicate_copyright returns False for a single header
+def test_has_duplicate_copyright_single_header(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    header_template = load_template("py")
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    test_file.write_text(header + "some content\n", encoding="utf-8")
+
+    result = cr_checker.has_duplicate_copyright(
+        test_file, header_template, False, "utf-8", 0
+    )
+
+    assert result is False
+
+
+# test that process_files counts duplicate headers separately from missing headers
+def test_process_files_detects_duplicate_header(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    header_template = load_template("py")
+    current_year = datetime.now().year
+    header = header_template.format(year=current_year)
+    test_file.write_text(header + header + "some content\n", encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"py": header_template},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["duplicate_copyright"] == 1
+    assert results["no_copyright"] == 0
+
+
+# test that has_duplicate_copyright detects two headers with different year ranges
+def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    header_template = load_template("py")
+    header1 = header_template.format(year="2026")
+    header2 = header_template.format(year="2024-2026")
+    test_file.write_text(header1 + header2 + "some content\n", encoding="utf-8")
+
+    result = cr_checker.has_duplicate_copyright(
+        test_file, header_template, False, "utf-8", 0
+    )
+
+    assert result is True

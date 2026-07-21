@@ -1,0 +1,37 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # v6.0.0
+    hooks:
+      - id: check-yaml
+      - id: end-of-file-fixer
+        exclude: requirements_lock.txt|\.svg$
+      - id: trailing-whitespace
+      - id: check-shebang-scripts-are-executable
+      - id: check-executables-have-shebangs
+      - id: check-added-large-files
+        args: [--maxkb=100, --enforce-all] # increase or add git lfs if too strict
+        exclude: org.eclipse.dash.licenses-1.1.0.jar|blanket_index.html
+  - repo: https://github.com/google/yamlfmt
+    rev: 21ca5323a9c87ee37a434e0ca908efc0a89daa07 # v0.21.0
+    hooks:
+      - id: yamlfmt
+  # Ensure every file has a copyright header as per the Eclipse Foundation's requirements
+  - repo: local
+    hooks:
+      - id: copyright
+        name: Check and fix copyright headers with cr_checker
+        entry: cr_checker/tool/cr_checker.py --exclusion copyright_exclusions.txt --fix
+        language: script
+        minimum_pre_commit_version: 3.2.0
