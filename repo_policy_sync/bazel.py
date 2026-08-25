@@ -34,6 +34,7 @@ def parse_bazel_version(value: str) -> BazelVersion | None:
     match = _VERSION.fullmatch(value)
     return tuple(int(component) for component in match.groups()) if match else None
 
+
 def parse_bazel_dependency_condition(value: str) -> BazelDependencyCondition | None:
     """Parse ``module OP major.minor.patch`` condition syntax."""
 
