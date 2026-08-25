@@ -793,6 +793,7 @@ def test_close_pull_request_uses_gh(monkeypatch) -> None:
             "https://github.example/owner/repo/pull/1",
             "--repo",
             "owner/repo",
+            "--delete-branch",
         ]
     ]
 
@@ -1039,7 +1040,13 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
                     "body": "<!-- repo-policy-sync-policy: example -->\n"
                     "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
                     "mergedAt": "2026-01-01T00:00:00Z",
-                }
+                },
+                {
+                    "number": 99,
+                    "url": "https://github.example/owner/repo/pull/99",
+                    "body": "a historical PR owned by another tool",
+                    "mergedAt": "2026-02-01T00:00:00Z",
+                },
             ]
         )
 

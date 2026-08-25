@@ -39,6 +39,10 @@ authoritative source for the complete schema, validation rules, and examples.
 All operations accept an optional `rationale`. When a change is needed, the
 rationale is included with the generated change description.
 
+The devcontainer migration rejects moving a root `.devcontainer.json` when it
+contains path-sensitive `build`, `dockerComposeFile`, `mounts`, or
+`workspaceMount` settings whose relative meaning would change.
+
 ## Common rules
 
 - Operation paths are relative to the repository root unless the policy

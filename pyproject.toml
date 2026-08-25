@@ -1,6 +1,6 @@
 [project]
 name = "tools"
-version = "0.0.0"
+version = "0.1.0"
 description = "Gathering of different small tools used throughout S-CORE"
 readme = "README.md"
 requires-python = ">=3.12"

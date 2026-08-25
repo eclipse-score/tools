@@ -27,6 +27,7 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
+    validate_repository_path,
 )
 
 
@@ -95,6 +96,7 @@ class SynchronizeFileOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
+        validate_repository_path(root, path)
         _validate_target(path, operation)
         content_changed = not path.is_file() or (
             _desired_contents(path, operation) != path.read_text(encoding="utf-8")
@@ -121,6 +123,7 @@ class SynchronizeFileOperation:
     ) -> None:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
+        validate_repository_path(root, path)
         _validate_target(path, operation)
         desired_contents = _desired_contents(path, operation)
         if not path.is_file() or path.read_text(encoding="utf-8") != desired_contents:
@@ -237,7 +240,9 @@ def _merge_workflow_content(
                 merged = _merge_matching_job_permissions(merged, source, rules)
             else:
                 merged = _append_workflow_job(merged, source, rules)
-    return merged
+    # Workflow files are line-oriented YAML; always leave a separator for a
+    # following section and a final newline for tools that rewrite the file.
+    return merged if merged.endswith("\n") else merged + "\n"
 
 
 def _replace_top_level_section(existing: str, source: str, key: str) -> str:
@@ -259,9 +264,14 @@ def _replace_top_level_section(existing: str, source: str, key: str) -> str:
             + existing[insert_at:]
         )
     start, end = existing_section
+    replacement = source[source_section[0] : source_section[1]]
+    if existing[end:] and not replacement.endswith("\n"):
+        # A source section without a trailing newline would otherwise join the
+        # next existing top-level key into the same YAML line.
+        replacement += "\n"
     return (
         existing[:start]
-        + source[source_section[0] : source_section[1]]
+        + replacement
         + existing[end:]
     )
 
@@ -302,11 +312,8 @@ def _append_workflow_job(
 
     source_job_name = _job_name(source_job)
     existing_job_names = {
-        match.group(1)
-        for match in re.finditer(
-            r"(?m)^  ([^\s#][^:\n]*):[^\n]*(?:\n|$)",
-            existing[existing_jobs[0] : existing_jobs[1]],
-        )
+        match.group("name")
+        for match in _mapping_entries(existing[existing_jobs[0] : existing_jobs[1]])
     }
     if source_job_name is not None and source_job_name in existing_job_names:
         raise RepoPolicySyncError(
@@ -357,7 +364,7 @@ def _merge_matching_job_permissions(
 
 
 def _job_name(job_block: str) -> str | None:
-    match = re.match(r"  ([^\s#][^:\n]*):", job_block)
+    match = re.match(r"[ \t]+([^\s#][^:\n]*):", job_block)
     return match.group(1) if match is not None else None
 
 
@@ -373,9 +380,7 @@ def _matching_job_location(
     jobs_section: str,
     rules: tuple[tuple[str, tuple[int, int, int]], ...],
 ) -> tuple[int, int] | None:
-    job_lines = list(
-        re.finditer(r"(?m)^  ([^\s#][^:\n]*):[^\n]*(?:\n|$)", jobs_section)
-    )
+    job_lines = _mapping_entries(jobs_section)
     for index, match in enumerate(job_lines):
         end = (
             job_lines[index + 1].start()
@@ -389,13 +394,47 @@ def _matching_job_location(
 
 
 def _nested_job_section(text: str, key: str) -> tuple[int, int] | None:
-    lines = list(re.finditer(r"(?m)^    ([^\s#][^:\n]*):[^\n]*(?:\n|$)", text))
+    lines = _mapping_entries(text, nested=True)
     for index, match in enumerate(lines):
-        if match.group(1).strip().strip("\"'") != key:
+        if match.group("name").strip().strip("\"'") != key:
             continue
         end = lines[index + 1].start() if index + 1 < len(lines) else len(text)
         return match.start(), end
     return None
+
+
+def _mapping_entries(
+    text: str, *, nested: bool = False
+) -> list[re.Match[str]]:
+    """Return mapping entries at the relevant indentation level.
+
+    Workflow files commonly use two or four spaces. Selecting the first
+    mapping indentation present keeps job detection independent of that local
+    style without attempting to parse all of YAML.
+    """
+
+    candidates = list(
+        re.finditer(
+            r"(?m)^(?P<indent>[ \t]+)(?P<name>[^\s#][^:\n]*):[^\n]*(?:\n|$)",
+            text,
+        )
+    )
+    if not candidates:
+        return []
+    widths = [len(match.group("indent").expandtabs(8)) for match in candidates]
+    if nested:
+        parent_width = widths[0]
+        child_widths = [width for width in widths if width > parent_width]
+        if not child_widths:
+            return []
+        target_width = min(child_widths)
+    else:
+        target_width = min(widths)
+    return [
+        match
+        for match, width in zip(candidates, widths)
+        if width == target_width
+    ]
 
 
 def _preserved_ref(

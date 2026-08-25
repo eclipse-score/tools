@@ -29,6 +29,7 @@ from ._validation import (
     required_string,
     safe_relative_path,
     string_list,
+    validate_repository_path,
 )
 
 _VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
@@ -111,7 +112,11 @@ class MigrateDevcontainerJsonOperation:
             return ()
         dockerfile = root / operation.dockerfile
         destination = root / operation.destination
-        migration = _migration_contents(source, operation, organization)
+        validate_repository_path(root, dockerfile)
+        validate_repository_path(root, destination)
+        migration = _migration_contents(
+            source, source_relative, operation, organization
+        )
         if migration is None:
             return ()
         dockerfile_contents, destination_contents = migration
@@ -170,12 +175,16 @@ class MigrateDevcontainerJsonOperation:
         organization: str | None = None,
     ) -> None:
         assert isinstance(operation, MigrateDevcontainerJson)
-        _, source = _find_source(root, operation)
-        if source is None:
+        source_relative, source = _find_source(root, operation)
+        if source is None or source_relative is None:
             return
         dockerfile = root / operation.dockerfile
         destination = root / operation.destination
-        migration = _migration_contents(source, operation, organization)
+        validate_repository_path(root, dockerfile)
+        validate_repository_path(root, destination)
+        migration = _migration_contents(
+            source, source_relative, operation, organization
+        )
         if migration is None:
             return
         dockerfile_contents, destination_contents = migration
@@ -212,6 +221,7 @@ def _find_source(
     matches: list[tuple[Path, Path]] = []
     for path in operation.sources:
         candidate = root / path
+        validate_repository_path(root, candidate)
         if candidate.exists():
             matches.append((path, candidate))
     if len(matches) > 1:
@@ -223,7 +233,10 @@ def _find_source(
 
 
 def _migration_contents(
-    source: Path, operation: MigrateDevcontainerJson, organization: str | None
+    source: Path,
+    source_relative: Path,
+    operation: MigrateDevcontainerJson,
+    organization: str | None,
 ) -> tuple[str, str] | None:
     if not source.is_file():
         raise RepoPolicySyncError(f"{source} must be a file")
@@ -236,6 +249,22 @@ def _migration_contents(
         ) from exc
     if not isinstance(configuration, dict):
         raise RepoPolicySyncError(f"{source} must contain a JSON object")
+    if source_relative.parent == Path(".") and operation.destination != source_relative:
+        # Moving a root config into .devcontainer changes the base directory for
+        # these fields. Refuse the ambiguous case instead of guessing rewrites.
+        location_sensitive_keys = {
+            "build",
+            "dockerComposeFile",
+            "mounts",
+            "workspaceMount",
+        }
+        affected_keys = sorted(location_sensitive_keys.intersection(configuration))
+        if affected_keys:
+            keys = ", ".join(affected_keys)
+            raise RepoPolicySyncError(
+                f"refusing to move root {source_relative}: relative paths in {keys} "
+                "would change meaning"
+            )
     image = configuration.get("image")
     prefix = f"{operation.image}:"
     if not isinstance(image, str) or not image.startswith(prefix):

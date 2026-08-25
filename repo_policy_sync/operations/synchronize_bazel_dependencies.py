@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..bazel import parse_bazel_version
+from ..bazel import parse_bazel_version, starlark_call_ranges
 from ..errors import PolicyError, RepoPolicySyncError
 from ..models import (
     BazelDependencyUpdate,
@@ -34,13 +34,12 @@ from ._validation import (
     required_string,
     safe_relative_path,
     string_list,
+    validate_repository_path,
 )
 
 # Keep the complete call text so argument values can be located exactly.
-_BAZEL_DEP_CALL = re.compile(r"bazel_dep\s*\((.*?)\)", re.DOTALL)
 _NAME_ARGUMENT = re.compile(r"\bname\s*=\s*([\"'])([^\"']+)\1")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*([\"'])([^\"']*)\1")
-_GIT_OVERRIDE_CALL = re.compile(r"git_override\s*\((.*?)\)", re.DOTALL)
 _MODULE_NAME_ARGUMENT = re.compile(r"\bmodule_name\s*=\s*([\"'])([^\"']+)\1")
 _COMMIT_ARGUMENT = re.compile(r"\bcommit\s*=\s*([\"'])([^\"']*)\1")
 _REMOTE_ARGUMENT = re.compile(r"\bremote\s*=\s*([\"'])([^\"']*)\1")
@@ -135,6 +134,7 @@ class SynchronizeBazelDependenciesOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, SynchronizeBazelDependencies)
         module_path = root / operation.module_file
+        validate_repository_path(root, module_path)
         # Validation happens while collecting replacements, even when no text changes.
         replacements, locations = _module_replacements(module_path, operation)
         changes: list[Change] = []
@@ -168,6 +168,7 @@ class SynchronizeBazelDependenciesOperation:
     ) -> None:
         assert isinstance(operation, SynchronizeBazelDependencies)
         module_path = root / operation.module_file
+        validate_repository_path(root, module_path)
         replacements, locations = _module_replacements(module_path, operation)
         if replacements:
             text = module_path.read_text(encoding="utf-8")
@@ -285,12 +286,17 @@ def _replace_build_references(text: str, pairs: tuple[tuple[str, str], ...]) -> 
         return text
     replacements = dict(pairs)
     names = sorted(replacements, key=lambda name: (-len(name), name))
+    # Only external labels have @ or @@. Requiring that marker avoids changing
+    # local target names that happen to contain the old module name.
     pattern = re.compile(
-        r"(?<![A-Za-z0-9_])(?P<module>"
+        r"(?P<prefix>@@?)(?P<module>"
         + "|".join(re.escape(name) for name in names)
-        + r")(?![A-Za-z0-9_])"
+        + r")(?=//)"
     )
-    return pattern.sub(lambda match: replacements[match.group("module")], text)
+    return pattern.sub(
+        lambda match: match.group("prefix") + replacements[match.group("module")],
+        text,
+    )
 
 
 def _build_reference_description(pairs: tuple[tuple[str, str], ...]) -> str:
@@ -396,8 +402,10 @@ def _git_override_locations(
         for name in _dependency_names(dependency)
     }
     locations: dict[str, _GitOverrideLocation] = {}
-    for call in _GIT_OVERRIDE_CALL.finditer(text):
-        module_name_matches = list(_MODULE_NAME_ARGUMENT.finditer(call.group(1)))
+    for body_start, body_end in starlark_call_ranges(text, "git_override"):
+        # Commented examples are not active overrides and must remain unchanged.
+        body = text[body_start:body_end]
+        module_name_matches = list(_MODULE_NAME_ARGUMENT.finditer(body))
         matching_names = [
             match for match in module_name_matches if match.group(2) in configured_names
         ]
@@ -415,37 +423,36 @@ def _git_override_locations(
                 f"{operation.module_file} must contain at most one git_override for "
                 f"{module_name!r}"
             )
-        commit_matches = list(_COMMIT_ARGUMENT.finditer(call.group(1)))
+        commit_matches = list(_COMMIT_ARGUMENT.finditer(body))
         if len(commit_matches) != 1:
             raise RepoPolicySyncError(
                 f"{operation.module_file} git_override for {module_name!r} must declare "
                 "commit exactly once"
             )
         commit_match = commit_matches[0]
-        remote_matches = list(_REMOTE_ARGUMENT.finditer(call.group(1)))
+        remote_matches = list(_REMOTE_ARGUMENT.finditer(body))
         if len(remote_matches) > 1:
             raise RepoPolicySyncError(
                 f"{operation.module_file} git_override for {module_name!r} must declare "
                 "remote at most once"
             )
         remote_match = remote_matches[0] if remote_matches else None
-        call_content_start = call.start(1)
         locations[module_name] = _GitOverrideLocation(
             module_name=module_name,
             commit=commit_match.group(2),
-            module_name_start=call_content_start + module_name_match.start(2),
-            module_name_end=call_content_start + module_name_match.end(2),
-            commit_start=call_content_start + commit_match.start(2),
-            commit_end=call_content_start + commit_match.end(2),
+            module_name_start=body_start + module_name_match.start(2),
+            module_name_end=body_start + module_name_match.end(2),
+            commit_start=body_start + commit_match.start(2),
+            commit_end=body_start + commit_match.end(2),
             remote=remote_match.group(2) if remote_match else None,
-            remote_start=(call_content_start + remote_match.start(2))
+            remote_start=(body_start + remote_match.start(2))
             if remote_match
             else None,
-            remote_end=(call_content_start + remote_match.end(2))
+            remote_end=(body_start + remote_match.end(2))
             if remote_match
             else None,
-            remote_insertion=call.end(1),
-            remote_insertion_prefix="" if call.group(1).endswith("\n") else "\n",
+            remote_insertion=body_end,
+            remote_insertion_prefix="" if body.endswith("\n") else "\n",
         )
     return locations
 
@@ -459,8 +466,11 @@ def _module_locations(
         for dependency in operation.dependencies
         for name in _dependency_names(dependency)
     }
-    for call in _BAZEL_DEP_CALL.finditer(text):
-        name_matches = list(_NAME_ARGUMENT.finditer(call.group(1)))
+    for body_start, body_end in starlark_call_ranges(text, "bazel_dep"):
+        # Only active bazel_dep calls participate in synchronization; comments
+        # often document an old dependency and must not affect the result.
+        body = text[body_start:body_end]
+        name_matches = list(_NAME_ARGUMENT.finditer(body))
         matching_names = [
             match for match in name_matches if match.group(2) in configured_names
         ]
@@ -479,7 +489,7 @@ def _module_locations(
             raise RepoPolicySyncError(
                 f"{operation.module_file} must contain at most one bazel_dep for {name!r}"
             )
-        version_matches = list(_VERSION_ARGUMENT.finditer(call.group(1)))
+        version_matches = list(_VERSION_ARGUMENT.finditer(body))
         if len(version_matches) != 1:
             raise RepoPolicySyncError(
                 f"{operation.module_file} bazel_dep for {name!r} must declare version exactly once"
@@ -491,14 +501,13 @@ def _module_locations(
             raise RepoPolicySyncError(
                 f"{operation.module_file} bazel_dep for {name!r} must use X.Y.Z, found {version_text!r}"
             )
-        call_content_start = call.start(1)
         locations[name] = _DependencyLocation(
             name=name,
             version=version,
-            name_start=call_content_start + name_match.start(2),
-            name_end=call_content_start + name_match.end(2),
-            version_start=call_content_start + version_match.start(2),
-            version_end=call_content_start + version_match.end(2),
+            name_start=body_start + name_match.start(2),
+            name_end=body_start + name_match.end(2),
+            version_start=body_start + version_match.start(2),
+            version_end=body_start + version_match.end(2),
         )
     for dependency in operation.dependencies:
         # A migration may find either its old name or its new name, but never both.
@@ -521,11 +530,14 @@ def _build_files(
     root: Path, operation: SynchronizeBazelDependencies
 ) -> tuple[Path, ...]:
     # BUILD files are selected by basename because Bazel allows them in every package.
-    return tuple(
-        path
-        for path in sorted(root.rglob("*"))
-        # Git metadata is not part of the repository content being synchronized.
-        if path.is_file()
-        and path.name in operation.build_file_names
-        and ".git" not in path.relative_to(root).parts
-    )
+    paths: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if ".git" in relative.parts:
+            continue
+        # Validate every discovered path before filtering so a symlinked
+        # directory cannot be followed later when a BUILD file is read.
+        validate_repository_path(root, path)
+        if path.is_file() and path.name in operation.build_file_names:
+            paths.append(path)
+    return tuple(paths)

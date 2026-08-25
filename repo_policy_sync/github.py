@@ -336,6 +336,10 @@ class GitHubCli:
                         f"gh returned invalid pull-request JSON for {repository}"
                     )
                 if accepted_marker not in body:
+                    if state == "merged":
+                        # Merged history may contain an unrelated PR from a
+                        # previous branch user; only an open PR can block reuse.
+                        continue
                     raise CommandError(
                         f"refusing to reuse {repository} branch {branch}: its {state} pull request "
                         f"is not owned by policy {policy_id}"
@@ -667,7 +671,19 @@ class GitHubCli:
     def close_pull_request(self, *, repository: str, pull_request: PullRequest) -> None:
         """Close a policy-owned pull request after ownership is verified."""
 
-        self._run(["gh", "pr", "close", pull_request.url, "--repo", repository])
+        # A closed generated PR no longer needs its policy branch. Removing it
+        # prevents stale branch contents from being mistaken for current work.
+        self._run(
+            [
+                "gh",
+                "pr",
+                "close",
+                pull_request.url,
+                "--repo",
+                repository,
+                "--delete-branch",
+            ]
+        )
 
     def mark_pull_request_draft(
         self, *, repository: str, pull_request: PullRequest

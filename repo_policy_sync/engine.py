@@ -15,20 +15,38 @@
 
 from __future__ import annotations
 
+import os
 import re
 import shlex
 import subprocess
+import tempfile
 from pathlib import Path
 
-from .bazel import matches_bazel_dependency_condition, parse_bazel_version
-from .errors import CommandError, redact_sensitive_text
+from .bazel import (
+    matches_bazel_dependency_condition,
+    parse_bazel_version,
+    starlark_call_ranges,
+)
+from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .models import Change, Evaluation, Policy, SynchronizeBazelDependencies
 from .operations import apply as apply_operation
 from .operations import describe_changes
+from .operations._validation import validate_repository_path
 
-_BAZEL_DEP_CALL = re.compile(r"bazel_dep\s*\((.*?)\)", re.DOTALL)
 _NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*[\"']([^\"']+)[\"']")
+_REDUCED_ENVIRONMENT_KEYS = {
+    "CI",
+    "LANG",
+    "PATH",
+    "SHELL",
+    "TERM",
+    "TMPDIR",
+    "TMP",
+    "TEMP",
+    "USER",
+    "LOGNAME",
+}
 
 
 def evaluate_policy(
@@ -87,14 +105,33 @@ def apply_policy(
 
 
 def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
+    # Policy commands execute repository-controlled code. Keep only the basic
+    # process environment and replace user configuration with temporary paths so
+    # credentials and host-specific settings are not inherited accidentally.
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key in _REDUCED_ENVIRONMENT_KEYS or key.startswith("LC_")
+    }
     try:
-        subprocess.run(
-            command,
-            cwd=root,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        with tempfile.TemporaryDirectory(prefix="repo-policy-sync-after-apply-") as home:
+            environment.update(
+                {
+                    "HOME": home,
+                    "XDG_CONFIG_HOME": str(Path(home) / ".config"),
+                    "GH_CONFIG_DIR": str(Path(home) / ".gh"),
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                    "GIT_TERMINAL_PROMPT": "0",
+                }
+            )
+            subprocess.run(
+                command,
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
     except FileNotFoundError as exc:
         raise CommandError(f"required command is unavailable: {command[0]}") from exc
     except subprocess.CalledProcessError as exc:
@@ -110,7 +147,9 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
 def _should_run_after_apply(
     root: Path, command, changed_paths: set[Path], *, force: bool = False
 ) -> bool:
-    return (root / command.when_file_exists).is_file() and (
+    path = root / command.when_file_exists
+    validate_repository_path(root, path)
+    return path.is_file() and (
         force
         or command.when_path_changed is None
         or command.when_path_changed in changed_paths
@@ -131,17 +170,36 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
     if condition is None:
         return True
     module_file = root / "MODULE.bazel"
+    validate_repository_path(root, module_file)
     if not module_file.is_file():
         return False
     text = module_file.read_text(encoding="utf-8")
     dependencies: dict[str, tuple[int, int, int] | None] = {}
-    for call in _BAZEL_DEP_CALL.finditer(text):
-        name_match = _NAME_ARGUMENT.search(call.group(1))
+    for start, end in starlark_call_ranges(text, "bazel_dep"):
+        body = text[start:end]
+        name_match = _NAME_ARGUMENT.search(body)
         if name_match is None:
             continue
-        version_match = _VERSION_ARGUMENT.search(call.group(1))
+        version_match = _VERSION_ARGUMENT.search(body)
         dependencies[name_match.group(1)] = (
             parse_bazel_version(version_match.group(1)) if version_match else None
+        )
+    condition_names = {
+        dependency_condition.module_name
+        for dependency_condition in condition.any_direct_module_conditions
+    }
+    invalid_versions = sorted(
+        name
+        for name in condition_names
+        if name in dependencies and dependencies[name] is None
+    )
+    if invalid_versions:
+        # A configured version condition cannot be evaluated meaningfully for a
+        # missing or non-numeric version; fail loudly instead of silently
+        # treating a malformed dependency as a non-match.
+        names = ", ".join(repr(name) for name in invalid_versions)
+        raise RepoPolicySyncError(
+            f"MODULE.bazel configured bazel_dep versions must be numeric major.minor.patch: {names}"
         )
     # A policy can require a complete set and also accept one of several names.
     dependency_names = set(dependencies)
@@ -177,7 +235,9 @@ def _matches_file_exists_condition(root: Path, policy: Policy) -> bool:
     condition = policy.file_exists_condition
     if condition is None:
         return True
-    return (root / condition.path).is_file()
+    path = root / condition.path
+    validate_repository_path(root, path)
+    return path.is_file()
 
 
 def _matches_file_contains_condition(root: Path, policy: Policy) -> bool:
@@ -206,7 +266,9 @@ def _condition_paths(root: Path, path: Path) -> tuple[Path, ...]:
 
     # Literal paths are common, so avoid glob expansion and keep their behavior simple.
     if not any(character in str(path) for character in "*?["):
-        return (root / path,) if (root / path).is_file() else ()
+        candidate = root / path
+        validate_repository_path(root, candidate)
+        return (candidate,) if candidate.is_file() else ()
     # Glob conditions are used for files such as BUILD files at any directory depth.
     candidates: list[Path] = []
     for candidate in sorted(root.glob(str(path))):
@@ -214,6 +276,7 @@ def _condition_paths(root: Path, path: Path) -> tuple[Path, ...]:
         # Git metadata is not part of the repository content being evaluated.
         if ".git" in relative.parts:
             continue
+        validate_repository_path(root, candidate)
         if candidate.is_file():
             candidates.append(candidate)
     return tuple(candidates)

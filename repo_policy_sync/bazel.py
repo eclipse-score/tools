@@ -35,6 +35,68 @@ def parse_bazel_version(value: str) -> BazelVersion | None:
     return tuple(int(component) for component in match.groups()) if match else None
 
 
+def starlark_call_ranges(text: str, function_name: str) -> tuple[tuple[int, int], ...]:
+    """Return body ranges for calls outside comments and strings."""
+
+    # Masking non-code text preserves the original offsets, so callers can
+    # inspect the original source and still apply precise replacements.
+    masked = _mask_starlark(text)
+    pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(function_name)}\s*\(")
+    ranges: list[tuple[int, int]] = []
+    for match in pattern.finditer(masked):
+        opening = masked.find("(", match.start(), match.end())
+        depth = 0
+        # Count nested parentheses instead of stopping at the first closing
+        # one; Starlark call arguments can themselves contain function calls.
+        for index in range(opening, len(masked)):
+            if masked[index] == "(":
+                depth += 1
+            elif masked[index] == ")":
+                depth -= 1
+                if depth == 0:
+                    ranges.append((opening + 1, index))
+                    break
+    return tuple(ranges)
+
+
+def _mask_starlark(text: str) -> str:
+    # Comments and strings can contain text that looks like a real call. Replace
+    # them with spaces while retaining newlines and character positions for the
+    # offset calculations in starlark_call_ranges.
+    masked = list(text)
+    index = 0
+    while index < len(text):
+        if text[index] == "#":
+            while index < len(text) and text[index] not in "\r\n":
+                masked[index] = " "
+                index += 1
+            continue
+        if text[index] not in "'\"":
+            index += 1
+            continue
+        quote = text[index]
+        delimiter = quote * 3 if text.startswith(quote * 3, index) else quote
+        for offset in range(len(delimiter)):
+            masked[index + offset] = " "
+        index += len(delimiter)
+        escaped = False
+        while index < len(text):
+            character = text[index]
+            if character not in "\r\n":
+                masked[index] = " "
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif text.startswith(delimiter, index):
+                for offset in range(len(delimiter)):
+                    masked[index + offset] = " "
+                index += len(delimiter)
+                break
+            index += 1
+    return "".join(masked)
+
+
 def parse_bazel_dependency_condition(value: str) -> BazelDependencyCondition | None:
     """Parse ``module OP major.minor.patch`` condition syntax."""
 

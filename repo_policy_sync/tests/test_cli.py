@@ -211,6 +211,46 @@ def test_recreate_selects_only_the_requested_bundled_policy(
     assert observed["recreate"] is True
 
 
+def test_recreate_does_not_load_unrelated_local_policies(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    policy_directory = tmp_path / "policies"
+    target = policy_directory / "target" / "policy.yml"
+    target.parent.mkdir(parents=True)
+    target.write_text("not loaded here\n")
+    unrelated = policy_directory / "unrelated" / "policy.yml"
+    unrelated.parent.mkdir()
+    unrelated.write_text("this is invalid policy YAML: [\n")
+    report = _empty_report()
+    loaded_paths = []
+    monkeypatch.setattr(
+        cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
+    )
+    monkeypatch.setattr(cli, "run_policies", lambda **_: report)
+
+    assert (
+        cli.main(
+            (
+                "--org",
+                "eclipse-score",
+                "--repo",
+                "reference_integration",
+                "--policy-dir",
+                str(policy_directory),
+                "--policy",
+                "target",
+                "--apply",
+                "--recreate",
+                "--quiet",
+            )
+        )
+        == 0
+    )
+
+    assert loaded_paths == [target]
+
+
 def test_bundled_policies_do_not_require_a_local_policy_directory(
     monkeypatch, tmp_path: Path
 ) -> None:

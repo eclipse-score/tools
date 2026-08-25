@@ -25,6 +25,7 @@ from ._validation import (
     required_string,
     safe_relative_path,
     string_list,
+    validate_repository_path,
 )
 
 
@@ -66,6 +67,7 @@ class EnsureLineOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureLine)
         path = root / operation.path
+        validate_repository_path(root, path)
         _validate_target(path, operation)
         lines = _read_lines(path)
         normalized = _normalized_lines(lines, operation)
@@ -96,6 +98,7 @@ class EnsureLineOperation:
     ) -> None:
         assert isinstance(operation, EnsureLine)
         path = root / operation.path
+        validate_repository_path(root, path)
         _validate_target(path, operation)
         normalized = _normalized_lines(_read_lines(path), operation)
         if normalized == _read_lines(path):

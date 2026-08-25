@@ -310,13 +310,23 @@ def _resolve_recreate_policy_paths(
         if policy_directories is not None
         else ((DEFAULT_POLICY_DIRECTORY,) if DEFAULT_POLICY_DIRECTORY.is_dir() else ())
     )
-    if configured_directories:
-        try:
-            return resolve_policy_names(policy_names, configured_directories)
-        except PolicyError as exc:
-            if not str(exc).startswith("unknown policy name(s):"):
-                raise
-    return resolve_policy_names(policy_names, BUNDLED_POLICY_DIRECTORY)
+    # Recreate is deliberately restricted to one policy. Resolve its expected
+    # path directly so an unrelated malformed policy cannot block the request.
+    candidates = tuple(
+        directory / name / "policy.yml"
+        for directory in configured_directories
+        for name in policy_names
+        if (directory / name / "policy.yml").is_file()
+    )
+    if candidates:
+        if len(candidates) > 1:
+            raise PolicyError(f"policy ID is not unique: {policy_names[0]}")
+        return candidates
+
+    bundled_path = BUNDLED_POLICY_DIRECTORY / policy_names[0] / "policy.yml"
+    if bundled_path.is_file():
+        return (bundled_path,)
+    raise PolicyError(f"unknown policy name(s): {', '.join(policy_names)}")
 
 
 def _write_report(path: Path, output: str | None) -> None:

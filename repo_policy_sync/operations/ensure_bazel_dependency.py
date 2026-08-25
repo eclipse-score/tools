@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from ..bazel import starlark_call_ranges
 from ..errors import RepoPolicySyncError
 from ..models import Change, EnsureBazelDependency, EnsureOperation
 from ._validation import (
@@ -27,10 +28,10 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
+    validate_repository_path,
 )
 
 _NUMERIC_VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
-_BAZEL_DEP_CALL = re.compile(r"bazel_dep\s*\((.*?)\)", re.DOTALL)
 _NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*([\"'])([^\"']*)\1")
 
@@ -108,6 +109,7 @@ class EnsureBazelDependencyOperation:
 
 def _docker_version(root: Path, operation: EnsureBazelDependency) -> str:
     path = root / operation.dockerfile
+    validate_repository_path(root, path)
     if not path.is_file():
         raise RepoPolicySyncError(f"{operation.dockerfile} must exist")
     text = path.read_text(encoding="utf-8")
@@ -133,12 +135,16 @@ def _module_dependency(
     root: Path, operation: EnsureBazelDependency
 ) -> _Dependency | None:
     path = root / operation.module_file
+    validate_repository_path(root, path)
     if not path.is_file():
         raise RepoPolicySyncError(f"{operation.module_file} must exist")
     text = path.read_text(encoding="utf-8")
     calls = []
-    for match in _BAZEL_DEP_CALL.finditer(text):
-        name_matches = list(_NAME_ARGUMENT.finditer(match.group(1)))
+    for start, end in starlark_call_ranges(text, "bazel_dep"):
+        # A commented dependency is documentation, not an installed direct
+        # dependency, so only ranges returned from active source are examined.
+        body = text[start:end]
+        name_matches = list(_NAME_ARGUMENT.finditer(body))
         if any(
             name_match.group(1) == operation.module_name for name_match in name_matches
         ):
@@ -147,14 +153,14 @@ def _module_dependency(
                     f"{operation.module_file} bazel_dep for {operation.module_name!r} "
                     "must declare name exactly once"
                 )
-            calls.append(match)
+            calls.append((start, end))
     if len(calls) > 1:
         raise RepoPolicySyncError(
             f"{operation.module_file} must contain at most one bazel_dep for {operation.module_name!r}"
         )
     if not calls:
         return None
-    version_matches = list(_VERSION_ARGUMENT.finditer(calls[0].group(1)))
+    version_matches = list(_VERSION_ARGUMENT.finditer(text[calls[0][0] : calls[0][1]]))
     if not version_matches:
         raise RepoPolicySyncError(
             f'{operation.module_file} bazel_dep for {operation.module_name!r} must declare version = "X.Y.Z"'
