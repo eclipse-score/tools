@@ -68,3 +68,10 @@ Before adding a new utility here, check:
    consumers better than adding it here?
 
 If any of these gives you pause, raise it for discussion before merging.
+
+## Repository Policy Sync
+
+The [`repo_policy_sync`](repo_policy_sync/README.md) component evaluates and
+optionally remediates repository policies across a GitHub organization. Its
+supported entry point is `score-repo-policy-sync`; start with plan mode and
+use apply mode only after reviewing the generated changes.

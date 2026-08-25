@@ -1,0 +1,49 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+title: "chore(devcontainer): standardize SCORE devcontainer integration"
+description: |
+  Add the SCORE devcontainer's direct Bazel dependency and provide the standard
+  SCORE tool launcher and paths.
+when:
+  file_exists: MODULE.bazel
+  file_contains:
+    path: .devcontainer/Dockerfile
+    pattern: '(?m)^\s*FROM\s+ghcr\.io/eclipse-score/devcontainer:'
+ensure:
+  - type: ensure_bazel_dependency
+    dockerfile: .devcontainer/Dockerfile
+    module_file: MODULE.bazel
+    image: ghcr.io/eclipse-score/devcontainer
+    module_name: score_devcontainer
+    rationale: Declare the SCORE devcontainer as a direct Bazel dependency.
+  - type: synchronize_file
+    path: .devcontainer/run-tool
+    source: run-tool
+    executable: true
+    rationale: Provide the standard SCORE tool launcher in repositories using the SCORE devcontainer.
+  - type: replace_regex
+    path: .pre-commit-config.yaml
+    pattern: '(?<![A-Za-z0-9_.-])(?:tools|\.devcontainer)/run_tool\.sh(?![A-Za-z0-9_.-])'
+    replacement: .devcontainer/run-tool
+    rationale: Point pre-commit hooks at the standard SCORE tool launcher.
+  - type: ensure_no_such_file
+    path: tools/run_tool.sh
+    rationale: Replace the legacy tool launcher with the standard SCORE devcontainer launcher.
+  - type: ensure_no_such_file
+    path: .devcontainer/run_tool.sh
+    rationale: Replace the previous launcher path with the standard hyphenated path.
+after_apply:
+  - command: [bazel, mod, deps]
+    when_file_exists: MODULE.bazel.lock
+    when_path_changed: MODULE.bazel
+    description: Regenerate MODULE.bazel.lock with `bazel mod deps`.

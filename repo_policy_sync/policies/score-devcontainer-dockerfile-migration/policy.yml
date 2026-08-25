@@ -1,0 +1,34 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+title: "chore(devcontainer): use a Dockerfile for the SCORE devcontainer"
+description: |
+  Replace the image-based SCORE devcontainer configuration with a Dockerfile
+  so Dependabot can keep the development image up to date.
+when:
+  file_contains_any:
+    - path: .devcontainer.json
+      pattern: '"image"\s*:\s*"ghcr\.io/eclipse-score/devcontainer:v'
+    - path: .devcontainer/devcontainer.json
+      pattern: '"image"\s*:\s*"ghcr\.io/eclipse-score/devcontainer:v'
+ensure:
+  - type: migrate_devcontainer_json
+    sources:
+      - .devcontainer.json
+      - .devcontainer/devcontainer.json
+    destination: .devcontainer/devcontainer.json
+    dockerfile: .devcontainer/Dockerfile
+    image: ghcr.io/eclipse-score/devcontainer
+    dockerfile_comment: "# Use Dockerfile to get dependabot version bumps after new image is released"
+    copyright_header_source: copyright-header
+    copyright_header_organization: eclipse-score
+    rationale: Dependabot can update the SCORE development image in Dockerfiles.

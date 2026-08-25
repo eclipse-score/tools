@@ -1,0 +1,20 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+title: "chore(bazel): use a minimal module declaration"
+description: Keep the Bazel module declaration limited to its repository-owned name.
+ensure:
+  - type: replace_regex
+    path: MODULE.bazel
+    pattern: '(?m)^[ \t]*module\((?=[^)]*\bname\s*=\s*"([^"]+)")(?=[^)]*(?:\bversion\s*=|\bcompatibility_level\s*=))[^)]*\)'
+    replacement: 'module(name = "\1")'
+    rationale: Remove module metadata that should be derived by the Bazel Registry.

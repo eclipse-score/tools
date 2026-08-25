@@ -1,0 +1,34 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+title: "chore(devcontainer): align SCORE devcontainer versions"
+description: |
+  Keep the SCORE devcontainer image and its direct Bazel dependency on the same
+  version. This policy is intentionally limited to recurring version updates.
+when:
+  bazel:
+    direct_module_dependencies: [score_devcontainer]
+  file_contains:
+    path: .devcontainer/Dockerfile
+    pattern: '(?m)^\s*FROM\s+ghcr\.io/eclipse-score/devcontainer:'
+ensure:
+  - type: synchronize_devcontainer_version
+    dockerfile: .devcontainer/Dockerfile
+    module_file: MODULE.bazel
+    image: ghcr.io/eclipse-score/devcontainer
+    module_name: score_devcontainer
+    rationale: Keep the development image and its Bazel integration on a compatible version.
+after_apply:
+  - command: [bazel, mod, deps]
+    when_file_exists: MODULE.bazel.lock
+    when_path_changed: MODULE.bazel
+    description: Regenerate MODULE.bazel.lock with `bazel mod deps`.

@@ -72,7 +72,7 @@ def test_detect_shebang_offset_counts_trailing_newlines(tmp_path):
         "rst",
     ]
 )
-def prepare_test_with_header(request: SubRequest, tmp_path: PosixPath) -> tuple:
+def prepare_test_with_header(request, tmp_path: Path) -> tuple:
     extension = request.param
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
@@ -103,11 +103,10 @@ def prepare_test_with_header(request: SubRequest, tmp_path: PosixPath) -> tuple:
         "rst",
     ]
 )
-def prepare_test_no_header(request: SubRequest, tmp_path: PosixPath) -> tuple:
+def prepare_test_no_header(request, tmp_path: Path) -> tuple:
     extension = request.param
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
-    current_year = datetime.now().year
     test_file.write_text(
         "some content\n",
         encoding="utf-8",

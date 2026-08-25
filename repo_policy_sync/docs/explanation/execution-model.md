@@ -1,0 +1,81 @@
+<!-- ----------------------------------------------------------------------------
+  Copyright (c) 2026 Contributors to the Eclipse Foundation
+
+  See the NOTICE file(s) distributed with this work for additional
+  information regarding copyright ownership.
+
+  This program and the accompanying materials are made available under the
+  terms of the Apache License Version 2.0 which is available at
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  SPDX-License-Identifier: Apache-2.0
+----------------------------------------------------------------------------- -->
+
+# Execution model and boundaries
+
+Repository Policy Sync evaluates the bundled SCORE catalogue and, when
+present, local policies from `./policies` or the directories selected with
+`--policy-dir`. Bundled policies can be excluded with
+`--exclude-bundled-policy`. Policy names selected with `--policy` are resolved
+from the local policy directories. A policy that needs changes
+owns one deterministic branch and one pull request per repository.
+
+## Lifecycle
+
+1. Discover organization repositories and load policies. Policy definitions
+   are discovered as `policy.yml` files in the selected policy directory in
+   deterministic path order.
+2. Refresh each selected repository’s disposable checkout to its current default branch.
+3. Evaluate the policy against that checkout. The checkout is the
+   authority for applicability and compliance.
+4. In plan mode, report required changes and make no remote changes.
+5. In apply mode, reuse a policy-owned pull request when present, otherwise
+   create a policy branch, apply the policy, run the configured pre-commit hooks
+   on the policy-changed paths when the target repository has
+   `.pre-commit-config.yaml`, commit, push, and open a pull request. If the
+   first pre-commit run applies formatting fixes,
+   the changes are staged and pre-commit is run once more before publishing.
+   The same pre-commit gate runs before rebuilding an existing policy branch.
+   Existing policy-owned pull requests receive the current title and body. If
+   pre-commit still fails after the retry, no commit, push, or pull request is
+   created. With `--allow-dirty-pr`, the changes are committed and pushed
+   anyway, and the resulting pull request is draft with a comment containing
+   the remaining pre-commit failure.
+   If the refreshed default branch is already compliant, apply mode closes an
+   existing policy-owned pull request after verifying its branch head; plan
+   mode leaves the pull request open.
+
+   Pre-commit runs use a credential-reduced environment and temporary home
+   directory. Hooks are still arbitrary repository code, so apply mode requires
+   trusted target repositories.
+
+Checkout synchronization and each policy's repository processing run in
+parallel. Repositories remain isolated in separate checkouts; use
+`--sync-workers` and `--policy-workers` to bound their respective concurrency.
+
+## Supported behavior
+
+- `when.bazel` dependency-presence and version conditions,
+  `when.file_exists`, and `when.file_contains` conditions;
+- the explicitly registered `ensure_line`, `ensure_minimum_version`,
+  `ensure_bazel_dependency`, `ensure_no_such_file`, `replace_regex`, `migrate_devcontainer_json`,
+  `synchronize_devcontainer_version`, `synchronize_bazel_dependencies`, and
+  `synchronize_file` operations;
+- fixed `automation` and `repo-policy-sync` labels, policy titles, descriptions, and
+  per-operation rationales;
+- terminal-table output, a compact repository-by-policy Markdown matrix, and a
+  versioned JSON report for automation.
+
+## Exit status
+
+| Status | Meaning |
+| --- | --- |
+| `0` | Plan mode found no policy drift, or apply mode completed without errors. |
+| `1` | Plan mode found one or more required changes. |
+| `2` | Input, authentication, GitHub, Git, or execution error. |
+
+## Current boundaries
+
+- Handling a remote policy branch that has no open policy-owned pull request.
+- Retries and rate-limit handling.
+- Additional conditions and built-in operations.

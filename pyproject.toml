@@ -6,5 +6,27 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "bazel-runfiles==1.3.0",
+    "pre-commit>=4.0.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+score-copyright = "cr_checker.tool.cr_checker:main"
+score-repo-policy-sync = "repo_policy_sync.cli:main"
+
+[dependency-groups]
+dev = [
     "pytest>=9.1.1",
+    "ruff==0.15.10",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "cr_checker",
+    "repo_policy_sync",
 ]

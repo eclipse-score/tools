@@ -1,0 +1,7 @@
+{
+  // JSONC is accepted by devcontainer configuration files.
+  "name": "SCORE development",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+}

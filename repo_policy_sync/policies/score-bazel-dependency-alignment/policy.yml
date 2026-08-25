@@ -1,0 +1,52 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+title: "chore(bazel): align SCORE platform dependencies"
+description: |
+  Keep the SCORE platform, documentation, base libraries, and process
+  dependencies on compatible releases. Migrate the legacy score_process module
+  and every BUILD reference to score_process_description as part of the
+  coordinated upgrade.
+when:
+  bazel:
+    # Any one of these version conditions is enough to require alignment.
+    any_direct_module_conditions:
+      - score_platform < 0.7.0
+      - score_docs_as_code < 8.0.0
+      - score_baselibs < 0.2.12
+      - score_process_description < 2.1.1
+ensure:
+  - type: synchronize_bazel_dependencies
+    module_file: MODULE.bazel
+    dependencies:
+      - name: score_platform
+        version: 0.7.0
+        optional: true
+      - name: score_docs_as_code
+        version: 8.0.0
+        optional: true
+      - name: score_baselibs
+        version: 0.2.11
+        override: bf0020fefef402642dcb0092832e03ba4267d739
+        remote: https://github.com/eclipse-score/baselibs.git
+        optional: true
+      - name: score_process
+        replacement_name: score_process_description
+        version: 2.1.1
+        optional: true
+    build_file_names: [BUILD, BUILD.bazel]
+    rationale: Keep the SCORE dependencies compatible and complete the score_process rename.
+after_apply:
+  - command: [bazel, mod, deps]
+    when_file_exists: MODULE.bazel.lock
+    when_path_changed: MODULE.bazel
+    description: Regenerate MODULE.bazel.lock with `bazel mod deps`.
