@@ -45,4 +45,7 @@ jobs:
       - name: Build the Python wheel
         run: uv build --wheel
       - name: Smoke-test the installed Repository Policy Sync CLI
-        run: uv run --with dist/*.whl score-repo-policy-sync --help
+        run: |
+          wheel=$(find dist -maxdepth 1 -name '*.whl' -print -quit)
+          uv run --no-project --with "$wheel" score-copyright --help
+          uv run --no-project --with "$wheel" score-repo-policy-sync --help

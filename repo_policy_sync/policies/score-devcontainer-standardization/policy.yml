@@ -33,7 +33,7 @@ ensure:
     rationale: Provide the standard SCORE tool launcher in repositories using the SCORE devcontainer.
   - type: replace_regex
     path: .pre-commit-config.yaml
-    pattern: '(?:tools|\.devcontainer)/run_tool\.sh'
+    pattern: '(?<![A-Za-z0-9_.-])(?:tools|\.devcontainer)/run_tool\.sh(?![A-Za-z0-9_.-])'
     replacement: .devcontainer/run-tool
     rationale: Point pre-commit hooks at the standard SCORE tool launcher.
   - type: ensure_no_such_file

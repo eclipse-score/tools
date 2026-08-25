@@ -1139,6 +1139,27 @@ def test_devcontainer_standardization_is_not_applicable_without_module_file(
     assert evaluate_policy(tmp_path, policy).applies is False
 
 
+def test_devcontainer_standardization_does_not_rewrite_similar_paths(
+    tmp_path: Path,
+) -> None:
+    policy = load_policy(
+        BUNDLED_POLICY_DIRECTORY / "score-devcontainer-standardization" / "policy.yml"
+    )
+    (tmp_path / ".devcontainer").mkdir()
+    (tmp_path / ".devcontainer/Dockerfile").write_text(
+        "FROM ghcr.io/eclipse-score/devcontainer:v1.9.0\n"
+    )
+    (tmp_path / "MODULE.bazel").write_text(
+        'bazel_dep(name = "score_devcontainer", version = "1.9.0")\n'
+    )
+    pre_commit = tmp_path / ".pre-commit-config.yaml"
+    pre_commit.write_text("entry: custom-tools/run_tool.sh actionlint\n")
+
+    apply_policy(tmp_path, policy)
+
+    assert pre_commit.read_text() == "entry: custom-tools/run_tool.sh actionlint\n"
+
+
 def test_devcontainer_policy_rejects_unsupported_or_duplicate_declarations(
     tmp_path: Path,
 ) -> None:
@@ -1234,6 +1255,26 @@ def test_devcontainer_migration_adds_copyright_only_for_eclipse_score(
         assert '"context"' not in config
 
 
+def test_devcontainer_migration_handles_compact_jsonc_image_property(
+    tmp_path: Path,
+) -> None:
+    policy = load_policy(
+        BUNDLED_POLICY_DIRECTORY
+        / "score-devcontainer-dockerfile-migration"
+        / "policy.yml"
+    )
+    (tmp_path / ".devcontainer.json").write_text(
+        '{"image":"ghcr.io/eclipse-score/devcontainer:v1.9.0",'
+        '"custom":{"label":"value"}}'
+    )
+
+    apply_policy(tmp_path, policy)
+
+    destination = tmp_path / ".devcontainer/devcontainer.json"
+    assert not (tmp_path / ".devcontainer.json").exists()
+    assert '"dockerfile": "Dockerfile"' in destination.read_text()
+
+
 def test_devcontainer_migration_rejects_root_config_with_relative_paths(
     tmp_path: Path,
 ) -> None:
@@ -1292,4 +1333,37 @@ def test_operations_reject_symlink_to_path_outside_checkout(tmp_path: Path) -> N
             evaluate_policy(tmp_path, policy)
     finally:
         (outside / "target").unlink(missing_ok=True)
+        outside.rmdir()
+
+
+def test_synchronize_bazel_dependencies_skips_unrelated_symlink(
+    tmp_path: Path,
+) -> None:
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    try:
+        (outside / "file").write_text("unrelated\n")
+        (tmp_path / "unrelated-link").symlink_to(outside / "file")
+        module_file = tmp_path / "MODULE.bazel"
+        module_file.write_text(
+            'bazel_dep(name = "score_platform", version = "0.6.0")\n'
+        )
+        policy = Policy(
+            "example",
+            "Example",
+            None,
+            None,
+            (
+                SynchronizeBazelDependencies(
+                    Path("MODULE.bazel"),
+                    (BazelDependencyUpdate("score_platform", "0.7.0"),),
+                ),
+            ),
+        )
+
+        apply_policy(tmp_path, policy)
+
+        assert 'version = "0.7.0"' in module_file.read_text()
+    finally:
+        (outside / "file").unlink(missing_ok=True)
         outside.rmdir()

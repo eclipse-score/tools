@@ -531,8 +531,11 @@ def _build_files(
         relative = path.relative_to(root)
         if ".git" in relative.parts:
             continue
-        # Validate every discovered path before filtering so a symlinked
-        # directory cannot be followed later when a BUILD file is read.
+        # A final symlink is not a BUILD file managed by this operation. Check
+        # its parent for containment, then skip it without following the link.
+        if path.is_symlink():
+            validate_repository_path(root, path, allow_final_symlink=True)
+            continue
         validate_repository_path(root, path)
         if path.is_file() and path.name in operation.build_file_names:
             paths.append(path)

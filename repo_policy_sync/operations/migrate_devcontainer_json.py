@@ -34,8 +34,8 @@ from ._validation import (
 
 _VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
 _IMAGE_PROPERTY = re.compile(
-    r'(?m)^(?P<indent>[ \t]*)"image"\s*:\s*"(?P<image>[^"]+)"'
-    r"(?P<comma>,?)(?P<tail>[ \t]*(?://[^\r\n]*)?(?:\r?\n|$))"
+    r'(?m)(?P<indent>^[ \t]*|(?<=[{,])[ \t]*)"image"\s*:\s*"'
+    r'(?P<image>[^"\\]*(?:\\.[^"\\]*)*)"(?P<comma>,?)'
 )
 
 
@@ -293,7 +293,7 @@ def _migration_contents(
     replacement = (
         f'{indent}"build": {{\n'
         f'{indent}  "dockerfile": {dockerfile}\n'
-        f"{indent}}}{match.group('comma')}{match.group('tail')}"
+        f"{indent}}}{match.group('comma')}"
     )
     destination_contents = text[: match.start()] + replacement + text[match.end() :]
     copyright_header = (
@@ -310,54 +310,10 @@ def _migration_contents(
 
 
 def _strip_jsonc(text: str) -> str:
-    """Remove JSONC comments and trailing commas while preserving strings."""
+    """Remove simple full-line comments and trailing commas."""
 
-    result: list[str] = []
-    in_string = False
-    escaped = False
-    in_line_comment = False
-    in_block_comment = False
-    index = 0
-    while index < len(text):
-        character = text[index]
-        following = text[index + 1] if index + 1 < len(text) else ""
-        if in_line_comment:
-            if character in "\r\n":
-                in_line_comment = False
-                result.append(character)
-            else:
-                result.append(" ")
-        elif in_block_comment:
-            if character == "*" and following == "/":
-                in_block_comment = False
-                result.extend((" ", " "))
-                index += 1
-            else:
-                result.append("\n" if character in "\r\n" else " ")
-        elif in_string:
-            result.append(character)
-            if escaped:
-                escaped = False
-            elif character == "\\":
-                escaped = True
-            elif character == '"':
-                in_string = False
-        elif character == '"':
-            in_string = True
-            result.append(character)
-        elif character == "/" and following == "/":
-            in_line_comment = True
-            result.extend((" ", " "))
-            index += 1
-        elif character == "/" and following == "*":
-            in_block_comment = True
-            result.extend((" ", " "))
-            index += 1
-        else:
-            result.append(character)
-        index += 1
-
-    return re.sub(r",\s*([}\]])", r"\1", "".join(result))
+    without_comments = re.sub(r"(?m)^[ \t]*//[^\r\n]*(?:\r?\n|$)", "", text)
+    return re.sub(r",\s*([}\]])", r"\1", without_comments)
 
 
 def _validate_target(path: Path, operation: MigrateDevcontainerJson) -> None:
