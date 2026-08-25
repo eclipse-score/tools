@@ -169,6 +169,15 @@ def load_exclusion(path):
     """
     Loads the list of files being excluded from the copyright check.
 
+    Entries in the exclusion file are documented as being relative to the
+    repository root (see README.md), so they are resolved the same way
+    ``collect_inputs`` resolves its own inputs: relative to
+    ``BUILD_WORKSPACE_DIRECTORY`` when set (as it is under ``bazel run``,
+    where the process cwd is not necessarily the repository root), and
+    relative to the current working directory otherwise. Without this, the
+    exclusion list only worked correctly when the tool happened to be
+    invoked with its cwd equal to the repository root.
+
     Args:
         path (str): Path to the exclusion file.
 
@@ -177,20 +186,23 @@ def load_exclusion(path):
                            all paths listed in the exclusion file exist and are files.
     """
 
+    workspace_dir = Path(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "").strip())
     exclusion = []
     valid = True
     with open(path, "r", encoding="utf-8") as file:
         for item in file.read().splitlines():
-            path = Path(item)
-            if not path.exists():
+            if not item.strip():
+                continue
+            resolved = Path(workspace_dir / item)
+            if not resolved.exists():
                 LOGGER.error("Excluded file %s does not exist.", item)
                 valid = False
                 continue
-            if not path.is_file():
+            if not resolved.is_file():
                 LOGGER.error("Excluded file %s is not a file.", item)
                 valid = False
                 continue
-            exclusion.append(item)
+            exclusion.append(str(resolved))
 
     LOGGER.debug(exclusion)
     return exclusion, valid

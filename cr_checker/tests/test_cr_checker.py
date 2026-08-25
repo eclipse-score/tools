@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import importlib.util
+import os
 import pytest
 from datetime import datetime
 from pathlib import Path
@@ -415,3 +416,88 @@ def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
     )
 
     assert result is True
+
+
+# test that load_exclusion resolves entries relative to BUILD_WORKSPACE_DIRECTORY,
+# not the process cwd, so it works regardless of where the tool is invoked from
+# (e.g. under `bazel run`, where BUILD_WORKSPACE_DIRECTORY is the repo root but
+# the process cwd is not).
+def test_load_exclusion_resolves_relative_to_workspace_dir(tmp_path, monkeypatch):
+    cr_checker = load_cr_checker_module()
+
+    workspace = tmp_path / "workspace"
+    (workspace / "src").mkdir(parents=True)
+    excluded_file = workspace / "src" / "foo.py"
+    excluded_file.write_text("print('hi')\n", encoding="utf-8")
+
+    exclusion_file = workspace / "copyright_exclusions.txt"
+    exclusion_file.write_text("src/foo.py\n", encoding="utf-8")
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setenv("BUILD_WORKSPACE_DIRECTORY", str(workspace))
+
+    exclusion, valid = cr_checker.load_exclusion(str(exclusion_file))
+
+    assert valid is True
+    assert str(excluded_file) in exclusion
+
+
+def test_load_exclusion_without_workspace_dir_uses_cwd(tmp_path, monkeypatch):
+    cr_checker = load_cr_checker_module()
+
+    (tmp_path / "src").mkdir()
+    excluded_file = tmp_path / "src" / "foo.py"
+    excluded_file.write_text("print('hi')\n", encoding="utf-8")
+
+    exclusion_file = tmp_path / "copyright_exclusions.txt"
+    exclusion_file.write_text("src/foo.py\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("BUILD_WORKSPACE_DIRECTORY", raising=False)
+
+    exclusion, valid = cr_checker.load_exclusion(str(exclusion_file))
+
+    assert valid is True
+    # No BUILD_WORKSPACE_DIRECTORY set: entries stay relative to cwd, same as
+    # before this fix, since tmp_path (cwd) is where the source file actually is.
+    assert "src/foo.py" in exclusion
+
+
+# test that a file excluded via an exclusion list loaded from outside the
+# repository root is still correctly skipped by process_files, end-to-end
+def test_exclusion_from_load_exclusion_is_honored_by_process_files(
+    tmp_path, monkeypatch
+):
+    cr_checker = load_cr_checker_module()
+
+    workspace = tmp_path / "workspace"
+    (workspace / "src").mkdir(parents=True)
+    excluded_file = workspace / "src" / "foo.py"
+    excluded_file.write_text("print('hi')\n", encoding="utf-8")
+
+    exclusion_file = workspace / "copyright_exclusions.txt"
+    exclusion_file.write_text("src/foo.py\n", encoding="utf-8")
+
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    monkeypatch.setenv("BUILD_WORKSPACE_DIRECTORY", str(workspace))
+
+    exclusion, valid = cr_checker.load_exclusion(str(exclusion_file))
+    assert valid is True
+
+    files = cr_checker.collect_inputs([str(excluded_file)], exts=["py"])
+
+    results = cr_checker.process_files(
+        files=files,
+        templates={"py": load_template("py")},
+        fix=False,
+        exclusion=exclusion,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    # foo.py has no copyright header, but is excluded, so it must not be flagged
+    assert results["no_copyright"] == 0
