@@ -28,6 +28,7 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
+    validate_repository_path,
 )
 
 _NUMERIC_VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
@@ -124,6 +125,7 @@ def _docker_location(
     root: Path, operation: SynchronizeDevcontainerVersion
 ) -> _VersionLocation:
     path = root / operation.dockerfile
+    validate_repository_path(root, path)
     if not path.is_file():
         raise RepoPolicySyncError(f"{operation.dockerfile} must exist")
     text = path.read_text(encoding="utf-8")
@@ -150,6 +152,7 @@ def _module_location(
     root: Path, operation: SynchronizeDevcontainerVersion
 ) -> _VersionLocation:
     path = root / operation.module_file
+    validate_repository_path(root, path)
     if not path.is_file():
         raise RepoPolicySyncError(f"{operation.module_file} must exist")
     text = path.read_text(encoding="utf-8")

@@ -38,6 +38,7 @@ from ._validation import (
     required_string,
     safe_relative_path,
     string_list,
+    validate_repository_path,
 )
 
 
@@ -130,6 +131,7 @@ class SynchronizeBazelDependenciesOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, SynchronizeBazelDependencies)
         module_path = root / operation.module_file
+        validate_repository_path(root, module_path)
         # Validation happens while collecting replacements, even when no text changes.
         replacements, locations = _module_replacements(module_path, operation)
         changes: list[Change] = []
@@ -163,6 +165,7 @@ class SynchronizeBazelDependenciesOperation:
     ) -> None:
         assert isinstance(operation, SynchronizeBazelDependencies)
         module_path = root / operation.module_file
+        validate_repository_path(root, module_path)
         replacements, locations = _module_replacements(module_path, operation)
         if replacements:
             text = module_path.read_text(encoding="utf-8")
@@ -316,6 +319,12 @@ def _git_override_replacements(
         # their override. Required dependencies have already been validated by
         # _module_locations.
         if location is None:
+            continue
+        target_version = parse_bazel_version(dependency.version)
+        assert target_version is not None
+        if location.version > target_version:
+            # A git override belongs to the configured baseline. Preserve a
+            # newer released dependency and its existing source pin.
             continue
         final_name = (
             dependency.replacement_name
@@ -506,10 +515,13 @@ def _build_files(
     root: Path, operation: SynchronizeBazelDependencies
 ) -> tuple[Path, ...]:
     # BUILD files are selected by basename because Bazel allows them in every package.
-    return tuple(
-        path
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-        and path.name in operation.build_file_names
-        and ".git" not in path.relative_to(root).parts
-    )
+    paths: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        # Git metadata is not part of the repository content being synchronized.
+        if ".git" in relative.parts:
+            continue
+        validate_repository_path(root, path)
+        if path.is_file() and path.name in operation.build_file_names:
+            paths.append(path)
+    return tuple(paths)

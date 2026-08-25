@@ -29,6 +29,7 @@ from ._validation import (
     required_string,
     safe_relative_path,
     string_list,
+    validate_repository_path,
 )
 
 _VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
@@ -110,12 +111,14 @@ class MigrateDevcontainerJsonOperation:
         if source is None:
             return ()
         dockerfile = root / operation.dockerfile
+        validate_repository_path(root, dockerfile)
+        destination = root / operation.destination
+        validate_repository_path(root, destination)
         migration = _migration_contents(source, operation, organization)
         if migration is None:
             return ()
         dockerfile_contents, destination_contents = migration
         _validate_target(dockerfile, operation)
-        destination = root / operation.destination
         _validate_destination(destination, operation)
         changes: list[Change] = []
         if not dockerfile.exists():
@@ -174,12 +177,14 @@ class MigrateDevcontainerJsonOperation:
         if source is None:
             return
         dockerfile = root / operation.dockerfile
+        validate_repository_path(root, dockerfile)
+        destination = root / operation.destination
+        validate_repository_path(root, destination)
         migration = _migration_contents(source, operation, organization)
         if migration is None:
             return
         dockerfile_contents, destination_contents = migration
         _validate_target(dockerfile, operation)
-        destination = root / operation.destination
         _validate_destination(destination, operation)
         if (
             dockerfile.exists()
@@ -209,9 +214,12 @@ class MigrateDevcontainerJsonOperation:
 def _find_source(
     root: Path, operation: MigrateDevcontainerJson
 ) -> tuple[Path | None, Path | None]:
-    matches = tuple(
-        (path, root / path) for path in operation.sources if (root / path).exists()
-    )
+    matches: list[tuple[Path, Path]] = []
+    for path in operation.sources:
+        candidate = root / path
+        validate_repository_path(root, candidate)
+        if candidate.exists():
+            matches.append((path, candidate))
     if len(matches) > 1:
         paths = ", ".join(str(path) for path, _ in matches)
         raise RepoPolicySyncError(

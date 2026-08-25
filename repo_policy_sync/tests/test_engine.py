@@ -22,6 +22,7 @@ from repo_policy_sync.policy import BUNDLED_POLICY_DIRECTORY, load_policy
 from repo_policy_sync.models import (
     AfterApplyCommand,
     BazelDependencyUpdate,
+    BazelDependencyCondition,
     BazelCondition,
     Change,
     EnsureBazelDependency,
@@ -76,6 +77,35 @@ def test_policy_does_not_apply_without_direct_dependency(tmp_path: Path) -> None
     evaluation = evaluate_policy(tmp_path, _policy())
     assert not evaluation.applies
     assert evaluation.changes == ()
+
+
+@pytest.mark.parametrize(
+    "dependency",
+    [
+        'bazel_dep(name = "score_docs_as_code", version = "1.0")',
+        'bazel_dep(name = "score_docs_as_code", version = "1.0.0-rc1")',
+        'bazel_dep(name = "score_docs_as_code")',
+    ],
+)
+def test_bazel_conditions_reject_uncomparable_configured_versions(
+    tmp_path: Path, dependency: str
+) -> None:
+    (tmp_path / "MODULE.bazel").write_text(dependency + "\n")
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        BazelCondition(
+            (),
+            any_direct_module_conditions=(
+                BazelDependencyCondition("score_docs_as_code", "<", (2, 0, 0)),
+            ),
+        ),
+        (),
+    )
+
+    with pytest.raises(RepoPolicySyncError, match="score_docs_as_code"):
+        evaluate_policy(tmp_path, policy)
 
 
 def test_bazel_conditions_ignore_commented_dependencies(tmp_path: Path) -> None:
@@ -168,6 +198,25 @@ def test_ensure_no_such_file_removes_a_dangling_symlink(tmp_path: Path) -> None:
     assert evaluation.changes == (Change(Path("obsolete"), "remove file"),)
     apply_policy(tmp_path, policy)
     assert not link.is_symlink()
+
+
+def test_path_operations_reject_symlinks_to_outside_checkout(tmp_path: Path) -> None:
+    external = tmp_path.parent / f"{tmp_path.name}-external.txt"
+    external.write_text("legacy\n")
+    (tmp_path / "managed.txt").symlink_to(external)
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        None,
+        (ReplaceRegex(Path("managed.txt"), "legacy", "current"),),
+    )
+
+    with pytest.raises(RepoPolicySyncError, match="symbolic link"):
+        apply_policy(tmp_path, policy)
+
+    assert external.read_text() == "legacy\n"
+    external.unlink()
 
 
 def test_replace_regex_applies_and_is_idempotent(tmp_path: Path) -> None:
@@ -366,6 +415,68 @@ def test_synchronize_bazel_dependencies_adds_and_updates_git_override(
         'remote = "https://github.com/eclipse-score/baselibs.git"'
         in module_file.read_text()
     )
+
+
+def test_synchronize_bazel_dependencies_preserves_override_for_newer_version(
+    tmp_path: Path,
+) -> None:
+    module_file = tmp_path / "MODULE.bazel"
+    module_file.write_text(
+        'bazel_dep(name = "score_baselibs", version = "0.2.12")\n\n'
+        "git_override(\n"
+        '    module_name = "score_baselibs",\n'
+        '    commit = "newer-commit",\n'
+        '    remote = "https://github.com/eclipse-score/baselibs.git",\n'
+        ")\n"
+    )
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        None,
+        (
+            SynchronizeBazelDependencies(
+                Path("MODULE.bazel"),
+                (
+                    BazelDependencyUpdate(
+                        "score_baselibs",
+                        "0.2.11",
+                        override="baseline-commit",
+                        remote="https://github.com/eclipse-score/baselibs.git",
+                    ),
+                ),
+            ),
+        ),
+    )
+
+    assert apply_policy(tmp_path, policy).changes == ()
+    assert 'version = "0.2.12"' in module_file.read_text()
+    assert 'commit = "newer-commit"' in module_file.read_text()
+
+
+def test_bazel_dependency_policy_preserves_newer_baselibs_override(
+    tmp_path: Path,
+) -> None:
+    module_file = tmp_path / "MODULE.bazel"
+    module_file.write_text(
+        'bazel_dep(name = "score_platform", version = "0.6.3")\n'
+        'bazel_dep(name = "score_baselibs", version = "0.2.12")\n\n'
+        "git_override(\n"
+        '    module_name = "score_baselibs",\n'
+        '    commit = "newer-commit",\n'
+        '    remote = "https://github.com/eclipse-score/baselibs.git",\n'
+        ")\n"
+    )
+    policy = load_policy(
+        BUNDLED_POLICY_DIRECTORY / "score-bazel-dependency-alignment" / "policy.yml"
+    )
+
+    apply_policy(tmp_path, policy)
+
+    module = module_file.read_text()
+    assert 'version = "0.7.0"' in module
+    assert 'version = "0.2.12"' in module
+    assert 'commit = "newer-commit"' in module
 
 
 def test_synchronize_bazel_dependencies_uses_configured_build_rename(
@@ -606,7 +717,7 @@ def test_synchronize_workflow_preserves_publish_permissions_on_matching_job(
         "  publish:\n"
         "    uses: eclipse-score/cicd-workflows/.github/workflows/docs-publish.yml@v0.0.2\n"
         "    with:\n"
-        "      deployment_type: custom\n"
+        "      deployment_type: custom"
     )
     policy = Policy(
         "example",
@@ -644,6 +755,7 @@ def test_synchronize_workflow_preserves_publish_permissions_on_matching_job(
     result = target.read_text()
     assert "contents: write\n" in result
     assert "pages: write\n" in result
+    assert "deployment_type: custom\n    permissions:" in result
     assert "deployment_type: custom\n" in result
 
 

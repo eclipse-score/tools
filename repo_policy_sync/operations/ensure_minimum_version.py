@@ -24,6 +24,7 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
+    validate_repository_path,
 )
 
 _VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
@@ -55,6 +56,7 @@ class EnsureMinimumVersionOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureMinimumVersion)
         path = root / operation.path
+        validate_repository_path(root, path)
         current_version = _read_version(path, operation)
         if current_version is None or current_version >= _required_version(operation):
             return ()
@@ -75,6 +77,7 @@ class EnsureMinimumVersionOperation:
     ) -> None:
         assert isinstance(operation, EnsureMinimumVersion)
         path = root / operation.path
+        validate_repository_path(root, path)
         current_version = _read_version(path, operation)
         if current_version is None or current_version >= _required_version(operation):
             return

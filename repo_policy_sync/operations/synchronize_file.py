@@ -27,6 +27,7 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
+    validate_repository_path,
 )
 
 
@@ -95,6 +96,7 @@ class SynchronizeFileOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
+        validate_repository_path(root, path)
         _validate_target(path, operation)
         content_changed = not path.is_file() or (
             _desired_contents(path, operation) != path.read_text(encoding="utf-8")
@@ -121,6 +123,7 @@ class SynchronizeFileOperation:
     ) -> None:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
+        validate_repository_path(root, path)
         _validate_target(path, operation)
         desired_contents = _desired_contents(path, operation)
         if not path.is_file() or path.read_text(encoding="utf-8") != desired_contents:
@@ -348,7 +351,8 @@ def _merge_matching_job_permissions(
     existing_permissions = _nested_job_section(existing_job, "permissions")
     if existing_permissions is None:
         insertion = existing_jobs[0] + existing_job_end
-        return existing[:insertion] + source_permissions + existing[insertion:]
+        prefix = "" if existing[:insertion].endswith("\n") else "\n"
+        return existing[:insertion] + prefix + source_permissions + existing[insertion:]
     permission_start, permission_end = existing_permissions
     absolute_start = existing_jobs[0] + existing_job_start + permission_start
     absolute_end = existing_jobs[0] + existing_job_start + permission_end

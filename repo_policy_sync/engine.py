@@ -26,10 +26,11 @@ from .bazel import (
     parse_bazel_version,
     starlark_string_arguments,
 )
-from .errors import CommandError, redact_sensitive_text
+from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .models import Change, Evaluation, Policy, SynchronizeBazelDependencies
 from .operations import apply as apply_operation
 from .operations import describe_changes
+from .operations._validation import validate_repository_path
 
 
 def evaluate_policy(
@@ -111,7 +112,9 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
 def _should_run_after_apply(
     root: Path, command, changed_paths: set[Path], *, force: bool = False
 ) -> bool:
-    return (root / command.when_file_exists).is_file() and (
+    path = root / command.when_file_exists
+    validate_repository_path(root, path)
+    return path.is_file() and (
         force
         or command.when_path_changed is None
         or command.when_path_changed in changed_paths
@@ -132,6 +135,7 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
     if condition is None:
         return True
     module_file = root / "MODULE.bazel"
+    validate_repository_path(root, module_file)
     if not module_file.is_file():
         return False
     text = module_file.read_text(encoding="utf-8")
@@ -143,6 +147,20 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
         version_matches = starlark_string_arguments(text, call, "version")
         dependencies[name_matches[0].value] = (
             parse_bazel_version(version_matches[0].value) if version_matches else None
+        )
+    condition_names = {
+        dependency_condition.module_name
+        for dependency_condition in condition.any_direct_module_conditions
+    }
+    invalid_versions = sorted(
+        name
+        for name in condition_names
+        if name in dependencies and dependencies[name] is None
+    )
+    if invalid_versions:
+        names = ", ".join(repr(name) for name in invalid_versions)
+        raise RepoPolicySyncError(
+            f"MODULE.bazel configured bazel_dep versions must be numeric major.minor.patch: {names}"
         )
     # A policy can require a complete set and also accept one of several names.
     dependency_names = set(dependencies)
@@ -176,7 +194,11 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
 
 def _matches_file_exists_condition(root: Path, policy: Policy) -> bool:
     condition = policy.file_exists_condition
-    return condition is None or (root / condition.path).is_file()
+    if condition is None:
+        return True
+    path = root / condition.path
+    validate_repository_path(root, path)
+    return path.is_file()
 
 
 def _matches_file_contains_condition(root: Path, policy: Policy) -> bool:
@@ -205,11 +227,17 @@ def _condition_paths(root: Path, path: Path) -> tuple[Path, ...]:
 
     # Literal paths are common, so avoid glob expansion and keep their behavior simple.
     if not any(character in str(path) for character in "*?["):
-        return (root / path,) if (root / path).is_file() else ()
+        candidate = root / path
+        validate_repository_path(root, candidate)
+        return (candidate,) if candidate.is_file() else ()
     # Glob conditions are used for files such as BUILD files at any directory depth.
-    return tuple(
-        candidate
-        for candidate in sorted(root.glob(str(path)))
+    candidates: list[Path] = []
+    for candidate in sorted(root.glob(str(path))):
+        relative = candidate.relative_to(root)
         # Git metadata is not part of the repository content being evaluated.
-        if candidate.is_file() and ".git" not in candidate.relative_to(root).parts
-    )
+        if ".git" in relative.parts:
+            continue
+        validate_repository_path(root, candidate)
+        if candidate.is_file():
+            candidates.append(candidate)
+    return tuple(candidates)
