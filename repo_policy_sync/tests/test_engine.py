@@ -503,7 +503,9 @@ def test_synchronize_bazel_dependencies_ignores_commented_override(
 
     module = module_file.read_text()
     assert 'commit = "baseline-commit"' in module
-    assert '# git_override(module_name = "score_baselibs", commit = "commented"' in module
+    assert (
+        '# git_override(module_name = "score_baselibs", commit = "commented"' in module
+    )
 
 
 def test_bazel_dependency_policy_preserves_newer_baselibs_override(
@@ -727,9 +729,7 @@ def test_synchronize_workflow_keeps_sections_separated_without_source_newline(
     target = tmp_path / ".github/workflows/docs.yml"
     target.parent.mkdir(parents=True)
     target.write_text(
-        "name: Local\non: [push]\njobs:\n"
-        "  local:\n"
-        "    runs-on: ubuntu-latest\n"
+        "name: Local\non: [push]\njobs:\n  local:\n    runs-on: ubuntu-latest\n"
     )
     policy = Policy(
         "example",
@@ -798,9 +798,7 @@ def test_synchronize_workflow_rejects_four_space_job_id_collision(
     target = tmp_path / ".github/workflows/docs.yml"
     target.parent.mkdir(parents=True)
     target.write_text(
-        "name: Local\non: [push]\njobs:\n"
-        "    docs:\n"
-        "      runs-on: ubuntu-latest\n"
+        "name: Local\non: [push]\njobs:\n    docs:\n      runs-on: ubuntu-latest\n"
     )
     policy = Policy(
         "example",
@@ -1245,10 +1243,10 @@ def test_devcontainer_migration_rejects_root_config_with_relative_paths(
         / "policy.yml"
     )
     (tmp_path / ".devcontainer.json").write_text(
-        '{\n'
+        "{\n"
         '  "image": "ghcr.io/eclipse-score/devcontainer:v1.9.0",\n'
         '  "mounts": ["source=./cache,target=/cache"]\n'
-        '}\n'
+        "}\n"
     )
 
     with pytest.raises(RepoPolicySyncError, match="relative paths"):

@@ -114,7 +114,9 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
         if key in _REDUCED_ENVIRONMENT_KEYS or key.startswith("LC_")
     }
     try:
-        with tempfile.TemporaryDirectory(prefix="repo-policy-sync-after-apply-") as home:
+        with tempfile.TemporaryDirectory(
+            prefix="repo-policy-sync-after-apply-"
+        ) as home:
             environment.update(
                 {
                     "HOME": home,

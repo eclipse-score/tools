@@ -445,12 +445,8 @@ def _git_override_locations(
             commit_start=body_start + commit_match.start(2),
             commit_end=body_start + commit_match.end(2),
             remote=remote_match.group(2) if remote_match else None,
-            remote_start=(body_start + remote_match.start(2))
-            if remote_match
-            else None,
-            remote_end=(body_start + remote_match.end(2))
-            if remote_match
-            else None,
+            remote_start=(body_start + remote_match.start(2)) if remote_match else None,
+            remote_end=(body_start + remote_match.end(2)) if remote_match else None,
             remote_insertion=body_end,
             remote_insertion_prefix="" if body.endswith("\n") else "\n",
         )

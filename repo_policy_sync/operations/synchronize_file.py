@@ -269,11 +269,7 @@ def _replace_top_level_section(existing: str, source: str, key: str) -> str:
         # A source section without a trailing newline would otherwise join the
         # next existing top-level key into the same YAML line.
         replacement += "\n"
-    return (
-        existing[:start]
-        + replacement
-        + existing[end:]
-    )
+    return existing[:start] + replacement + existing[end:]
 
 
 def _remove_top_level_section(text: str, key: str) -> str:
@@ -403,9 +399,7 @@ def _nested_job_section(text: str, key: str) -> tuple[int, int] | None:
     return None
 
 
-def _mapping_entries(
-    text: str, *, nested: bool = False
-) -> list[re.Match[str]]:
+def _mapping_entries(text: str, *, nested: bool = False) -> list[re.Match[str]]:
     """Return mapping entries at the relevant indentation level.
 
     Workflow files commonly use two or four spaces. Selecting the first
@@ -430,11 +424,7 @@ def _mapping_entries(
         target_width = min(child_widths)
     else:
         target_width = min(widths)
-    return [
-        match
-        for match, width in zip(candidates, widths)
-        if width == target_width
-    ]
+    return [match for match, width in zip(candidates, widths) if width == target_width]
 
 
 def _preserved_ref(
