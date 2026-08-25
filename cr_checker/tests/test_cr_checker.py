@@ -414,3 +414,114 @@ def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
     )
 
     assert result is True
+
+
+# test that an exclusion.txt file sitting in the root directory is respected:
+# the listed file is neither flagged nor altered
+def test_exclusion_file_respected_at_root(tmp_path):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("py")
+
+    test_file = tmp_path / "file.py"
+    original_content = "some content\n"
+    test_file.write_text(original_content, encoding="utf-8")
+
+    exclusion_file = tmp_path / "exclusion.txt"
+    exclusion_file.write_text(str(test_file), encoding="utf-8")
+
+    exclusion, valid = cr_checker.load_exclusion(exclusion_file)
+    assert valid is True
+    assert exclusion == [str(test_file)]
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"py": header_template},
+        fix=True,
+        exclusion=exclusion,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+    assert results["fixed"] == 0
+    assert test_file.read_text(encoding="utf-8") == original_content
+
+
+# test that an exclusion.txt file sitting in a deeply nested directory is respected:
+# the listed file is neither flagged nor altered
+def test_exclusion_file_respected_in_nested_directory(tmp_path):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("py")
+
+    nested_dir = tmp_path / "a" / "b" / "c" / "d"
+    nested_dir.mkdir(parents=True)
+
+    test_file = nested_dir / "file.py"
+    original_content = "some content\n"
+    test_file.write_text(original_content, encoding="utf-8")
+
+    exclusion_file = nested_dir / "exclusion.txt"
+    exclusion_file.write_text(str(test_file), encoding="utf-8")
+
+    exclusion, valid = cr_checker.load_exclusion(exclusion_file)
+    assert valid is True
+    assert exclusion == [str(test_file)]
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"py": header_template},
+        fix=True,
+        exclusion=exclusion,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+    assert results["fixed"] == 0
+    assert test_file.read_text(encoding="utf-8") == original_content
+
+
+# test that a workspace-relative exclusion entry (as produced by e.g. `git ls-files`)
+# is still resolved correctly when the process's cwd is not the workspace root, which
+# is what happens under `bazel run`/`bazel test` (BUILD_WORKSPACE_DIRECTORY is set to
+# the workspace root while the cwd is the execroot/runfiles directory)
+def test_exclusion_file_respected_under_bazel_run_cwd(tmp_path, monkeypatch):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("py")
+
+    workspace_dir = tmp_path / "workspace"
+    nested_dir = workspace_dir / ".claude" / "skills" / "some_skill" / "scripts"
+    nested_dir.mkdir(parents=True)
+
+    test_file = nested_dir / "fix_titles.py"
+    original_content = "some content\n"
+    test_file.write_text(original_content, encoding="utf-8")
+
+    relative_entry = ".claude/skills/some_skill/scripts/fix_titles.py"
+    exclusion_file = workspace_dir / "exclusion.txt"
+    exclusion_file.write_text(relative_entry, encoding="utf-8")
+
+    execroot = tmp_path / "execroot"
+    execroot.mkdir()
+    monkeypatch.chdir(execroot)
+    monkeypatch.setenv("BUILD_WORKSPACE_DIRECTORY", str(workspace_dir))
+
+    exclusion, valid = cr_checker.load_exclusion(exclusion_file)
+    assert valid is True
+    assert exclusion == [str(test_file)]
+
+    collected_files = cr_checker.collect_inputs([relative_entry], exts=["py"])
+    assert collected_files == [test_file]
+
+    results = cr_checker.process_files(
+        files=collected_files,
+        templates={"py": header_template},
+        fix=True,
+        exclusion=exclusion,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["no_copyright"] == 0
+    assert results["fixed"] == 0
+    assert test_file.read_text(encoding="utf-8") == original_content

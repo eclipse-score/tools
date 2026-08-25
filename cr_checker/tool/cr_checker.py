@@ -169,6 +169,13 @@ def load_exclusion(path):
     """
     Loads the list of files being excluded from the copyright check.
 
+    Paths listed in the exclusion file are interpreted the same way as the
+    positional ``inputs`` handled by `collect_inputs`: relative to
+    `BUILD_WORKSPACE_DIRECTORY` when running under `bazel run`,
+    or relative to the current working directory otherwise. The returned
+    exclusion list is normalized the same way so it can be matched against
+    the paths produced by `collect_inputs`.
+
     Args:
         path (str): Path to the exclusion file.
 
@@ -177,20 +184,24 @@ def load_exclusion(path):
                            all paths listed in the exclusion file exist and are files.
     """
 
+    workspace_dir = Path(os.environ.get("BUILD_WORKSPACE_DIRECTORY", "").strip())
+
     exclusion = []
     valid = True
     with open(path, "r", encoding="utf-8") as file:
         for item in file.read().splitlines():
-            path = Path(item)
-            if not path.exists():
+            if not item:
+                continue
+            resolved = Path(workspace_dir / item)
+            if not resolved.exists():
                 LOGGER.error("Excluded file %s does not exist.", item)
                 valid = False
                 continue
-            if not path.is_file():
+            if not resolved.is_file():
                 LOGGER.error("Excluded file %s is not a file.", item)
                 valid = False
                 continue
-            exclusion.append(item)
+            exclusion.append(str(resolved))
 
     LOGGER.debug(exclusion)
     return exclusion, valid
