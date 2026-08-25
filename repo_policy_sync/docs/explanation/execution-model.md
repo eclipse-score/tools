@@ -30,9 +30,10 @@ owns one deterministic branch and one pull request per repository.
    authority for applicability and compliance.
 4. In plan mode, report required changes and make no remote changes.
 5. In apply mode, reuse a policy-owned pull request when present, otherwise
-   create a policy branch, apply the policy, run `pre-commit run --all-files`
-   when the target repository has `.pre-commit-config.yaml`, commit, push, and
-   open a pull request. If the first pre-commit run applies formatting fixes,
+   create a policy branch, apply the policy, run the configured pre-commit hooks
+   on the policy-changed paths when the target repository has
+   `.pre-commit-config.yaml`, commit, push, and open a pull request. If the
+   first pre-commit run applies formatting fixes,
    the changes are staged and pre-commit is run once more before publishing.
    The same pre-commit gate runs before rebuilding an existing policy branch.
    Existing policy-owned pull requests receive the current title and body. If

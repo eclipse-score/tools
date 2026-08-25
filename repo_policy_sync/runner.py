@@ -280,7 +280,10 @@ def run_policies(
                 "pull-request-recreated-no-changes",
             }:
                 pull_requests_recreated += 1
-            elif outcome.status == "pull-request-closed":
+            if outcome.status == "pull-request-closed" or (
+                outcome.status == "not-applicable"
+                and outcome.policy_pr_status == "closed"
+            ):
                 pull_requests_closed += 1
     return RunReport(
         RunSummary(
@@ -451,6 +454,28 @@ def _run_repository(
                     )
         raise
     if not evaluation.applies:
+        if apply:
+            existing_pr = client.find_open_pull_request(
+                repository=full_name,
+                branches=policy_branches(policy),
+                policy_id=policy.id,
+            )
+            if existing_pr is not None:
+                _close_owned_pull_request(
+                    client=client,
+                    repository=full_name,
+                    policy=policy,
+                    pull_request=existing_pr,
+                    checkout=checkout,
+                )
+                return RepositoryOutcome(
+                    repository,
+                    policy.id,
+                    "no (live)",
+                    "not-applicable",
+                    pull_request_url=existing_pr.url,
+                    policy_pr_status="closed",
+                )
         return RepositoryOutcome(repository, policy.id, "no (live)", "not-applicable")
     if recreate:
         return _recreate_repository(
@@ -486,7 +511,7 @@ def _run_repository(
             )
         )
         if apply and existing_pr is not None:
-            _close_compliant_pull_request(
+            _close_owned_pull_request(
                 client=client,
                 repository=full_name,
                 policy=policy,
@@ -721,7 +746,7 @@ def _policy_pr_url(status: PolicyPullRequestStatus | None) -> str | None:
     return pull_request.url if pull_request is not None else None
 
 
-def _close_compliant_pull_request(
+def _close_owned_pull_request(
     *,
     client: RepositoryClient,
     repository: str,

@@ -105,8 +105,9 @@ read access required by the organization's token policy. Keep apply workflows
 manual or otherwise separately protected; the pull-request validation
 workflow must not pass `--apply`.
 
-Apply mode runs the target repository's `pre-commit run --all-files` command
-before publishing changes. Treat apply mode as trusted-repository execution:
+Apply mode runs the target repository's configured pre-commit hooks on the
+policy-changed paths before publishing changes. Treat apply mode as
+trusted-repository execution:
 repository hooks can execute arbitrary code. The runner removes the usual
 GitHub token and user configuration environment, disables Git prompts, and
 uses a temporary home directory, but this is not a sandbox.

@@ -800,6 +800,38 @@ def test_apply_closes_owned_pull_request_after_default_branch_compliance(
     assert client.closed
 
 
+def test_apply_closes_owned_pull_request_when_policy_is_not_applicable(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "repository"
+    checkout.mkdir()
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        BazelCondition(("missing_dependency",)),
+        (),
+    )
+    client = CompliantPullRequestClient()
+
+    outcome = _run_repository(
+        client=client,
+        org="eclipse-score",
+        repository="candidate",
+        default_branch="main",
+        policy=policy,
+        checkout=checkout,
+        apply=True,
+    )
+
+    assert outcome.when == "no (live)"
+    assert outcome.status == "not-applicable"
+    assert outcome.policy_pr_status == "closed"
+    assert outcome.pull_request_url == client.pull_request.url
+    assert client.verified
+    assert client.closed
+
+
 def test_compliant_pull_request_is_not_closed_when_branch_head_changed(
     tmp_path: Path,
 ) -> None:

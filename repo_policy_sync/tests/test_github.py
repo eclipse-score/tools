@@ -159,6 +159,7 @@ def test_commit_runs_pre_commit_after_staging_when_repository_configures_it(
     monkeypatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / ".gitignore").write_text("\n")
     commands: list[tuple[list[str], Path | None]] = []
 
     def record(
@@ -189,7 +190,10 @@ def test_commit_runs_pre_commit_after_staging_when_repository_configures_it(
         "--",
         ".gitignore",
     ]
-    assert commands[1] == (["pre-commit", "run", "--all-files"], tmp_path)
+    assert commands[1] == (
+        ["pre-commit", "run", "--files", ".gitignore"],
+        tmp_path,
+    )
     assert commands[2][0] == [
         "git",
         "-C",
@@ -235,6 +239,7 @@ def test_pre_commit_does_not_inherit_credentials_or_user_configuration(
 
 def test_pre_commit_failure_stops_commit_and_push(monkeypatch, tmp_path: Path) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / ".gitignore").write_text("\n")
     commands: list[tuple[list[str], Path | None]] = []
 
     def record(
@@ -271,6 +276,7 @@ def test_pre_commit_formatting_fix_is_rechecked_before_publishing(
     monkeypatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / ".gitignore").write_text("\n")
     commands: list[tuple[list[str], Path | None]] = []
     pre_commit_runs = 0
 
@@ -327,6 +333,7 @@ def test_dirty_commit_keeps_pre_commit_failure_and_publishes_changes(
     monkeypatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / ".gitignore").write_text("\n")
     commands: list[tuple[list[str], Path | None]] = []
 
     def record(
@@ -879,6 +886,7 @@ def test_recreate_force_push_runs_pre_commit_before_commit(
     monkeypatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    (tmp_path / "MODULE.bazel.lock").write_text("lock\n")
     commands: list[tuple[list[str], Path | None]] = []
 
     def record(
@@ -910,7 +918,10 @@ def test_recreate_force_push_runs_pre_commit_before_commit(
         "--",
         "MODULE.bazel.lock",
     ]
-    assert commands[1] == (["pre-commit", "run", "--all-files"], tmp_path)
+    assert commands[1] == (
+        ["pre-commit", "run", "--files", "MODULE.bazel.lock"],
+        tmp_path,
+    )
     assert commands[2][0] == [
         "git",
         "-C",

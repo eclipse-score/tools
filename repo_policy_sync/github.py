@@ -430,7 +430,9 @@ class GitHubCli:
             pre_commit_failure=pre_commit_failure,
         )
 
-    def run_pre_commit(self, *, checkout: Path) -> bool:
+    def run_pre_commit(
+        self, *, checkout: Path, paths: tuple[str, ...] | None = None
+    ) -> bool:
         """Run every configured pre-commit hook before publishing policy changes.
 
         A non-zero result is allowed one retry because formatter hooks commonly
@@ -439,6 +441,8 @@ class GitHubCli:
         """
 
         if not (checkout / ".pre-commit-config.yaml").is_file():
+            return False
+        if paths is not None and not paths:
             return False
         environment = {
             key: value
@@ -455,11 +459,10 @@ class GitHubCli:
                     "GIT_TERMINAL_PROMPT": "0",
                 }
             )
-            self._run(
-                ["pre-commit", "run", "--all-files"],
-                cwd=checkout,
-                env=environment,
-            )
+            command = ["pre-commit", "run", "--all-files"]
+            if paths is not None:
+                command = ["pre-commit", "run", "--files", *paths]
+            self._run(command, cwd=checkout, env=environment)
         return True
 
     def _run_pre_commit(
@@ -467,12 +470,15 @@ class GitHubCli:
     ) -> tuple[bool, str | None]:
         """Run pre-commit twice when needed so formatter fixes can be published cleanly."""
 
+        existing_paths = tuple(path for path in paths if (checkout / path).exists())
+        if not existing_paths:
+            return False, None
         try:
-            ran = self.run_pre_commit(checkout=checkout)
+            ran = self.run_pre_commit(checkout=checkout, paths=existing_paths)
         except CommandError:
             self._run(["git", "-C", str(checkout), "add", "-A", "--", *paths])
             try:
-                ran = self.run_pre_commit(checkout=checkout)
+                ran = self.run_pre_commit(checkout=checkout, paths=existing_paths)
             except CommandError as exc:
                 if not allow_dirty_pr:
                     raise
