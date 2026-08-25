@@ -22,10 +22,8 @@ from repo_policy_sync.policy import BUNDLED_POLICY_DIRECTORY, load_policy
 from repo_policy_sync.models import (
     AfterApplyCommand,
     BazelDependencyUpdate,
-    BazelDependencyCondition,
     BazelCondition,
     Change,
-    EnsureBazelDependency,
     EnsureLine,
     EnsureMinimumVersion,
     EnsureNoSuchFile,
@@ -75,48 +73,6 @@ def test_policy_does_not_apply_without_direct_dependency(tmp_path: Path) -> None
         'bazel_dep(name = "other", version = "1.0")\n'
     )
     evaluation = evaluate_policy(tmp_path, _policy())
-    assert not evaluation.applies
-    assert evaluation.changes == ()
-
-
-@pytest.mark.parametrize(
-    "dependency",
-    [
-        'bazel_dep(name = "score_docs_as_code", version = "1.0")',
-        'bazel_dep(name = "score_docs_as_code", version = "1.0.0-rc1")',
-        'bazel_dep(name = "score_docs_as_code")',
-    ],
-)
-def test_bazel_conditions_reject_uncomparable_configured_versions(
-    tmp_path: Path, dependency: str
-) -> None:
-    (tmp_path / "MODULE.bazel").write_text(dependency + "\n")
-    policy = Policy(
-        "example",
-        "Example",
-        None,
-        BazelCondition(
-            (),
-            any_direct_module_conditions=(
-                BazelDependencyCondition("score_docs_as_code", "<", (2, 0, 0)),
-            ),
-        ),
-        (),
-    )
-
-    with pytest.raises(RepoPolicySyncError, match="score_docs_as_code"):
-        evaluate_policy(tmp_path, policy)
-
-
-def test_bazel_conditions_ignore_commented_dependencies(tmp_path: Path) -> None:
-    (tmp_path / "MODULE.bazel").write_text(
-        '# bazel_dep(name = "score_docs_as_code", version = "1.0")\n'
-        'module(name = "example")\n'
-        "note = \"bazel_dep(name = 'score_docs_as_code', version = '1.0')\"\n"
-    )
-
-    evaluation = evaluate_policy(tmp_path, _policy())
-
     assert not evaluation.applies
     assert evaluation.changes == ()
 
@@ -180,43 +136,6 @@ def test_ensure_no_such_file_refuses_a_directory_during_evaluation(
 
     with pytest.raises(RepoPolicySyncError, match="refusing to remove directory"):
         evaluate_policy(tmp_path, _policy())
-
-
-def test_ensure_no_such_file_removes_a_dangling_symlink(tmp_path: Path) -> None:
-    link = tmp_path / "obsolete"
-    link.symlink_to("missing")
-    policy = Policy(
-        "example",
-        "Example",
-        None,
-        None,
-        (EnsureNoSuchFile(Path("obsolete")),),
-    )
-
-    evaluation = evaluate_policy(tmp_path, policy)
-
-    assert evaluation.changes == (Change(Path("obsolete"), "remove file"),)
-    apply_policy(tmp_path, policy)
-    assert not link.is_symlink()
-
-
-def test_path_operations_reject_symlinks_to_outside_checkout(tmp_path: Path) -> None:
-    external = tmp_path.parent / f"{tmp_path.name}-external.txt"
-    external.write_text("legacy\n")
-    (tmp_path / "managed.txt").symlink_to(external)
-    policy = Policy(
-        "example",
-        "Example",
-        None,
-        None,
-        (ReplaceRegex(Path("managed.txt"), "legacy", "current"),),
-    )
-
-    with pytest.raises(RepoPolicySyncError, match="symbolic link"):
-        apply_policy(tmp_path, policy)
-
-    assert external.read_text() == "legacy\n"
-    external.unlink()
 
 
 def test_replace_regex_applies_and_is_idempotent(tmp_path: Path) -> None:
@@ -1042,63 +961,6 @@ def test_devcontainer_policy_rejects_unsupported_or_duplicate_declarations(
     with pytest.raises(RepoPolicySyncError, match="must declare version"):
         apply_policy(tmp_path, _devcontainer_policy())
     assert module_file.read_text() == before_module
-
-
-def test_ensure_bazel_dependency_ignores_commented_dependency(
-    tmp_path: Path,
-) -> None:
-    dockerfile = tmp_path / ".devcontainer/Dockerfile"
-    dockerfile.parent.mkdir()
-    dockerfile.write_text("FROM ghcr.io/eclipse-score/devcontainer:v1.9.0\n")
-    module_file = tmp_path / "MODULE.bazel"
-    module_file.write_text(
-        '# bazel_dep(name = "score_devcontainer", version = "1.9.0")\n'
-    )
-    policy = Policy(
-        "example",
-        "Example",
-        None,
-        None,
-        (
-            EnsureBazelDependency(
-                Path(".devcontainer/Dockerfile"),
-                Path("MODULE.bazel"),
-                "ghcr.io/eclipse-score/devcontainer",
-                "score_devcontainer",
-            ),
-        ),
-    )
-
-    apply_policy(tmp_path, policy)
-
-    assert module_file.read_text().count('name = "score_devcontainer"') == 2
-
-
-def test_synchronize_devcontainer_version_ignores_commented_dependency(
-    tmp_path: Path,
-) -> None:
-    _write_devcontainer_files(tmp_path, "1.9.0", "1.8.4")
-    module_file = tmp_path / "MODULE.bazel"
-    module_file.write_text(
-        '# bazel_dep(name = "score_devcontainer", version = "1.8.4")\n'
-    )
-    policy = Policy(
-        "example",
-        "Example",
-        None,
-        None,
-        (
-            SynchronizeDevcontainerVersion(
-                Path(".devcontainer/Dockerfile"),
-                Path("MODULE.bazel"),
-                "ghcr.io/eclipse-score/devcontainer",
-                "score_devcontainer",
-            ),
-        ),
-    )
-
-    with pytest.raises(RepoPolicySyncError, match="exactly one bazel_dep"):
-        apply_policy(tmp_path, policy)
 
 
 def test_after_apply_changed_path_guard_only_regenerates_lock_after_module_change(

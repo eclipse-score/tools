@@ -16,7 +16,7 @@
 from pathlib import Path
 from typing import Any
 
-from ..errors import PolicyError, RepoPolicySyncError
+from ..errors import PolicyError
 
 
 def expect_keys(value: dict[str, Any], allowed: set[str], source: Path) -> None:
@@ -34,46 +34,6 @@ def safe_relative_path(raw: str, source: Path) -> Path:
             f"policy {source}: path must be a non-empty repository-relative path"
         )
     return path
-
-
-def validate_repository_path(
-    root: Path, path: Path, *, allow_final_symlink: bool = False
-) -> None:
-    """Reject repository paths that escape through symlinks before I/O."""
-
-    root_absolute = root.absolute()
-    path_absolute = path.absolute()
-    try:
-        relative = path_absolute.relative_to(root_absolute)
-    except ValueError as exc:
-        raise RepoPolicySyncError(
-            f"repository path is outside checkout: {path}"
-        ) from exc
-
-    current = root_absolute
-    parts = relative.parts
-    for index, part in enumerate(parts):
-        current /= part
-        if current.is_symlink() and not (
-            allow_final_symlink and index == len(parts) - 1
-        ):
-            raise RepoPolicySyncError(
-                f"repository path must not contain a symbolic link: {relative}"
-            )
-
-    containment_path = (
-        path_absolute.parent
-        if allow_final_symlink and path_absolute.is_symlink()
-        else path_absolute
-    )
-    try:
-        resolved_root = root_absolute.resolve(strict=False)
-        resolved_path = containment_path.resolve(strict=False)
-        resolved_path.relative_to(resolved_root)
-    except (OSError, ValueError) as exc:
-        raise RepoPolicySyncError(
-            f"repository path resolves outside checkout: {relative}"
-        ) from exc
 
 
 def required_string(value: dict[str, Any], key: str, source: Path) -> str:

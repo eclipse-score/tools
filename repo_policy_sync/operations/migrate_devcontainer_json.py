@@ -29,7 +29,6 @@ from ._validation import (
     required_string,
     safe_relative_path,
     string_list,
-    validate_repository_path,
 )
 
 _VERSION = re.compile(r"v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\Z")
@@ -111,9 +110,7 @@ class MigrateDevcontainerJsonOperation:
         if source is None:
             return ()
         dockerfile = root / operation.dockerfile
-        validate_repository_path(root, dockerfile)
         destination = root / operation.destination
-        validate_repository_path(root, destination)
         migration = _migration_contents(source, operation, organization)
         if migration is None:
             return ()
@@ -177,9 +174,7 @@ class MigrateDevcontainerJsonOperation:
         if source is None:
             return
         dockerfile = root / operation.dockerfile
-        validate_repository_path(root, dockerfile)
         destination = root / operation.destination
-        validate_repository_path(root, destination)
         migration = _migration_contents(source, operation, organization)
         if migration is None:
             return
@@ -217,7 +212,6 @@ def _find_source(
     matches: list[tuple[Path, Path]] = []
     for path in operation.sources:
         candidate = root / path
-        validate_repository_path(root, candidate)
         if candidate.exists():
             matches.append((path, candidate))
     if len(matches) > 1:

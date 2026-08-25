@@ -20,17 +20,15 @@ import shlex
 import subprocess
 from pathlib import Path
 
-from .bazel import (
-    find_starlark_calls,
-    matches_bazel_dependency_condition,
-    parse_bazel_version,
-    starlark_string_arguments,
-)
-from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
+from .bazel import matches_bazel_dependency_condition, parse_bazel_version
+from .errors import CommandError, redact_sensitive_text
 from .models import Change, Evaluation, Policy, SynchronizeBazelDependencies
 from .operations import apply as apply_operation
 from .operations import describe_changes
-from .operations._validation import validate_repository_path
+
+_BAZEL_DEP_CALL = re.compile(r"bazel_dep\s*\((.*?)\)", re.DOTALL)
+_NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
+_VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*[\"']([^\"']+)[\"']")
 
 
 def evaluate_policy(
@@ -112,9 +110,7 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
 def _should_run_after_apply(
     root: Path, command, changed_paths: set[Path], *, force: bool = False
 ) -> bool:
-    path = root / command.when_file_exists
-    validate_repository_path(root, path)
-    return path.is_file() and (
+    return (root / command.when_file_exists).is_file() and (
         force
         or command.when_path_changed is None
         or command.when_path_changed in changed_paths
@@ -135,32 +131,17 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
     if condition is None:
         return True
     module_file = root / "MODULE.bazel"
-    validate_repository_path(root, module_file)
     if not module_file.is_file():
         return False
     text = module_file.read_text(encoding="utf-8")
     dependencies: dict[str, tuple[int, int, int] | None] = {}
-    for call in find_starlark_calls(text, "bazel_dep"):
-        name_matches = starlark_string_arguments(text, call, "name")
-        if not name_matches:
+    for call in _BAZEL_DEP_CALL.finditer(text):
+        name_match = _NAME_ARGUMENT.search(call.group(1))
+        if name_match is None:
             continue
-        version_matches = starlark_string_arguments(text, call, "version")
-        dependencies[name_matches[0].value] = (
-            parse_bazel_version(version_matches[0].value) if version_matches else None
-        )
-    condition_names = {
-        dependency_condition.module_name
-        for dependency_condition in condition.any_direct_module_conditions
-    }
-    invalid_versions = sorted(
-        name
-        for name in condition_names
-        if name in dependencies and dependencies[name] is None
-    )
-    if invalid_versions:
-        names = ", ".join(repr(name) for name in invalid_versions)
-        raise RepoPolicySyncError(
-            f"MODULE.bazel configured bazel_dep versions must be numeric major.minor.patch: {names}"
+        version_match = _VERSION_ARGUMENT.search(call.group(1))
+        dependencies[name_match.group(1)] = (
+            parse_bazel_version(version_match.group(1)) if version_match else None
         )
     # A policy can require a complete set and also accept one of several names.
     dependency_names = set(dependencies)
@@ -196,9 +177,7 @@ def _matches_file_exists_condition(root: Path, policy: Policy) -> bool:
     condition = policy.file_exists_condition
     if condition is None:
         return True
-    path = root / condition.path
-    validate_repository_path(root, path)
-    return path.is_file()
+    return (root / condition.path).is_file()
 
 
 def _matches_file_contains_condition(root: Path, policy: Policy) -> bool:
@@ -227,9 +206,7 @@ def _condition_paths(root: Path, path: Path) -> tuple[Path, ...]:
 
     # Literal paths are common, so avoid glob expansion and keep their behavior simple.
     if not any(character in str(path) for character in "*?["):
-        candidate = root / path
-        validate_repository_path(root, candidate)
-        return (candidate,) if candidate.is_file() else ()
+        return (root / path,) if (root / path).is_file() else ()
     # Glob conditions are used for files such as BUILD files at any directory depth.
     candidates: list[Path] = []
     for candidate in sorted(root.glob(str(path))):
@@ -237,7 +214,6 @@ def _condition_paths(root: Path, path: Path) -> tuple[Path, ...]:
         # Git metadata is not part of the repository content being evaluated.
         if ".git" in relative.parts:
             continue
-        validate_repository_path(root, candidate)
         if candidate.is_file():
             candidates.append(candidate)
     return tuple(candidates)

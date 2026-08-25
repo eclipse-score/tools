@@ -27,7 +27,6 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
-    validate_repository_path,
 )
 
 
@@ -96,7 +95,6 @@ class SynchronizeFileOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
-        validate_repository_path(root, path)
         _validate_target(path, operation)
         content_changed = not path.is_file() or (
             _desired_contents(path, operation) != path.read_text(encoding="utf-8")
@@ -123,7 +121,6 @@ class SynchronizeFileOperation:
     ) -> None:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
-        validate_repository_path(root, path)
         _validate_target(path, operation)
         desired_contents = _desired_contents(path, operation)
         if not path.is_file() or path.read_text(encoding="utf-8") != desired_contents:

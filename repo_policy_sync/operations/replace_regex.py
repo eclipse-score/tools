@@ -24,7 +24,6 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
-    validate_repository_path,
 )
 
 
@@ -60,7 +59,6 @@ class ReplaceRegexOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, ReplaceRegex)
         path = root / operation.path
-        validate_repository_path(root, path)
         _validate_target(path, operation)
         if not path.is_file():
             return ()
@@ -80,7 +78,6 @@ class ReplaceRegexOperation:
     ) -> None:
         assert isinstance(operation, ReplaceRegex)
         path = root / operation.path
-        validate_repository_path(root, path)
         _validate_target(path, operation)
         if not path.is_file():
             return

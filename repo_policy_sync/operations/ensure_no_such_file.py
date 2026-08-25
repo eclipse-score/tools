@@ -23,7 +23,6 @@ from ._validation import (
     optional_string,
     required_string,
     safe_relative_path,
-    validate_repository_path,
 )
 
 
@@ -47,7 +46,6 @@ class EnsureNoSuchFileOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureNoSuchFile)
         path = root / operation.path
-        validate_repository_path(root, path, allow_final_symlink=True)
         if not path.is_symlink() and path.is_dir():
             raise RepoPolicySyncError(f"refusing to remove directory {operation.path}")
         return (
@@ -65,7 +63,6 @@ class EnsureNoSuchFileOperation:
     ) -> None:
         assert isinstance(operation, EnsureNoSuchFile)
         path = root / operation.path
-        validate_repository_path(root, path, allow_final_symlink=True)
         if not path.exists() and not path.is_symlink():
             return
         if not path.is_symlink() and path.is_dir():
