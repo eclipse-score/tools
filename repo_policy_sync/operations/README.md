@@ -35,6 +35,7 @@ authoritative source for the complete schema, validation rules, and examples.
 | `synchronize_devcontainer_version` | Keeping a devcontainer image and Bazel dependency aligned | Finds one Dockerfile image tag and one direct `bazel_dep`, then upgrades the lower numeric version. |
 | `synchronize_bazel_dependencies` | Aligning a set of bzlmod dependencies and BUILD references | Updates configured direct dependencies, renames legacy modules, and manages configured git overrides. |
 | `synchronize_file` | Distributing a checked-in policy asset | Copies a policy-local UTF-8 asset to a repository-relative target and can set its executable bit. |
+| `synchronize_workflow` | Maintaining a reusable GitHub Actions workflow and its `workflow_run` companion | Finds the unique workflow calling a configured reusable workflow, preserves its name and local jobs, adds required triggers, and synchronizes `workflow_run` names. |
 
 All operations accept an optional `rationale`. When a change is needed, the
 rationale is included with the generated change description.

@@ -66,7 +66,7 @@ Use plan mode against one known repository before enabling apply mode for an
 organization:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org eclipse-score \
   --repo example-repository \
   --policy ensure-build-directory-ignored

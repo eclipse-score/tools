@@ -37,14 +37,20 @@ gh auth login
 
 # Plan with local policies from ./policies, when present, and the bundled SCORE
 # policies without changing remote repositories.
-uv run score-repo-policy-sync --org eclipse-score
+uv run score-repo-policy-sync plan --org eclipse-score
 
 # Add another local policy directory when needed.
-uv run score-repo-policy-sync --org eclipse-score \
+uv run score-repo-policy-sync plan --org eclipse-score \
   --policy-dir shared-policies
 
 # Apply: create or update policy-owned pull requests.
-uv run score-repo-policy-sync --org eclipse-score --apply
+uv run score-repo-policy-sync apply --org eclipse-score
+
+# Collect matching repository files for policy design and fixture review.
+uv run score-repo-policy-sync collect-samples \
+  --org eclipse-score \
+  --policy score-docs-workflow-alignment \
+  --output /tmp/score-policy-samples
 ```
 
 Pre-commit is run again when the first run applies formatting fixes. If the
@@ -53,7 +59,7 @@ pre-commit still fails but the changes should remain reviewable, opt in to a
 draft pull request. The failure is added as a PR comment:
 
 ```bash
-uv run score-repo-policy-sync --org eclipse-score --apply --allow-dirty-pr
+uv run score-repo-policy-sync apply --org eclipse-score --allow-dirty-pr
 ```
 
 Restrict a run with repeatable `--policy NAME` and `--repo NAME` flags. The
@@ -63,13 +69,13 @@ names are directory names below the selected policy directories. Use repeated
 `--policy-dir PATH` options to combine local policy directories:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org eclipse-score \
   --repo reference_integration \
   --policy-dir repo_policy_sync/policies \
   --policy minimum-bazel-version
 
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org etas \
   --repo reference_integration
 ```
@@ -77,7 +83,7 @@ uv run score-repo-policy-sync \
 To exclude a bundled policy for a repository or rollout:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org etas \
   --exclude-bundled-policy minimum-bazel-version
 ```
@@ -115,8 +121,8 @@ To rebuild a policy PR from the current default branch, use the guarded
 recreate operation with exactly one repository and policy:
 
 ```bash
-uv run score-repo-policy-sync --org eclipse-score --repo reference_integration \
-  --policy minimum-bazel-version --apply --recreate
+uv run score-repo-policy-sync apply --org eclipse-score --repo reference_integration \
+  --policy minimum-bazel-version --recreate
 ```
 
 ## Documentation

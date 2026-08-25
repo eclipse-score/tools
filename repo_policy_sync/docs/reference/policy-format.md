@@ -197,6 +197,40 @@ higher versions are unchanged. A missing file is compliant. A file containing
 any other format is rejected so the policy cannot accidentally overwrite an
 unknown version scheme.
 
+### `synchronize_workflow`
+
+```yaml
+- type: synchronize_workflow
+  source: docs.yml
+  reusable_workflow: eclipse-score/cicd-workflows/.github/workflows/docs.yml
+  minimum_version: 0.0.3
+  required_triggers:
+    - pull_request
+    - push
+    - merge_group
+    - release
+    - workflow_dispatch
+  workflow_run:
+    path: .github/workflows/docs-publish.yml
+    source: docs-publish.yml
+```
+
+Finds exactly one workflow below `.github/workflows` that calls the configured
+reusable workflow. The existing workflow remains the structural source of
+truth: its top-level `name`, local jobs, and job `with` values are preserved.
+Missing trigger events are copied from the policy asset, and the reusable job
+and permissions are synchronized. A lower reusable-workflow version is updated
+to the policy asset's ref; a higher version or unknown immutable ref is
+preserved.
+
+When `workflow_run` is configured, its workflow is synchronized in the same
+operation. The `on.workflow_run.workflows` value is derived from the selected
+build workflow's actual top-level `name`, so renaming or preserving a local
+workflow name cannot silently break the workflow-run companion.
+
+The operation rejects zero or multiple matching build workflows and rejects
+workflow assets that omit one of the declared `required_triggers`.
+
 ### `synchronize_file`
 
 ```yaml
@@ -225,9 +259,10 @@ preserve_reusable_workflow_refs:
 
 Policies that set `preserve_workflow_content: true` merge the standard
 workflow envelope into an existing workflow while retaining local jobs and
-their `with` parameters. The top-level `permissions` block is removed so the
-shared documentation build remains unprivileged; jobs needing permissions
-must declare them at job level.
+their `with` parameters. The source asset is authoritative for top-level
+`permissions`: an explicit block is copied into the target, while an omitted
+block removes any existing top-level permissions. Jobs needing different
+permissions must declare them at job level.
 
 ### `synchronize_devcontainer_version`
 

@@ -17,7 +17,7 @@ Use plan mode first. It refreshes disposable local checkouts and reports drift,
 but never changes remote repositories:
 
 ```bash
-uv run score-repo-policy-sync --org eclipse-score
+uv run score-repo-policy-sync plan --org eclipse-score
 ```
 
 The bundled SCORE policies are always loaded. In addition, policies are loaded
@@ -26,7 +26,7 @@ The directory layout and policy format are the same for local and bundled
 policies:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org etas
 ```
 
@@ -36,7 +36,7 @@ option to combine local policy directories.
 Exclude a bundled SCORE policy with `--exclude-bundled-policy`:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org eclipse-score \
   --repo reference_integration \
   --exclude-bundled-policy minimum-bazel-version
@@ -53,11 +53,24 @@ exclude_bundled_policies = ["minimum-bazel-version"]
 See the [configuration reference](../reference/configuration.md) for local
 policy directories and command-line overrides.
 
+To inspect all repository files selected by a policy's `when` conditions,
+collect read-only samples into an empty local directory:
+
+```bash
+uv run score-repo-policy-sync collect-samples \
+  --org eclipse-score \
+  --policy score-docs-workflow-alignment \
+  --output /tmp/score-policy-samples
+```
+
+The command writes one `before` case per matching repository and an
+`inventory.json`; it never creates branches, commits, or pull requests.
+
 Limit a rollout to selected policy and repository names with repeatable
 `--policy` and `--repo` options:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org eclipse-score \
   --repo reference_integration \
   --policy-dir policies \
@@ -68,12 +81,11 @@ When the plan is reviewed, apply the same selection to create or update the
 policy-owned pull requests:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync apply \
   --org eclipse-score \
   --repo reference_integration \
   --policy-dir policies \
-  --policy minimum-bazel-version \
-  --apply
+  --policy minimum-bazel-version
 ```
 
 ## Authentication and permissions
@@ -103,7 +115,7 @@ permissions:
 For private organizations, grant the equivalent organization and repository
 read access required by the organization's token policy. Keep apply workflows
 manual or otherwise separately protected; the pull-request validation
-workflow must not pass `--apply`.
+workflow must use the `plan` command and must not use `apply`.
 
 Apply mode runs the target repository's configured pre-commit hooks on the
 policy-changed paths before publishing changes. Treat apply mode as
@@ -116,7 +128,7 @@ For CI or another programmatic consumer, write the versioned JSON report to a
 file while retaining the standard table output:
 
 ```bash
-uv run score-repo-policy-sync \
+uv run score-repo-policy-sync plan \
   --org eclipse-score \
   --json-output policy-report.json
 ```
@@ -135,7 +147,7 @@ existing policy-owned PR after verifying that its branch head still matches the
 tool's ownership marker. Plan mode leaves the PR open. A changed or missing
 marker stops the run without closing the PR so it can be reviewed manually.
 
-Use `--apply --recreate` only to rebuild one existing policy pull request from
+Use `apply --recreate` only to rebuild one existing policy pull request from
 the current default branch. It requires exactly one `--repo` and one
 `--policy`; see the [CLI reference](../reference/cli.md) for all constraints.
 
@@ -156,5 +168,5 @@ an additional precaution.
 If an existing policy branch has changed outside the tool, Repository Policy
 Sync refuses to update it. Review the branch and pull request manually before
 rerunning. If a generated pull request is in conflict, a normal apply rerun
-rebuilds it from the current default branch; `--apply --recreate` is available
+rebuilds it from the current default branch; `apply --recreate` is available
 for the explicitly guarded one-repository, one-policy case.

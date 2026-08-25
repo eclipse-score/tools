@@ -28,7 +28,6 @@ def test_load_config_resolves_policy_directories_relative_to_config(
 org = "eclipse-score"
 policies = ["minimum-bazel-version"]
 repos = ["reference_integration"]
-apply = true
 policy_dirs = ["policies", "shared"]
 exclude_bundled_policies = ["minimum-bazel-version"]
 recreate = true
@@ -46,7 +45,6 @@ policy_workers = 3
     assert config.org == "eclipse-score"
     assert config.policies == ("minimum-bazel-version",)
     assert config.repositories == ("reference_integration",)
-    assert config.apply is True
     assert config.policy_directories == (tmp_path / "policies", tmp_path / "shared")
     assert config.exclude_bundled_policies == ("minimum-bazel-version",)
     assert config.recreate is True

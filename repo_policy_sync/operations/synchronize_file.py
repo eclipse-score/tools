@@ -216,33 +216,44 @@ def _merge_workflow_content(
     merged = existing
     for section in ("name", "on"):
         merged = _replace_top_level_section(merged, source, section)
-    # The shared build workflow is intentionally unprivileged. Existing
-    # top-level write permissions would apply to every job in this workflow.
-    merged = _remove_top_level_section(merged, "permissions")
+    # Use the policy asset as the source of truth for top-level permissions.
+    # This both removes repository-specific write permissions when the asset
+    # is unprivileged and preserves an explicitly required read permission.
+    if _top_level_section(source, "permissions") is None:
+        merged = _remove_top_level_section(merged, "permissions")
+    else:
+        merged = _replace_top_level_section(merged, source, "permissions")
 
-    if rules:
-        source_jobs = _top_level_section(source, "jobs")
-        source_job = (
-            _matching_job_block(source[source_jobs[0] : source_jobs[1]], rules)
-            if source_jobs is not None
-            else None
-        )
-        if source_job is not None:
-            existing_jobs = _top_level_section(merged, "jobs")
-            existing_job = (
-                _matching_job_location(
-                    merged[existing_jobs[0] : existing_jobs[1]], rules
-                )
-                if existing_jobs is not None
-                else None
-            )
-            if existing_jobs is not None and existing_job is not None:
-                merged = _merge_matching_job_permissions(merged, source, rules)
-            else:
-                merged = _append_workflow_job(merged, source, rules)
+    merged = _merge_workflow_jobs(merged, source, rules)
     # Workflow files are line-oriented YAML; always leave a separator for a
     # following section and a final newline for tools that rewrite the file.
     return merged if merged.endswith("\n") else merged + "\n"
+
+
+def _merge_workflow_jobs(
+    existing: str,
+    source: str,
+    rules: tuple[tuple[str, tuple[int, int, int]], ...],
+) -> str:
+    if not rules:
+        return existing
+    source_jobs = _top_level_section(source, "jobs")
+    source_job = (
+        _matching_job_block(source[source_jobs[0] : source_jobs[1]], rules)
+        if source_jobs is not None
+        else None
+    )
+    if source_job is None:
+        return existing
+    existing_jobs = _top_level_section(existing, "jobs")
+    existing_job = (
+        _matching_job_location(existing[existing_jobs[0] : existing_jobs[1]], rules)
+        if existing_jobs is not None
+        else None
+    )
+    if existing_jobs is not None and existing_job is not None:
+        return _merge_matching_job_permissions(existing, source, rules)
+    return _append_workflow_job(existing, source, rules)
 
 
 def _replace_top_level_section(existing: str, source: str, key: str) -> str:

@@ -70,6 +70,42 @@ def evaluate_policy(
     return Evaluation(applies=True, changes=tuple(changes))
 
 
+def matches_policy_conditions(root: Path, policy: Policy) -> bool:
+    """Return whether a checked-out repository matches a policy's ``when``."""
+
+    return _matches_conditions(root, policy)
+
+
+def policy_sample_paths(root: Path, policy: Policy) -> tuple[Path, ...]:
+    """Return repository files relevant for a policy sample collection."""
+
+    conditions = []
+    if policy.file_contains_condition is not None:
+        conditions.append(policy.file_contains_condition)
+    if policy.file_contains_any_condition is not None:
+        conditions.extend(policy.file_contains_any_condition.conditions)
+    if conditions:
+        paths = {
+            path
+            for condition in conditions
+            for path in _condition_paths(root, condition.path)
+            if re.search(condition.pattern, path.read_text(encoding="utf-8"))
+        }
+        return tuple(sorted(paths))
+
+    workflows = root / ".github/workflows"
+    validate_repository_path(root, workflows)
+    if not workflows.is_dir():
+        return ()
+    return tuple(
+        sorted(
+            path
+            for path in workflows.rglob("*")
+            if path.is_file() and path.suffix in {".yml", ".yaml"}
+        )
+    )
+
+
 def apply_policy(
     root: Path,
     policy: Policy,

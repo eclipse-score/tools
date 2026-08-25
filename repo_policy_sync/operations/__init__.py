@@ -28,6 +28,7 @@ from .replace_regex import ReplaceRegexOperation
 from .synchronize_devcontainer_version import SynchronizeDevcontainerVersionOperation
 from .synchronize_bazel_dependencies import SynchronizeBazelDependenciesOperation
 from .synchronize_file import SynchronizeFileOperation
+from .synchronize_workflow import SynchronizeWorkflowOperation
 
 
 class OperationHandler(Protocol):
@@ -63,6 +64,7 @@ _HANDLERS: tuple[OperationHandler, ...] = (
     SynchronizeDevcontainerVersionOperation(),
     SynchronizeBazelDependenciesOperation(),
     SynchronizeFileOperation(),
+    SynchronizeWorkflowOperation(),
 )
 # Operations that work on a repository root are handled explicitly below;
 # path-based operations can be dispatched directly to one target file.

@@ -674,7 +674,7 @@ def test_synchronize_file_replaces_contents_and_makes_the_target_executable(
     assert apply_policy(tmp_path, policy).changes == ()
 
 
-def test_synchronize_workflow_inserts_missing_name_and_preserves_jobs(
+def test_synchronize_file_inserts_missing_name_and_preserves_workflow_jobs(
     tmp_path: Path,
 ) -> None:
     target = tmp_path / ".github/workflows/docs.yml"
@@ -723,7 +723,56 @@ def test_synchronize_workflow_inserts_missing_name_and_preserves_jobs(
     assert "  docs:\n" in result
 
 
-def test_synchronize_workflow_keeps_sections_separated_without_source_newline(
+def test_synchronize_file_uses_source_workflow_permissions(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / ".github/workflows/docs.yml"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        "name: Local\n"
+        "permissions:\n"
+        "  contents: write\n"
+        "on: [push]\n"
+        "jobs:\n"
+        "  docs:\n"
+        "    uses: eclipse-score/cicd-workflows/.github/workflows/docs.yml@old\n"
+    )
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        None,
+        (
+            SynchronizeFile(
+                path=Path(".github/workflows/docs.yml"),
+                contents=(
+                    "name: Documentation\n"
+                    "permissions:\n"
+                    "  contents: read\n"
+                    "on: [workflow_dispatch]\n"
+                    "jobs:\n"
+                    "  docs:\n"
+                    "    uses: eclipse-score/cicd-workflows/.github/workflows/docs.yml@new\n"
+                ),
+                preserve_reusable_workflow_refs=(
+                    (
+                        "eclipse-score/cicd-workflows/.github/workflows/docs.yml",
+                        (0, 0, 3),
+                    ),
+                ),
+                preserve_workflow_content=True,
+            ),
+        ),
+    )
+
+    apply_policy(tmp_path, policy)
+
+    result = target.read_text()
+    assert "permissions:\n  contents: read\n" in result
+    assert "contents: write" not in result
+
+
+def test_synchronize_file_keeps_workflow_sections_separated_without_source_newline(
     tmp_path: Path,
 ) -> None:
     target = tmp_path / ".github/workflows/docs.yml"
@@ -756,7 +805,7 @@ def test_synchronize_workflow_keeps_sections_separated_without_source_newline(
     )
 
 
-def test_synchronize_workflow_rejects_job_id_collision(tmp_path: Path) -> None:
+def test_synchronize_file_rejects_workflow_job_id_collision(tmp_path: Path) -> None:
     target = tmp_path / ".github/workflows/docs.yml"
     target.parent.mkdir(parents=True)
     target.write_text(
@@ -792,7 +841,7 @@ def test_synchronize_workflow_rejects_job_id_collision(tmp_path: Path) -> None:
         apply_policy(tmp_path, policy)
 
 
-def test_synchronize_workflow_rejects_four_space_job_id_collision(
+def test_synchronize_file_rejects_four_space_workflow_job_id_collision(
     tmp_path: Path,
 ) -> None:
     target = tmp_path / ".github/workflows/docs.yml"
@@ -830,7 +879,7 @@ def test_synchronize_workflow_rejects_four_space_job_id_collision(
         apply_policy(tmp_path, policy)
 
 
-def test_synchronize_workflow_preserves_publish_permissions_on_matching_job(
+def test_synchronize_file_preserves_publish_permissions_on_matching_job(
     tmp_path: Path,
 ) -> None:
     target = tmp_path / ".github/workflows/docs-publish.yml"

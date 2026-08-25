@@ -18,6 +18,7 @@ import pytest
 from repo_policy_sync import cli
 from repo_policy_sync.policy import BUNDLED_POLICY_DIRECTORY
 from repo_policy_sync.runner import RunReport, RunSummary
+from repo_policy_sync.samples import SampleCollectionReport
 
 
 def _empty_report() -> RunReport:
@@ -44,13 +45,13 @@ def _empty_report() -> RunReport:
 @pytest.mark.parametrize(
     "argv, message",
     [
-        (("--org", "eclipse-score", "--recreate"), "--recreate requires --apply"),
+        (("plan", "--org", "eclipse-score", "--recreate"), "unrecognized arguments"),
         (
-            ("--org", "eclipse-score", "--apply", "--recreate", "--policy", "example"),
+            ("apply", "--org", "eclipse-score", "--recreate", "--policy", "example"),
             "exactly one --repo",
         ),
         (
-            ("--org", "eclipse-score", "--apply", "--recreate", "--repo", "example"),
+            ("apply", "--org", "eclipse-score", "--recreate", "--repo", "example"),
             "exactly one --policy",
         ),
     ],
@@ -88,6 +89,7 @@ def test_default_output_is_a_table(monkeypatch, capsys) -> None:
     assert (
         cli.main(
             (
+                "plan",
                 "--org",
                 "eclipse-score",
                 "--policy-dir",
@@ -120,6 +122,7 @@ def test_all_reports_can_be_written_from_one_run(
     assert (
         cli.main(
             (
+                "plan",
                 "--org",
                 "eclipse-score",
                 "--policy-dir",
@@ -156,6 +159,7 @@ def test_json_report_requests_pull_request_status(
     assert (
         cli.main(
             (
+                "plan",
                 "--org",
                 "eclipse-score",
                 "--policy-dir",
@@ -170,6 +174,38 @@ def test_json_report_requests_pull_request_status(
 
     assert observed["include_pull_request_status"] is True
     capsys.readouterr()
+
+
+def test_collect_samples_is_a_read_only_command(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    observed = {}
+    output = tmp_path / "samples"
+    monkeypatch.setattr(cli, "load_policies", lambda _: ())
+    monkeypatch.setattr(
+        cli,
+        "collect_samples",
+        lambda **kwargs: (
+            observed.update(kwargs) or SampleCollectionReport(output=output, cases=())
+        ),
+    )
+
+    assert (
+        cli.main(
+            (
+                "collect-samples",
+                "--org",
+                "eclipse-score",
+                "--output",
+                str(output),
+                "--quiet",
+            )
+        )
+        == 0
+    )
+    assert observed["output_directory"] == output
+    assert observed["repository_names"] == ()
+    assert "📦 Workflow samples" in capsys.readouterr().out
 
 
 def test_recreate_selects_only_the_requested_bundled_policy(
@@ -191,13 +227,13 @@ def test_recreate_selects_only_the_requested_bundled_policy(
     assert (
         cli.main(
             (
+                "apply",
                 "--org",
                 "eclipse-score",
                 "--repo",
                 "reference_integration",
                 "--policy",
                 "minimum-bazel-version",
-                "--apply",
                 "--recreate",
                 "--quiet",
             )
@@ -232,6 +268,7 @@ def test_recreate_does_not_load_unrelated_local_policies(
     assert (
         cli.main(
             (
+                "apply",
                 "--org",
                 "eclipse-score",
                 "--repo",
@@ -240,7 +277,6 @@ def test_recreate_does_not_load_unrelated_local_policies(
                 str(policy_directory),
                 "--policy",
                 "target",
-                "--apply",
                 "--recreate",
                 "--quiet",
             )
@@ -265,6 +301,7 @@ def test_bundled_policies_do_not_require_a_local_policy_directory(
     assert (
         cli.main(
             (
+                "plan",
                 "--org",
                 "etas-eng",
                 "--repo",
@@ -286,6 +323,7 @@ def test_bundled_policies_do_not_require_a_local_policy_directory(
     assert (
         cli.main(
             (
+                "plan",
                 "--org",
                 "etas-eng",
                 "--repo",
@@ -313,6 +351,7 @@ def test_bundled_policy_selected_from_bundled_directory_is_not_loaded_twice(
     assert (
         cli.main(
             (
+                "plan",
                 "--org",
                 "eclipse-score",
                 "--repo",
@@ -321,7 +360,6 @@ def test_bundled_policy_selected_from_bundled_directory_is_not_loaded_twice(
                 "repo_policy_sync/policies",
                 "--policy",
                 "minimum-bazel-version",
-                "--no-apply",
                 "--quiet",
             )
         )
@@ -341,7 +379,6 @@ def test_config_values_are_overridden_by_explicit_cli_values(
         """[score-repo-policy-sync]
 org = "config-org"
 repos = ["config-repo"]
-apply = true
 policy_dirs = []
 exclude_bundled_policies = ["minimum-bazel-version"]
 recreate = false
@@ -367,13 +404,13 @@ policy_workers = 3
     assert (
         cli.main(
             (
+                "apply",
                 "--config",
                 str(config_path),
                 "--org",
                 "cli-org",
                 "--repo",
                 "cli-repo",
-                "--no-apply",
                 "--no-allow-dirty-pr",
                 "--exclude-bundled-policy",
                 "score-devcontainer-dockerfile-migration",
@@ -390,7 +427,7 @@ policy_workers = 3
     )
     assert observed["org"] == "cli-org"
     assert observed["repository_names"] == ("cli-repo",)
-    assert observed["apply"] is False
+    assert observed["apply"] is True
     assert observed["allow_dirty_pr"] is False
     assert observed["sync_workers"] == 7
     assert observed["policy_workers"] == 8
@@ -404,14 +441,14 @@ policy_workers = 3
 
 
 def test_configurable_defaults_are_left_unset_for_config_merging() -> None:
-    args = cli.create_parser().parse_args(("--org", "eclipse-score"))
+    args = cli.create_parser().parse_args(("plan", "--org", "eclipse-score"))
 
     assert args.sync_workers is None
     assert args.policy_workers is None
 
 
 def test_policy_directory_defaults_to_current_working_directory() -> None:
-    args = cli.create_parser().parse_args(("--org", "eclipse-score"))
+    args = cli.create_parser().parse_args(("plan", "--org", "eclipse-score"))
 
     assert args.policy_dir is None
     assert args.config is None
@@ -420,7 +457,7 @@ def test_policy_directory_defaults_to_current_working_directory() -> None:
 
 def test_dirty_pull_requests_can_be_enabled() -> None:
     args = cli.create_parser().parse_args(
-        ("--org", "eclipse-score", "--allow-dirty-pr")
+        ("apply", "--org", "eclipse-score", "--allow-dirty-pr")
     )
 
     assert args.allow_dirty_pr is True
@@ -429,6 +466,7 @@ def test_dirty_pull_requests_can_be_enabled() -> None:
 def test_policy_directory_can_be_repeated() -> None:
     args = cli.create_parser().parse_args(
         (
+            "plan",
             "--org",
             "eclipse-score",
             "--policy-dir",
@@ -444,7 +482,7 @@ def test_policy_directory_can_be_repeated() -> None:
 def test_removed_policy_directory_alias_is_rejected() -> None:
     with pytest.raises(SystemExit) as exit_code:
         cli.create_parser().parse_args(
-            ("--org", "eclipse-score", "--policy-directory", "policies")
+            ("plan", "--org", "eclipse-score", "--policy-directory", "policies")
         )
 
     assert exit_code.value.code == 2
@@ -452,7 +490,13 @@ def test_removed_policy_directory_alias_is_rejected() -> None:
 
 def test_bundled_policies_can_be_excluded_separately() -> None:
     args = cli.create_parser().parse_args(
-        ("--org", "eclipse-score", "--exclude-bundled-policy", "minimum-bazel-version")
+        (
+            "plan",
+            "--org",
+            "eclipse-score",
+            "--exclude-bundled-policy",
+            "minimum-bazel-version",
+        )
     )
 
     assert args.exclude_bundled_policy == ["minimum-bazel-version"]
@@ -464,13 +508,20 @@ def test_help_groups_options_by_frequency(capsys) -> None:
 
     assert exit_code.value.code == 0
     help_text = capsys.readouterr().out
+    assert "plan" in help_text
+    assert "apply" in help_text
+    assert "collect-samples" in help_text
+
+    with pytest.raises(SystemExit) as exit_code:
+        cli.create_parser().parse_args(("apply", "--help"))
+
+    assert exit_code.value.code == 0
+    help_text = capsys.readouterr().out
     assert (
         help_text.index("Typical:")
         < help_text.index("Rare:")
         < help_text.index("Debugging only:")
     )
-    assert (
-        help_text.index("--apply")
-        < help_text.index("--recreate")
-        < help_text.index("--cache-dir")
-    )
+    _, debugging_help = help_text.split("Debugging only:", 1)
+    assert "--recreate" in help_text
+    assert "--cache-dir" in debugging_help

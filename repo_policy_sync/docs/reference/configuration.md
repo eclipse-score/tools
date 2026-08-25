@@ -25,7 +25,6 @@ continues with its defaults. `--config`, `--json-output`, and
 org = "eclipse-score"
 policies = ["my-local-policy"]
 repos = ["reference_integration"]
-apply = false
 
 # Relative paths are resolved relative to this TOML file.
 policy_dirs = ["policies", "shared-policies"]
@@ -50,7 +49,6 @@ The TOML keys map to the corresponding CLI options as follows:
 | `org` | `--org` |
 | `policies` | repeated `--policy` |
 | `repos` | repeated `--repo` |
-| `apply` | `--apply` / `--no-apply` |
 | `policy_dirs` | repeated `--policy-dir` |
 | `exclude_bundled_policies` | repeated `--exclude-bundled-policy` |
 | `recreate` | `--recreate` / `--no-recreate` |

@@ -33,6 +33,7 @@ from .policy import (
 )
 from .reporting import render_json, render_markdown, render_table
 from .runner import DEFAULT_POLICY_WORKERS, DEFAULT_SYNC_WORKERS, run_policies
+from .samples import collect_samples, render_sample_collection
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -40,15 +41,56 @@ def create_parser() -> argparse.ArgumentParser:
         prog="score-repo-policy-sync",
         description="Evaluate and remediate repository policies across a GitHub organization.",
         epilog=(
-            "All policy options except --config, --json-output, and --markdown-output "
-            "may also be set in the TOML configuration. "
+            "All policy options except command-specific output options may also be "
+            "set in the TOML configuration. "
             "Explicit command-line values override configuration values."
         ),
     )
+    commands = parser.add_subparsers(dest="command", required=True, metavar="COMMAND")
+    plan = commands.add_parser(
+        "plan", help="Evaluate policies without changing repositories."
+    )
+    _add_common_arguments(plan, reports=True)
+    apply = commands.add_parser(
+        "apply", help="Apply policies and manage pull requests."
+    )
+    _add_common_arguments(apply, reports=True)
+    apply.add_argument(
+        "--recreate",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Recreate one existing policy-owned pull request from the current default branch.",
+    )
+    apply.add_argument(
+        "--allow-dirty-pr",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "After the automatic formatting-fix retry, create a draft pull request "
+            "when pre-commit still fails and comment with the failure."
+        ),
+    )
+    collect = commands.add_parser(
+        "collect-samples",
+        help="Collect policy-matching repository files without changing repositories.",
+    )
+    _add_common_arguments(collect)
+    collect.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        metavar="DIRECTORY",
+        help="Empty directory in which to write collected samples and inventory.json.",
+    )
+    return parser
+
+
+def _add_common_arguments(
+    parser: argparse.ArgumentParser, *, reports: bool = False
+) -> None:
     typical = parser.add_argument_group("Typical")
     rare = parser.add_argument_group("Rare")
     debugging = parser.add_argument_group("Debugging only")
-
     typical.add_argument(
         "--org",
         help="GitHub organization name (also available in the TOML configuration).",
@@ -57,7 +99,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--policy",
         action="append",
         metavar="NAME",
-        help="Select one local policy by name. Repeat to select policies; defaults to all local policies.",
+        help="Select one policy by name. Repeat to select policies; defaults to all available policies.",
     )
     typical.add_argument(
         "--repo",
@@ -65,29 +107,24 @@ def create_parser() -> argparse.ArgumentParser:
         default=None,
         help="Exact repository name to include. Repeat to include more repositories.",
     )
-    typical.add_argument(
-        "--apply",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="Commit, push, and create or update pull requests for required changes.",
-    )
     rare.add_argument(
         "--config",
         type=Path,
         help="TOML configuration file (default: score-repo-policy-sync.toml if present).",
     )
-    rare.add_argument(
-        "--json-output",
-        type=Path,
-        metavar="PATH",
-        help="Also write the JSON report to PATH.",
-    )
-    rare.add_argument(
-        "--markdown-output",
-        type=Path,
-        metavar="PATH",
-        help="Also write the Markdown report to PATH.",
-    )
+    if reports:
+        rare.add_argument(
+            "--json-output",
+            type=Path,
+            metavar="PATH",
+            help="Also write the JSON report to PATH.",
+        )
+        rare.add_argument(
+            "--markdown-output",
+            type=Path,
+            metavar="PATH",
+            help="Also write the Markdown report to PATH.",
+        )
     rare.add_argument(
         "--policy-dir",
         dest="policy_dir",
@@ -100,21 +137,6 @@ def create_parser() -> argparse.ArgumentParser:
         action="append",
         metavar="NAME",
         help="Exclude one bundled SCORE policy by name. Repeat to exclude policies.",
-    )
-    rare.add_argument(
-        "--recreate",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help="Recreate one existing policy-owned pull request from the current default branch (requires --apply).",
-    )
-    rare.add_argument(
-        "--allow-dirty-pr",
-        action=argparse.BooleanOptionalAction,
-        default=None,
-        help=(
-            "After the automatic formatting-fix retry, create a draft pull request "
-            "when pre-commit still fails and comment with the failure."
-        ),
     )
     rare.add_argument(
         "--quiet",
@@ -146,7 +168,6 @@ def create_parser() -> argparse.ArgumentParser:
             f"(default: {DEFAULT_POLICY_WORKERS}, the available CPU count)."
         ),
     )
-    return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -163,15 +184,28 @@ def main(argv: Sequence[str] | None = None) -> int:
         repository_names = tuple(
             args.repo if args.repo is not None else (config.repositories or ())
         )
-        apply = args.apply if args.apply is not None else (config.apply or False)
-        recreate = (
-            args.recreate if args.recreate is not None else (config.recreate or False)
-        )
+        applying = args.command == "apply"
+        recreate = args.recreate if applying and args.recreate is not None else False
         allow_dirty_pr = (
             args.allow_dirty_pr
-            if args.allow_dirty_pr is not None
-            else (config.allow_dirty_pr or False)
+            if applying and args.allow_dirty_pr is not None
+            else False
         )
+        if not applying and (config.recreate or config.allow_dirty_pr):
+            parser.error(
+                "configuration options recreate and allow_dirty_pr require the apply command"
+            )
+        if applying:
+            recreate = (
+                args.recreate
+                if args.recreate is not None
+                else (config.recreate or False)
+            )
+            allow_dirty_pr = (
+                args.allow_dirty_pr
+                if args.allow_dirty_pr is not None
+                else (config.allow_dirty_pr or False)
+            )
         quiet = args.quiet if args.quiet is not None else (config.quiet or False)
         cache_directory = (
             args.cache_dir
@@ -194,8 +228,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             else config.exclude_bundled_policies
         )
         if recreate:
-            if not apply:
-                parser.error("--recreate requires --apply")
             if len(repository_names) != 1:
                 parser.error("--recreate requires exactly one --repo")
             if len(policy_names) != 1:
@@ -250,13 +282,27 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             policy_paths = local_policy_paths + bundled_policy_paths
         policies = load_policies(policy_paths)
+        if args.command == "collect-samples":
+            sample_report = collect_samples(
+                client=GitHubCli(),
+                org=org,
+                policies=policies,
+                repository_names=repository_names,
+                checkout_cache_directory=cache_directory,
+                output_directory=args.output,
+                sync_workers=sync_workers,
+                progress=_discard_progress if quiet else _write_progress,
+            )
+            print(render_sample_collection(sample_report))
+            return 2 if sample_report.sync_failures else 0
+
         report = run_policies(
             client=GitHubCli(),
             org=org,
             policies=policies,
             repository_names=repository_names,
             checkout_cache_directory=cache_directory,
-            apply=apply,
+            apply=applying,
             recreate=recreate,
             allow_dirty_pr=allow_dirty_pr,
             sync_workers=sync_workers,
@@ -288,7 +334,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(output)
     if report.summary.sync_failures or report.summary.evaluation_failures:
         return 2
-    return 1 if report.summary.drifted and not apply else 0
+    return 1 if report.summary.drifted and not applying else 0
 
 
 def _write_progress(message: str) -> None:

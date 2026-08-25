@@ -33,7 +33,6 @@ class PolicySyncConfig:
     org: str | None = None
     policies: tuple[str, ...] | None = None
     repositories: tuple[str, ...] | None = None
-    apply: bool | None = None
     policy_directories: tuple[Path, ...] | None = None
     exclude_bundled_policies: tuple[str, ...] = ()
     recreate: bool | None = None
@@ -88,7 +87,6 @@ def load_config(path: Path | None = None) -> PolicySyncConfig:
         "org",
         "policies",
         "repos",
-        "apply",
         "policy_dirs",
         "exclude_bundled_policies",
         "recreate",
@@ -107,7 +105,6 @@ def load_config(path: Path | None = None) -> PolicySyncConfig:
     org = _optional_string(section, "org", config_path)
     policies = _optional_string_list(section, "policies", config_path)
     repositories = _optional_string_list(section, "repos", config_path)
-    apply = _optional_bool(section, "apply", config_path)
 
     policy_directories = None
     if "policy_dirs" in section:
@@ -139,7 +136,6 @@ def load_config(path: Path | None = None) -> PolicySyncConfig:
         org=org,
         policies=policies,
         repositories=repositories,
-        apply=apply,
         policy_directories=policy_directories,
         exclude_bundled_policies=exclude_bundled_policies,
         recreate=recreate,

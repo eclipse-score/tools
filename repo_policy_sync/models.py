@@ -156,6 +156,20 @@ class SynchronizeFile:
 
 
 @dataclass(frozen=True)
+class SynchronizeWorkflow:
+    """Synchronize a reusable workflow while preserving repository structure."""
+
+    source: Path
+    contents: str
+    reusable_workflow: str
+    minimum_version: tuple[int, int, int]
+    required_triggers: tuple[str, ...]
+    workflow_run_path: Path | None = None
+    workflow_run_contents: str | None = None
+    rationale: str | None = None
+
+
+@dataclass(frozen=True)
 class MigrateDevcontainerJson:
     """Replace an image-based devcontainer config with a Dockerfile."""
 
@@ -178,6 +192,7 @@ EnsureOperation = (
     | SynchronizeDevcontainerVersion
     | SynchronizeBazelDependencies
     | SynchronizeFile
+    | SynchronizeWorkflow
     | MigrateDevcontainerJson
 )
 

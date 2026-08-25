@@ -10,18 +10,25 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-name: Documentation CI
+permissions:
+  contents: read
+
+name: Documentation
 on:
+  pull_request_target:
   pull_request:
+    types: [opened, reopened, synchronize]
   push:
     branches:
       - main
-    tags:
-      - "v*"
-  release:
-    types: [published]
   merge_group:
     types: [checks_requested]
+  release:
+    types: [published]
+  workflow_dispatch:
 jobs:
   docs:
     uses: eclipse-score/cicd-workflows/.github/workflows/docs.yml@v0.0.4
+    permissions:
+      contents: read
+      actions: write
