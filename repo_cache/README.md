@@ -25,6 +25,12 @@ Bazel-based or `uv`-based repository:
 uv add repo-cache --git https://github.com/eclipse-score/score_tools --subdirectory repo_cache
 ```
 
+Or run it directly with `uvx`, without adding it as a dependency anywhere:
+
+```bash
+uvx --from "git+https://github.com/eclipse-score/score_tools#subdirectory=repo_cache" score-repo-cache list --org eclipse-score
+```
+
 ## CLI
 
 ```bash
@@ -40,10 +46,9 @@ cloned there.
 ## Library
 
 ```python
-from pathlib import Path
-from repo_cache import sync_org
+from repo_cache import default_cache_directory, sync_org
 
-report = sync_org(org="eclipse-score", cache_dir=Path.home() / ".cache/repo-cache")
+report = sync_org(org="eclipse-score", cache_dir=default_cache_directory())
 for outcome in report.failures:
     print(outcome.repository.name, outcome.error)
 ```
@@ -52,3 +57,12 @@ for outcome in report.failures:
 
 Add `@score_tools//repo_cache:repo_cache` to your `py_library`/`py_binary`
 `deps` to use it from another Bazel workspace that depends on `score_tools`.
+
+To run the CLI directly as a `py_binary`:
+
+```bash
+bazel run @score_tools//repo_cache:score-repo-cache -- list --org eclipse-score
+```
+
+(from within `score_tools` itself, drop the `@score_tools//` prefix:
+`bazel run //repo_cache:score-repo-cache -- list --org eclipse-score`).
