@@ -169,6 +169,7 @@ class RepositoryOutcome:
     warnings: tuple[str, ...] = ()
     error: str | None = None
     policy_pr_status: str | None = None
+    pull_request_closed_by_run: bool = False
 
 
 def run_policies(
@@ -273,10 +274,7 @@ def run_policies(
                 "pull-request-recreated-no-changes",
             }:
                 pull_requests_recreated += 1
-            if outcome.status == "pull-request-closed" or (
-                outcome.status == "not-applicable"
-                and outcome.policy_pr_status == "closed"
-            ):
+            if outcome.pull_request_closed_by_run:
                 pull_requests_closed += 1
     return RunReport(
         RunSummary(
@@ -479,6 +477,7 @@ def _run_repository(
                     "not-applicable",
                     pull_request_url=existing_pr.url,
                     policy_pr_status="closed",
+                    pull_request_closed_by_run=True,
                 )
         return RepositoryOutcome(
             repository,
@@ -528,6 +527,7 @@ def _run_repository(
                 "pull-request-closed",
                 pull_request_url=existing_pr.url,
                 policy_pr_status="closed",
+                pull_request_closed_by_run=True,
             )
         return RepositoryOutcome(
             repository,
