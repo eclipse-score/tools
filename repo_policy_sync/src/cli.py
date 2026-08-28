@@ -285,6 +285,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             allow_dirty_pr=allow_dirty_pr,
             sync_workers=sync_workers,
             policy_workers=policy_workers,
+            # apply already looks up an open PR itself whenever it might act on
+            # one, so this only buys the extra merged-PR history used for
+            # display. Skip that extra `gh pr list` call in a bare apply run;
+            # still fetch it for plan (its only output) and for report files.
             include_pull_request_status=(
                 args.command == "plan"
                 or args.json_output is not None
