@@ -529,6 +529,40 @@ def test_create_pull_request_keeps_existing_automation_labels(monkeypatch) -> No
     )
 
 
+def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
+    monkeypatch,
+) -> None:
+    def run(command: list[str]) -> str:
+        if command[:5] == [
+            "gh",
+            "api",
+            "--paginate",
+            "--slurp",
+            "/repos/owner/repo/labels?per_page=100",
+        ]:
+            return '[[{"name":"automation"},{"name":"repo-policy-sync"}]]'
+        if command[:3] == ["gh", "pr", "create"]:
+            return "https://github.example/owner/repo/pull/1\n"
+        if command[:3] == ["gh", "pr", "edit"] and command[-1] == "repo-policy-sync":
+            raise CommandError("gh pr edit: permission denied")
+        if command[:3] == ["gh", "pr", "edit"]:
+            return ""
+        raise AssertionError(command)
+
+    monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
+    policy = Policy("example", "Example", None, None, ())
+
+    with pytest.raises(CommandError, match="permission denied"):
+        GitHubCli().create_pull_request(
+            repository="owner/repo",
+            base="main",
+            branch="repo-policy-sync/example",
+            policy=policy,
+            changes=(),
+            head_oid="a" * 40,
+        )
+
+
 def test_create_pull_request_can_create_a_draft(monkeypatch) -> None:
     commands: list[list[str]] = []
 
@@ -892,6 +926,35 @@ def test_pre_existing_user_pull_request_is_not_reused(monkeypatch) -> None:
         )
 
 
+def test_unlabeled_pull_request_on_expected_branch_is_not_reused(monkeypatch) -> None:
+    """A PR the `--label` lookup cannot see must still block branch reuse.
+
+    This covers both a maintainer's own PR opened directly on the expected
+    branch and a tool-created PR whose label application previously failed:
+    neither carries the tool label, so the `--label` query alone would miss
+    them and the branch could otherwise be silently pushed over.
+    """
+
+    policy = Policy("example", "Example", None, None, ())
+    branch = policy_branches(policy)[0]
+
+    def run(command: list[str]) -> str:
+        if "--label" in command:
+            return "[]"
+        assert command[:3] == ["gh", "pr", "list"]
+        assert command[command.index("--head") + 1] == branch
+        return json.dumps([{"number": 7}])
+
+    monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
+
+    with pytest.raises(CommandError, match="is not owned by policy example"):
+        GitHubCli().find_open_pull_request(
+            repository="owner/repo",
+            branches=policy_branches(policy),
+            policy_id=policy.id,
+        )
+
+
 def test_legacy_policy_pull_request_is_recognized_on_its_old_branch(
     monkeypatch,
 ) -> None:
@@ -907,19 +970,22 @@ def test_legacy_policy_pull_request_is_recognized_on_its_old_branch(
     old_branch = "repo-sync/old-policy"
 
     def run(command: list[str]) -> str:
-        assert command[command.index("--label") + 1] == "repo-policy-sync"
-        return json.dumps(
-            [
-                {
-                    "number": 1,
-                    "url": "https://github.example/owner/repo/pull/1",
-                    "body": "<!-- repo-sync-policy: old-policy -->\n"
-                    "<!-- repo-sync-head: " + "a" * 40 + " -->",
-                    "headRefName": old_branch,
-                    "mergeable": "MERGEABLE",
-                }
-            ]
-        )
+        if "--label" in command:
+            assert command[command.index("--label") + 1] == "repo-policy-sync"
+            return json.dumps(
+                [
+                    {
+                        "number": 1,
+                        "url": "https://github.example/owner/repo/pull/1",
+                        "body": "<!-- repo-sync-policy: old-policy -->\n"
+                        "<!-- repo-sync-head: " + "a" * 40 + " -->",
+                        "headRefName": old_branch,
+                        "mergeable": "MERGEABLE",
+                    }
+                ]
+            )
+        assert command[:3] == ["gh", "pr", "list"]
+        return "[]"
 
     monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
 
@@ -951,6 +1017,19 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
                         "body": "<!-- repo-policy-sync-policy: example -->\n"
                         "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
                         "headRefName": branch,
+                    }
+                ]
+            )
+        if state == "closed":
+            return json.dumps(
+                [
+                    {
+                        "number": 4,
+                        "url": "https://github.example/owner/repo/pull/4",
+                        "body": "<!-- repo-policy-sync-policy: example -->\n"
+                        "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                        "headRefName": branch,
+                        "closedAt": "2026-03-01T00:00:00Z",
                     }
                 ]
             )
@@ -986,6 +1065,8 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
     assert status.open.url.endswith("/3")
     assert status.merged is not None
     assert status.merged.url.endswith("/2")
+    assert status.closed is not None
+    assert status.closed.url.endswith("/4")
 
 
 def test_multiple_policy_pull_requests_fail_instead_of_choosing(monkeypatch) -> None:

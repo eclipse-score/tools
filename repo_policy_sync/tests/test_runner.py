@@ -372,6 +372,43 @@ def test_runner_adds_policy_pull_request_status_for_markdown_reports(
     assert report.outcomes[0].pull_request_url.endswith("/7")
 
 
+def test_runner_reports_a_pre_existing_closed_pull_request_for_plan(
+    tmp_path: Path,
+) -> None:
+    """Plan surfaces a policy PR someone closed without merging, not just none."""
+    source = tmp_path / "repository"
+    source.mkdir()
+    policy = Policy(
+        "example", "Example", None, None, (EnsureLine(Path("required.txt"), "yes", ()),)
+    )
+    client = PolicyStatusClient(
+        source,
+        (Repository("candidate", "main"),),
+        PolicyPullRequestStatus(
+            closed=PullRequest(
+                8,
+                "https://github.example/owner/candidate/pull/8",
+                closed_at="2026-01-01",
+            )
+        ),
+    )
+
+    report = run_policies(
+        client=client,
+        org="eclipse-score",
+        policies=(policy,),
+        repository_names=(),
+        checkout_cache_directory=tmp_path / "cache",
+        apply=False,
+        sync_workers=1,
+        policy_workers=1,
+        include_pull_request_status=True,
+    )
+
+    assert report.outcomes[0].policy_pr_status == "closed"
+    assert report.outcomes[0].pull_request_url.endswith("/8")
+
+
 def test_runner_reports_pull_request_status_when_policy_is_not_applicable(
     tmp_path: Path,
 ) -> None:

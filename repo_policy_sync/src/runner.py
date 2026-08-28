@@ -741,13 +741,15 @@ def _policy_pr_label(status: PolicyPullRequestStatus | None) -> str | None:
         return "open"
     if status.merged is not None:
         return "merged"
+    if status.closed is not None:
+        return "closed"
     return "none"
 
 
 def _policy_pr_url(status: PolicyPullRequestStatus | None) -> str | None:
     if status is None:
         return None
-    pull_request = status.open or status.merged
+    pull_request = status.open or status.merged or status.closed
     return pull_request.url if pull_request is not None else None
 
 

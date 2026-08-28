@@ -56,6 +56,7 @@ class PullRequest:
     warnings: tuple[str, ...] = ()
     branch: str = ""
     merged_at: str | None = None
+    closed_at: str | None = None
     body: str | None = None
     mergeable: str | None = None
 
@@ -66,6 +67,7 @@ class PolicyPullRequestStatus:
 
     open: PullRequest | None = None
     merged: PullRequest | None = None
+    closed: PullRequest | None = None
 
 
 @dataclass(frozen=True)
@@ -111,7 +113,7 @@ class GitHubCli:
         policy_id: str,
         legacy_policy_ids: tuple[str, ...] = (),
     ) -> PolicyPullRequestStatus:
-        """Find the open PR and latest merged PR owned by a repository policy."""
+        """Find the open, latest merged, and latest closed PR owned by a policy."""
 
         open_pull_requests = self._find_policy_pull_requests(
             repository=repository,
@@ -140,9 +142,25 @@ class GitHubCli:
             ),
             default=None,
         )
+        closed_pull_requests = self._find_policy_pull_requests(
+            repository=repository,
+            branches=branches,
+            policy_id=policy_id,
+            legacy_policy_ids=legacy_policy_ids,
+            state="closed",
+        )
+        latest_closed = max(
+            closed_pull_requests,
+            key=lambda pull_request: (
+                pull_request.closed_at or "",
+                pull_request.number,
+            ),
+            default=None,
+        )
         return PolicyPullRequestStatus(
             open=open_pull_requests[0] if open_pull_requests else None,
             merged=latest_merged,
+            closed=latest_closed,
         )
 
     def _find_policy_pull_requests(
@@ -158,11 +176,12 @@ class GitHubCli:
 
         owned: list[PullRequest] = []
         accepted_markers = _policy_markers((policy_id, *legacy_policy_ids))
-        fields = (
-            "number,url,body,headRefName,mergedAt"
-            if state == "merged"
-            else "number,url,body,headRefName,mergeable"
-        )
+        if state == "merged":
+            fields = "number,url,body,headRefName,mergedAt"
+        elif state == "closed":
+            fields = "number,url,body,headRefName,closedAt"
+        else:
+            fields = "number,url,body,headRefName,mergeable"
         output = self._run(
             [
                 "gh",
@@ -222,6 +241,11 @@ class GitHubCli:
                 raise CommandError(
                     f"gh returned invalid pull-request JSON for {repository}"
                 )
+            closed_at = pull_request.get("closedAt")
+            if closed_at is not None and not isinstance(closed_at, str):
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
+                )
             mergeable = pull_request.get("mergeable")
             if mergeable is not None and not isinstance(mergeable, str):
                 raise CommandError(
@@ -234,11 +258,70 @@ class GitHubCli:
                     expected_head_oid=_policy_head_marker_from_body(body),
                     branch=branch,
                     merged_at=merged_at,
+                    closed_at=closed_at,
                     body=body,
                     mergeable=mergeable,
                 )
             )
+        if state == "open":
+            self._verify_no_unlabeled_branch_collision(
+                repository=repository,
+                branches=branches,
+                owned_branches={pull_request.branch for pull_request in owned},
+                policy_id=policy_id,
+            )
         return tuple(owned)
+
+    def _verify_no_unlabeled_branch_collision(
+        self,
+        *,
+        repository: str,
+        branches: tuple[str, ...],
+        owned_branches: set[str],
+        policy_id: str,
+    ) -> None:
+        """Refuse to reuse an expected branch whose open PR lacks the tool label.
+
+        The `--label` lookup above cannot see a PR that never got the tool
+        label: a maintainer's own PR on the branch, or a tool-created PR whose
+        label application failed. Without this check either would be silently
+        invisible and a later apply could push over it or attempt a duplicate
+        pull request instead of refusing safely.
+        """
+
+        for branch in branches:
+            if branch in owned_branches:
+                continue
+            output = self._run(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--repo",
+                    repository,
+                    "--head",
+                    branch,
+                    "--state",
+                    "open",
+                    "--json",
+                    "number",
+                ]
+            )
+            try:
+                pull_requests = json.loads(output)
+            except json.JSONDecodeError as exc:
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
+                ) from exc
+            if not isinstance(pull_requests, list):
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
+                )
+            if pull_requests:
+                raise CommandError(
+                    f"refusing to reuse {repository} branch {branch}: its open pull "
+                    f"request is not owned by policy {policy_id}"
+                )
 
     def switch_to_policy_branch(
         self, *, checkout: Path, branch: str, exists_remotely: bool
@@ -447,8 +530,15 @@ class GitHubCli:
         output = self._run(create_command).strip()
         if not output:
             raise CommandError(f"gh did not return a pull-request URL for {repository}")
+        # The tool label is the sole ownership signal `_find_policy_pull_requests`
+        # relies on, so a PR missing it would be invisible to every later run
+        # and could be duplicated or overwritten. Only the cosmetic "automation"
+        # label may fail without aborting.
         warnings: list[str] = []
         for label in AUTOMATION_LABELS:
+            if label == TOOL_SLUG:
+                self._run(["gh", "pr", "edit", output, "--add-label", label])
+                continue
             try:
                 self._run(["gh", "pr", "edit", output, "--add-label", label])
             except CommandError as exc:

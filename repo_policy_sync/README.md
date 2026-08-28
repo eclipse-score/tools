@@ -142,8 +142,10 @@ quadrants:
 The supported executable is `score-repo-policy-sync`. Policy IDs are the
 directory names containing each `policy.yml`, and policy-owned branches use
 the `repo-policy-sync/<policy-id>` naming scheme. The first version does not
-provide command aliases or historical policy-ID compatibility; update callers
-to the supported command and current policy IDs before rollout.
+provide command aliases; update callers to the supported command before
+rollout. Renaming a policy is supported by listing its former directory name
+in `legacy_names` (see Compatibility notes below) so the existing branch or
+pull request is located and updated instead of duplicated.
 
 ## First-version change summary
 
