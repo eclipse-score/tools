@@ -373,7 +373,7 @@ def test_runner_adds_policy_pull_request_status_for_markdown_reports(
 
 
 def test_runner_reports_a_pre_existing_closed_pull_request_for_plan(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Plan surfaces a policy PR someone closed without merging, not just none."""
     source = tmp_path / "repository"
@@ -392,6 +392,7 @@ def test_runner_reports_a_pre_existing_closed_pull_request_for_plan(
             )
         ),
     )
+    _install_fake_sync(monkeypatch, client)
 
     report = run_policies(
         client=client,
