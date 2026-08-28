@@ -286,7 +286,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             sync_workers=sync_workers,
             policy_workers=policy_workers,
             include_pull_request_status=(
-                args.json_output is not None or args.markdown_output is not None
+                args.command == "plan"
+                or args.json_output is not None
+                or args.markdown_output is not None
             ),
             progress=_discard_progress if quiet else _write_progress,
         )

@@ -175,6 +175,23 @@ def test_json_report_requests_pull_request_status(
     capsys.readouterr()
 
 
+def test_plan_requests_pull_request_status_for_terminal_report(
+    monkeypatch, capsys
+) -> None:
+    observed = {}
+    monkeypatch.setattr(cli, "load_policies", lambda _: ())
+    monkeypatch.setattr(
+        cli,
+        "run_policies",
+        lambda **kwargs: observed.update(kwargs) or _empty_report(),
+    )
+
+    assert cli.main(("plan", "--org", "eclipse-score", "--quiet")) == 0
+
+    assert observed["include_pull_request_status"] is True
+    capsys.readouterr()
+
+
 def test_recreate_selects_only_the_requested_bundled_policy(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -157,6 +157,55 @@ def test_render_table_uses_red_changes_required_marker() -> None:
     assert "🔴" in output
 
 
+def test_render_table_shows_pull_request_state_and_number_in_status() -> None:
+    report = _report()
+    outcome = report.outcomes[0]
+    report = RunReport(
+        summary=report.summary,
+        outcomes=(
+            RepositoryOutcome(
+                outcome.repository,
+                outcome.policy_id,
+                outcome.when,
+                outcome.status,
+                changes=outcome.changes,
+                pull_request_url="https://github.example/owner/repo/pull/1",
+                policy_pr_status="open",
+            ),
+        ),
+    )
+
+    output = render_table(report)
+
+    assert "Pull request" not in output
+    assert "🔄 open #1" in output
+    assert "https://github.example/owner/repo/pull/1" not in output
+
+
+def test_render_table_keeps_compliance_status_for_mismatched_pull_request() -> None:
+    report = _report()
+    outcome = report.outcomes[0]
+    report = RunReport(
+        summary=report.summary,
+        outcomes=(
+            RepositoryOutcome(
+                outcome.repository,
+                outcome.policy_id,
+                "yes (live)",
+                "compliant",
+                pull_request_url="https://github.example/owner/repo/pull/1",
+                policy_pr_status="open",
+            ),
+        ),
+    )
+
+    output = render_table(report).split("\n\n📊 Summary", 1)[0]
+
+    assert "│ ✅     │" in output
+    assert "open" not in output
+    assert "#1" not in output
+
+
 def test_render_json_is_machine_readable_and_versioned() -> None:
     output = render_json(_report())
 

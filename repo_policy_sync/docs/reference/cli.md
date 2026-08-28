@@ -27,7 +27,7 @@ are CLI-only.
 
 | Command | Description |
 | --- | --- |
-| `plan` | Evaluate policies without changing repositories. Exit status `1` indicates drift. |
+| `plan` | Evaluate policies and report matching policy pull requests without changing repositories. Exit status `1` indicates drift. |
 | `apply` | Apply policies and create or update policy-owned pull requests. |
 
 ## Typical
@@ -37,7 +37,7 @@ are CLI-only.
 | `--org NAME` | GitHub organization to scan. May be set in TOML. |
 | `--policy NAME` | Select a policy by directory name from local or bundled policies. Repeat to select more than one; when present, only the selected policies run. Defaults to all local and bundled policies. |
 | `--repo NAME` | Restrict the run to an exact repository name. Repeat to select more than one. |
-| *(stdout)* | Always prints the terminal policy-evaluation table. |
+| *(stdout)* | Always prints the terminal policy-evaluation table, including policy pull-request state and number. |
 
 ## Rare
 

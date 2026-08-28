@@ -31,7 +31,7 @@ def render_table(report: RunReport) -> str:
         (
             outcome.policy_id,
             outcome.repository,
-            _status_label(outcome.status),
+            _status_label(outcome),
             _actions_label(outcome),
         )
         for outcome in report.outcomes
@@ -44,7 +44,7 @@ def render_table(report: RunReport) -> str:
         _render_box_table(
             ("Policy", "Repository", "Status", "Actions"),
             rows,
-            column_limits=(24, 24, 32, 48),
+            column_limits=(24, 24, 44, 48),
         ),
     ]
     lines.extend(_summary_lines(report))
@@ -389,8 +389,8 @@ def _failure_table(title: str, failures: tuple[RepositoryOutcome, ...]) -> list[
     return lines
 
 
-def _status_label(status: str) -> str:
-    return {
+def _status_label(outcome: RepositoryOutcome) -> str:
+    label = {
         "compliant": "✅",
         "changes-required": _changes_required_marker(),
         "not-applicable": "⚪",
@@ -402,7 +402,14 @@ def _status_label(status: str) -> str:
         "pull-request-recreated": "♻ pull request recreated",
         "pull-request-recreated-no-changes": "♻ pull request recreated (no changes)",
         "pull-request-closed": "✅ pull request closed",
-    }.get(status, status)
+    }.get(outcome.status, outcome.status)
+    if _matching_pull_request_state_should_replace_compliance(outcome):
+        return _pull_request_label(outcome)
+    if outcome.status.startswith("pull-request-") and outcome.pull_request_url:
+        number = outcome.pull_request_url.rstrip("/").rsplit("/", 1)[-1]
+        if number.isdigit():
+            return f"{label} #{number}"
+    return label
 
 
 def _changes_required_marker() -> str:
@@ -413,11 +420,40 @@ def _actions_label(outcome: RepositoryOutcome) -> str:
     if outcome.error:
         return outcome.error
     actions = _format_changes(outcome.changes)
-    if outcome.pull_request_url:
-        actions = f"{actions}; PR: {outcome.pull_request_url}"
     if outcome.warnings:
         actions = f"{actions}; {'; '.join(outcome.warnings)}"
     return actions or "-"
+
+
+def _pull_request_label(outcome: RepositoryOutcome) -> str:
+    """Render the discovered policy PR state and number for terminal users."""
+
+    labels = {
+        "open": "🔄 open",
+        "merged": "🔗 merged",
+        "closed": "✅ closed",
+        "none": "— no PR",
+    }
+    if outcome.policy_pr_status is None:
+        return "? not checked"
+    label = labels.get(outcome.policy_pr_status, outcome.policy_pr_status)
+    if outcome.pull_request_url:
+        number = outcome.pull_request_url.rstrip("/").rsplit("/", 1)[-1]
+        if number.isdigit():
+            return f"{label} #{number}"
+    return label
+
+
+def _matching_pull_request_state_should_replace_compliance(
+    outcome: RepositoryOutcome,
+) -> bool:
+    """Return whether the PR state is the useful status for this outcome."""
+
+    if outcome.policy_pr_status == "open":
+        return outcome.status == "changes-required"
+    if outcome.policy_pr_status in {"merged", "closed"}:
+        return outcome.status in {"compliant", "pull-request-closed"}
+    return False
 
 
 def _format_changes(changes: tuple[Change, ...]) -> str:

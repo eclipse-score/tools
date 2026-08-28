@@ -11,7 +11,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 title: "chore(docs): update score_docs_as_code gitignore configuration"
-legacy_names: [docs-as-code-legacy-configuration-removal]
+legacy_names:
+  - docs-as-code-legacy-configuration-removal
+  - score-docs-as-code.gitignore-and-cleanup
+  - score-docs-as-code.legacy-documentation-cleanup
 description: >
   Update the `.gitignore` configuration for `score_docs_as_code`.
 

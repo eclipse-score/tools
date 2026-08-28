@@ -87,7 +87,9 @@ Policy options can be kept in the optional `score-repo-policy-sync.toml` file.
 Explicit CLI values override the file; see the
 [configuration reference](docs/reference/configuration.md).
 
-The CLI always prints a compact table to standard output. Pass
+The CLI always prints a compact table to standard output, including the
+discovered policy pull-request state (`open`, `merged`, `closed`, or `none`)
+and number. Pass
 `--json-output PATH` and/or `--markdown-output PATH` to write additional
 versioned JSON and Markdown reports during the same policy run. Markdown is
 suited for pull requests, issues, and wikis. Its cells use `✅` for compliant,
@@ -153,11 +155,11 @@ policy concurrency, and recovery from stale or conflicting policy branches.
 
 Compatibility notes:
 
-- Callers must use `score-repo-policy-sync`, `--policy-dir`, the current policy
-  IDs, and `repo-policy-sync/<policy-id>` branches. Legacy command aliases,
-  `--policy-directory`, and historical policy IDs are not supported.
-- Renaming a policy changes its branch and pull-request identity. Existing
-  policy branches or pull requests must be handled before adopting the new ID.
+- Callers must use `score-repo-policy-sync` and `--policy-dir`; legacy command
+  aliases and `--policy-directory` are not supported.
+- Policy migrations can list historical policy IDs in `legacy_names`. Matching
+  labelled historical pull requests are reported and can only be modified when
+  their body contains a verifiable branch-head marker.
 - The first version intentionally does not provide dynamic operation plugins,
   persistent result storage, generalized retries/rate-limit handling, or
   non-GitHub providers.

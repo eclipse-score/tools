@@ -28,6 +28,10 @@ from .errors import CommandError, redact_sensitive_text
 from .models import Change, Policy, policy_branch_slug
 
 TOOL_SLUG = "repo-policy-sync"
+# PRs created by the previous implementation used this slug in their body and
+# branch names.  Keep accepting it while the label remains the stable tool
+# ownership signal.
+LEGACY_TOOL_SLUG = "repo-sync"
 AUTOMATION_LABELS = ("automation", TOOL_SLUG)
 AUTOMATION_LABEL_COLOR = "EDEDED"
 _PRE_COMMIT_ENVIRONMENT_KEYS = {
@@ -150,90 +154,90 @@ class GitHubCli:
         legacy_policy_ids: tuple[str, ...],
         state: str,
     ) -> tuple[PullRequest, ...]:
-        """Find policy-owned PRs in one GitHub state across its branch."""
+        """Find policy-owned PRs in one GitHub state using the tool label."""
 
         owned: list[PullRequest] = []
-        accepted_markers = {
-            _policy_marker(identifier) for identifier in (policy_id, *legacy_policy_ids)
-        }
+        accepted_markers = _policy_markers((policy_id, *legacy_policy_ids))
         fields = (
-            "number,url,body,mergedAt"
+            "number,url,body,headRefName,mergedAt"
             if state == "merged"
-            else "number,url,body,mergeable"
+            else "number,url,body,headRefName,mergeable"
         )
-        for branch in branches:
-            output = self._run(
-                [
-                    "gh",
-                    "pr",
-                    "list",
-                    "--repo",
-                    repository,
-                    "--head",
-                    branch,
-                    "--state",
-                    state,
-                    "--json",
-                    fields,
-                ]
+        output = self._run(
+            [
+                "gh",
+                "pr",
+                "list",
+                "--repo",
+                repository,
+                "--label",
+                TOOL_SLUG,
+                "--state",
+                state,
+                "--limit",
+                "1000",
+                "--json",
+                fields,
+            ]
+        )
+        try:
+            pull_requests = json.loads(output)
+        except json.JSONDecodeError as exc:
+            raise CommandError(
+                f"gh returned invalid pull-request JSON for {repository}"
+            ) from exc
+        if not isinstance(pull_requests, list):
+            raise CommandError(
+                f"gh returned invalid pull-request JSON for {repository}"
             )
-            try:
-                pull_requests = json.loads(output)
-            except json.JSONDecodeError as exc:
-                raise CommandError(
-                    f"gh returned invalid pull-request JSON for {repository}"
-                ) from exc
-            if not isinstance(pull_requests, list):
+        for pull_request in pull_requests:
+            if not isinstance(pull_request, dict):
                 raise CommandError(
                     f"gh returned invalid pull-request JSON for {repository}"
                 )
-            for pull_request in pull_requests:
-                if not isinstance(pull_request, dict):
-                    raise CommandError(
-                        f"gh returned invalid pull-request JSON for {repository}"
-                    )
-                raw_body = pull_request.get("body", "")
-                body = "" if raw_body is None else raw_body
-                if not isinstance(body, str):
-                    raise CommandError(
-                        f"gh returned invalid pull-request JSON for {repository}"
-                    )
-                if not any(marker in body for marker in accepted_markers):
-                    if state == "merged":
-                        # Merged history may contain an unrelated PR from a
-                        # previous branch user; only an open PR can block reuse.
-                        continue
+            raw_body = pull_request.get("body", "")
+            body = "" if raw_body is None else raw_body
+            branch = pull_request.get("headRefName")
+            if not isinstance(body, str) or not isinstance(branch, str) or not branch:
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
+                )
+            if not any(marker in body for marker in accepted_markers):
+                if state == "open" and branch in branches:
                     raise CommandError(
                         f"refusing to reuse {repository} branch {branch}: its {state} pull request "
                         f"is not owned by policy {policy_id}"
                     )
-                number = pull_request.get("number")
-                url = pull_request.get("url")
-                if not isinstance(number, int) or not isinstance(url, str):
-                    raise CommandError(
-                        f"gh returned invalid pull-request JSON for {repository}"
-                    )
-                merged_at = pull_request.get("mergedAt")
-                if merged_at is not None and not isinstance(merged_at, str):
-                    raise CommandError(
-                        f"gh returned invalid pull-request JSON for {repository}"
-                    )
-                mergeable = pull_request.get("mergeable")
-                if mergeable is not None and not isinstance(mergeable, str):
-                    raise CommandError(
-                        f"gh returned invalid pull-request JSON for {repository}"
-                    )
-                owned.append(
-                    PullRequest(
-                        number=number,
-                        url=url,
-                        expected_head_oid=_policy_head_marker_from_body(body),
-                        branch=branch,
-                        merged_at=merged_at,
-                        body=body,
-                        mergeable=mergeable,
-                    )
+                # A labelled PR for another policy is expected in a repository
+                # that is managed by the tool; it is not ours to reuse.
+                continue
+            number = pull_request.get("number")
+            url = pull_request.get("url")
+            if not isinstance(number, int) or not isinstance(url, str):
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
                 )
+            merged_at = pull_request.get("mergedAt")
+            if merged_at is not None and not isinstance(merged_at, str):
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
+                )
+            mergeable = pull_request.get("mergeable")
+            if mergeable is not None and not isinstance(mergeable, str):
+                raise CommandError(
+                    f"gh returned invalid pull-request JSON for {repository}"
+                )
+            owned.append(
+                PullRequest(
+                    number=number,
+                    url=url,
+                    expected_head_oid=_policy_head_marker_from_body(body),
+                    branch=branch,
+                    merged_at=merged_at,
+                    body=body,
+                    mergeable=mergeable,
+                )
+            )
         return tuple(owned)
 
     def switch_to_policy_branch(
@@ -625,12 +629,25 @@ def _policy_marker(policy_id: str) -> str:
     return f"<!-- {TOOL_SLUG}-policy: {policy_id} -->"
 
 
+def _policy_markers(policy_ids: tuple[str, ...]) -> tuple[str, ...]:
+    """Return current and historical ownership markers for policy IDs."""
+
+    return tuple(
+        f"<!-- {tool_slug}-policy: {policy_id} -->"
+        for tool_slug in (TOOL_SLUG, LEGACY_TOOL_SLUG)
+        for policy_id in policy_ids
+    )
+
+
 def _policy_head_marker(head_oid: str) -> str:
     return f"<!-- {TOOL_SLUG}-head: {head_oid} -->"
 
 
 def _policy_head_marker_from_body(body: str) -> str | None:
-    match = re.search(rf"<!-- {re.escape(TOOL_SLUG)}-head: ([0-9a-f]{{40}}) -->", body)
+    tool_slugs = "|".join(
+        re.escape(tool_slug) for tool_slug in (TOOL_SLUG, LEGACY_TOOL_SLUG)
+    )
+    match = re.search(rf"<!-- (?:{tool_slugs})-head: ([0-9a-f]{{40}}) -->", body)
     return match.group(1) if match else None
 
 

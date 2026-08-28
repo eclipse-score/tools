@@ -414,6 +414,15 @@ def _run_repository(
     include_pull_request_status: bool = False,
 ) -> RepositoryOutcome:
     full_name = f"{org}/{repository}"
+    policy_pr_status = (
+        _find_policy_pull_request_status(
+            client=client,
+            repository=full_name,
+            policy=policy,
+        )
+        if include_pull_request_status
+        else None
+    )
     try:
         evaluation = evaluate_policy(checkout, policy, organization=org)
     except RepoPolicySyncError as exc:
@@ -471,7 +480,14 @@ def _run_repository(
                     pull_request_url=existing_pr.url,
                     policy_pr_status="closed",
                 )
-        return RepositoryOutcome(repository, policy.id, "no (live)", "not-applicable")
+        return RepositoryOutcome(
+            repository,
+            policy.id,
+            "no (live)",
+            "not-applicable",
+            pull_request_url=_policy_pr_url(policy_pr_status),
+            policy_pr_status=_policy_pr_label(policy_pr_status),
+        )
     if recreate:
         return _recreate_repository(
             client=client,
@@ -482,15 +498,6 @@ def _run_repository(
             checkout=checkout,
             allow_dirty_pr=allow_dirty_pr,
         )
-    policy_pr_status = (
-        _find_policy_pull_request_status(
-            client=client,
-            repository=full_name,
-            policy=policy,
-        )
-        if include_pull_request_status
-        else None
-    )
     if not evaluation.changes:
         existing_pr = (
             policy_pr_status.open

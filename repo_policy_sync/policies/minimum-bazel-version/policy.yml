@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 title: "chore(bazel): keep the declared version at 8.6.0 or newer"
+legacy_names: [bazel.minimum-version]
 description: |
   Bazel versions older than `8.6.0` are no longer supported, due to a breaking
   change in how they handle `compatibility_level`.

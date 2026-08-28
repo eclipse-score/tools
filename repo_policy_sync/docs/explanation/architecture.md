@@ -79,8 +79,8 @@ pre-authenticated `gh` CLI and Git.
   applicability and compliance.
 - Policy operations use repository-relative paths and are idempotent.
 - Each policy maps to one deterministic branch per repository.
-- A branch is treated as tool-owned only when its open pull request contains
-  the policy marker.
+- A labelled pull request is associated with a policy only when its body
+  contains the policy marker.
 - An apply run updates the owned pull request’s title and body from the current
   policy before pushing any required commit.
 

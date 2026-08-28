@@ -838,18 +838,19 @@ def test_policy_pull_request_without_head_marker_is_not_safe_to_reuse(
     branch = policy_branches(policy)[0]
 
     def run(command: list[str]) -> str:
-        if command[command.index("--head") + 1] == branch:
-            return json.dumps(
-                [
-                    {
-                        "number": 1,
-                        "url": "https://github.example/owner/repo/pull/1",
-                        "body": "<!-- repo-policy-sync-policy: example -->",
-                        "mergeable": "CONFLICTING",
-                    }
-                ]
-            )
-        return "[]"
+        assert command[command.index("--label") + 1] == "repo-policy-sync"
+        assert command[command.index("--limit") + 1] == "1000"
+        return json.dumps(
+            [
+                {
+                    "number": 1,
+                    "url": "https://github.example/owner/repo/pull/1",
+                    "body": "<!-- repo-policy-sync-policy: example -->",
+                    "headRefName": branch,
+                    "mergeable": "CONFLICTING",
+                }
+            ]
+        )
 
     monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
 
@@ -869,18 +870,17 @@ def test_pre_existing_user_pull_request_is_not_reused(monkeypatch) -> None:
     branch = policy_branches(policy)[0]
 
     def run(command: list[str]) -> str:
-        if command[command.index("--head") + 1] == branch:
-            return json.dumps(
-                [
-                    {
-                        "number": 1,
-                        "url": "https://github.example/owner/repo/pull/1",
-                        "body": "A pull request opened by a maintainer.",
-                        "mergeable": "MERGEABLE",
-                    }
-                ]
-            )
-        return "[]"
+        return json.dumps(
+            [
+                {
+                    "number": 1,
+                    "url": "https://github.example/owner/repo/pull/1",
+                    "body": "A pull request opened by a maintainer.",
+                    "headRefName": branch,
+                    "mergeable": "MERGEABLE",
+                }
+            ]
+        )
 
     monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
 
@@ -904,19 +904,18 @@ def test_legacy_policy_pull_request_is_recognized_on_its_old_branch(
         legacy_names=("old-policy",),
     )
     branches = policy_branches(policy)
+    old_branch = "repo-sync/old-policy"
 
     def run(command: list[str]) -> str:
-        branch = command[command.index("--head") + 1]
-        if branch == branches[0]:
-            return "[]"
-        assert branch == branches[1]
+        assert command[command.index("--label") + 1] == "repo-policy-sync"
         return json.dumps(
             [
                 {
                     "number": 1,
                     "url": "https://github.example/owner/repo/pull/1",
-                    "body": "<!-- repo-policy-sync-policy: old-policy -->\n"
-                    "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                    "body": "<!-- repo-sync-policy: old-policy -->\n"
+                    "<!-- repo-sync-head: " + "a" * 40 + " -->",
+                    "headRefName": old_branch,
                     "mergeable": "MERGEABLE",
                 }
             ]
@@ -932,7 +931,7 @@ def test_legacy_policy_pull_request_is_recognized_on_its_old_branch(
     )
 
     assert pull_request is not None
-    assert pull_request.branch == branches[1]
+    assert pull_request.branch == old_branch
 
 
 def test_policy_pull_request_status_includes_latest_merged_pull_request(
@@ -942,7 +941,6 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
     branch = policy_branches(policy)[0]
 
     def run(command: list[str]) -> str:
-        assert command[command.index("--head") + 1] == branch
         state = command[command.index("--state") + 1]
         if state == "open":
             return json.dumps(
@@ -952,6 +950,7 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
                         "url": "https://github.example/owner/repo/pull/3",
                         "body": "<!-- repo-policy-sync-policy: example -->\n"
                         "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                        "headRefName": branch,
                     }
                 ]
             )
@@ -962,12 +961,14 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
                     "url": "https://github.example/owner/repo/pull/2",
                     "body": "<!-- repo-policy-sync-policy: example -->\n"
                     "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                    "headRefName": branch,
                     "mergedAt": "2026-01-01T00:00:00Z",
                 },
                 {
                     "number": 99,
                     "url": "https://github.example/owner/repo/pull/99",
                     "body": "a historical PR owned by another tool",
+                    "headRefName": "other-tool/branch",
                     "mergedAt": "2026-02-01T00:00:00Z",
                 },
             ]
@@ -997,18 +998,19 @@ def test_multiple_policy_pull_requests_fail_instead_of_choosing(monkeypatch) -> 
     )
 
     def run(command: list[str]) -> str:
-        assert command[command.index("--head") + 1] == branch
         return json.dumps(
             [
                 {
                     "number": 1,
                     "url": "https://github.example/owner/repo/pull/1",
                     "body": body,
+                    "headRefName": branch,
                 },
                 {
                     "number": 2,
                     "url": "https://github.example/owner/repo/pull/2",
                     "body": body,
+                    "headRefName": "repo-sync/example",
                 },
             ]
         )

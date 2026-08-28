@@ -60,8 +60,11 @@ ensure:
 
 `title` and a non-empty `ensure` list are required. `description`,
 `legacy_names`, and `when` are optional. `legacy_names` is a list of former
-policy IDs whose branches and pull-request markers are still recognized for
-this policy. New pull requests use the current directory name and marker.
+policy IDs whose pull-request markers are still recognized for this policy.
+Pull requests are located through the `repo-policy-sync` label and then matched
+by marker, so this also supports historical branch names and the former
+`repo-sync` marker format. New pull requests use the current directory name
+and marker.
 Paths must be non-empty and
 repository-relative; absolute paths and paths containing `..` are rejected.
 

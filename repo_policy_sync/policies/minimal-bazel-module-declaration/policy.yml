@@ -11,6 +11,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 title: "chore(bazel): use a minimal module declaration"
+legacy_names:
+  - bazel.minimal-module-declaration
+  - bazel.module-one-line
 description: Keep the Bazel module declaration limited to its repository-owned name.
 
 when:

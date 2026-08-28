@@ -18,18 +18,22 @@ The policy directory name is the policy ID and maps to the deterministic branch
 `repo-policy-sync/<normalized-policy-id>`, so subsequent runs update the same pull
 request instead of creating duplicates.
 
-The first version recognizes only the current policy ID and the
-`repo-policy-sync/<normalized-policy-id>` branch and marker. Renaming a policy
-is a breaking change: update any existing policy branch or pull request before
-using the new ID.
+PR discovery uses the `repo-policy-sync` label and then matches the policy
+marker in the body. A policy can list former IDs in `legacy_names`, allowing
+historical branch names and the former `repo-sync` marker format to remain
+visible during a policy migration. New pull requests always use the current
+policy ID and branch scheme.
 
 ## Ownership and safety
 
-The PR body contains invisible markers for the policy ID and the branch head
-created by Repository Policy Sync. Before reusing a branch, the tool verifies
-that its remote head still matches the stored value. A missing marker or a
-mismatch fails the run without updating, closing, or otherwise taking over the
-pull request. This protects a policy branch that someone has changed manually.
+The label identifies the tool and the PR body contains an invisible marker for
+the policy. The body may also contain a marker for the branch head created by
+Repository Policy Sync. Before reusing or closing a PR in apply mode, the tool
+verifies that its remote head still matches the stored value. A missing head
+marker or a mismatch fails the run without updating, closing, or otherwise
+taking over the pull request. This protects a policy branch that someone has
+changed manually. Plan mode can report a matching historical PR even when its
+old body has no head marker.
 
 If the refreshed default branch is compliant while an owned PR remains open,
 apply mode closes that PR after verifying the same branch-head marker used for
