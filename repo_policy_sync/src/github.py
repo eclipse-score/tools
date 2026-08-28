@@ -127,12 +127,26 @@ class GitHubCli:
             raise CommandError(
                 f"multiple open pull requests match policy {policy_id} in {repository}: {urls}"
             )
-        merged_pull_requests = self._find_policy_pull_requests(
+        # `gh pr list --state closed` returns every non-open PR, merged ones
+        # included (GitHub's PR "state" only distinguishes open/closed; merged
+        # is a separate flag). One query covers both merged and closed history,
+        # classified below by whether `mergedAt` is set.
+        resolved_pull_requests = self._find_policy_pull_requests(
             repository=repository,
             branches=branches,
             policy_id=policy_id,
             legacy_policy_ids=legacy_policy_ids,
-            state="merged",
+            state="closed",
+        )
+        merged_pull_requests = tuple(
+            pull_request
+            for pull_request in resolved_pull_requests
+            if pull_request.merged_at is not None
+        )
+        closed_pull_requests = tuple(
+            pull_request
+            for pull_request in resolved_pull_requests
+            if pull_request.merged_at is None
         )
         latest_merged = max(
             merged_pull_requests,
@@ -141,13 +155,6 @@ class GitHubCli:
                 pull_request.number,
             ),
             default=None,
-        )
-        closed_pull_requests = self._find_policy_pull_requests(
-            repository=repository,
-            branches=branches,
-            policy_id=policy_id,
-            legacy_policy_ids=legacy_policy_ids,
-            state="closed",
         )
         latest_closed = max(
             closed_pull_requests,
@@ -176,10 +183,8 @@ class GitHubCli:
 
         owned: list[PullRequest] = []
         accepted_markers = _policy_markers((policy_id, *legacy_policy_ids))
-        if state == "merged":
-            fields = "number,url,body,headRefName,mergedAt"
-        elif state == "closed":
-            fields = "number,url,body,headRefName,closedAt"
+        if state == "closed":
+            fields = "number,url,body,headRefName,mergedAt,closedAt"
         else:
             fields = "number,url,body,headRefName,mergeable"
         output = self._run(

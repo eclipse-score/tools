@@ -87,9 +87,12 @@ Policy options can be kept in the optional `score-repo-policy-sync.toml` file.
 Explicit CLI values override the file; see the
 [configuration reference](docs/reference/configuration.md).
 
-The CLI always prints a compact table to standard output, including the
-discovered policy pull-request state (`open`, `merged`, `closed`, or `none`)
-and number. Pass
+The CLI always prints a compact table to standard output. Its status column
+shows the discovered policy pull-request state (`open`, `merged`, or `closed`)
+and number instead of the plain compliance status whenever that PR state is
+actionable — an open PR while changes are still required, or a merged/closed
+PR alongside current compliance; other combinations, including no matching
+PR, keep the plain compliance status. Pass
 `--json-output PATH` and/or `--markdown-output PATH` to write additional
 versioned JSON and Markdown reports during the same policy run. Markdown is
 suited for pull requests, issues, and wikis. Its cells use `✅` for compliant,

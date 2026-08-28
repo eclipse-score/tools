@@ -37,7 +37,7 @@ are CLI-only.
 | `--org NAME` | GitHub organization to scan. May be set in TOML. |
 | `--policy NAME` | Select a policy by directory name from local or bundled policies. Repeat to select more than one; when present, only the selected policies run. Defaults to all local and bundled policies. |
 | `--repo NAME` | Restrict the run to an exact repository name. Repeat to select more than one. |
-| *(stdout)* | Always prints the terminal policy-evaluation table, including policy pull-request state and number. |
+| *(stdout)* | Always prints the terminal policy-evaluation table; its status column shows policy pull-request state and number instead of the plain compliance status when that state is actionable. |
 
 ## Rare
 

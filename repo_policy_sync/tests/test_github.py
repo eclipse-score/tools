@@ -1021,8 +1021,19 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
                 ]
             )
         if state == "closed":
+            # `gh pr list --state closed` also returns merged PRs (GitHub only
+            # distinguishes open/closed; merged is a separate flag), so both
+            # the merged and the closed-only PR come back from this one query.
             return json.dumps(
                 [
+                    {
+                        "number": 2,
+                        "url": "https://github.example/owner/repo/pull/2",
+                        "body": "<!-- repo-policy-sync-policy: example -->\n"
+                        "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                        "headRefName": branch,
+                        "mergedAt": "2026-01-01T00:00:00Z",
+                    },
                     {
                         "number": 4,
                         "url": "https://github.example/owner/repo/pull/4",
@@ -1030,28 +1041,17 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
                         "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
                         "headRefName": branch,
                         "closedAt": "2026-03-01T00:00:00Z",
-                    }
+                    },
+                    {
+                        "number": 99,
+                        "url": "https://github.example/owner/repo/pull/99",
+                        "body": "a historical PR owned by another tool",
+                        "headRefName": "other-tool/branch",
+                        "mergedAt": "2026-02-01T00:00:00Z",
+                    },
                 ]
             )
-        return json.dumps(
-            [
-                {
-                    "number": 2,
-                    "url": "https://github.example/owner/repo/pull/2",
-                    "body": "<!-- repo-policy-sync-policy: example -->\n"
-                    "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
-                    "headRefName": branch,
-                    "mergedAt": "2026-01-01T00:00:00Z",
-                },
-                {
-                    "number": 99,
-                    "url": "https://github.example/owner/repo/pull/99",
-                    "body": "a historical PR owned by another tool",
-                    "headRefName": "other-tool/branch",
-                    "mergedAt": "2026-02-01T00:00:00Z",
-                },
-            ]
-        )
+        raise AssertionError(f"unexpected state: {state}")
 
     monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
 
