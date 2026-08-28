@@ -13,13 +13,13 @@
 
 from pathlib import Path
 
-from repo_policy_sync.src.cache import default_checkout_cache_directory
+from repo_cache.src.cache import default_cache_directory
 
 
-def test_default_checkout_cache_uses_generic_xdg_location(
+def test_default_cache_directory_uses_generic_xdg_location(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
 
-    assert default_checkout_cache_directory() == tmp_path / "repo-cache"
+    assert default_cache_directory() == tmp_path / "repo-cache"

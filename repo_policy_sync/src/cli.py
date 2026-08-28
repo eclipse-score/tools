@@ -20,7 +20,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from .cache import default_checkout_cache_directory
+from repo_cache import default_cache_directory
+
 from .config import load_config
 from .errors import PolicyError, RepoPolicySyncError
 from .github import GitHubCli
@@ -197,7 +198,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         cache_directory = (
             args.cache_dir
             if args.cache_dir is not None
-            else (config.cache_directory or default_checkout_cache_directory())
+            else (config.cache_directory or default_cache_directory())
         )
         sync_workers = (
             args.sync_workers

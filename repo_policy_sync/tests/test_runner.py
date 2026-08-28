@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from repo_cache import RepoCacheError, SyncOutcome, SyncReport
 from repo_policy_sync.src import runner
 from repo_policy_sync.src.errors import RepoPolicySyncError
 from repo_policy_sync.src.github import (
@@ -42,23 +43,7 @@ class FakeRepositoryClient:
     def __init__(self, source: Path, repositories: tuple[Repository, ...]) -> None:
         self.source = source
         self.repositories = repositories
-        self.authenticated = False
         self.cloned: list[str] = []
-
-    def ensure_authenticated(self) -> None:
-        self.authenticated = True
-
-    def list_repositories(self, *, org: str) -> tuple[Repository, ...]:
-        return self.repositories
-
-    def sync_default_branch(
-        self, *, repository: str, branch: str, destination: Path
-    ) -> None:
-        self.cloned.append(repository)
-        shutil.copytree(self.source, destination)
-
-    def restore_synced_default_branch(self, **_: object) -> None:
-        pass
 
     def find_open_pull_request(self, **_: object) -> None:
         return None
@@ -71,6 +56,77 @@ class FakeRepositoryClient:
 
     def create_pull_request(self, **_: object) -> None:
         raise AssertionError("plan mode must not create a pull request")
+
+
+def _install_fake_sync(
+    monkeypatch: pytest.MonkeyPatch,
+    client: FakeRepositoryClient,
+    *,
+    failures: dict[str, str] | None = None,
+) -> None:
+    """Replace runner.sync_org/restore_synced_default_branch with in-memory fakes.
+
+    Mirrors repo_cache.sync_org's archived/repos filtering closely enough for
+    runner-level tests, without shelling out to git/gh.
+    """
+
+    failures = failures or {}
+
+    def fake_sync_org(
+        *,
+        org: str,
+        cache_dir: Path,
+        repos=(),
+        include_archived: bool = False,
+        workers: int = 1,
+        progress=None,
+    ) -> SyncReport:
+        report_progress = progress or (lambda _: None)
+        active = tuple(
+            repository
+            for repository in client.repositories
+            if include_archived or not repository.archived
+        )
+        requested = set(repos)
+        available = {repository.name for repository in active}
+        missing = sorted(requested - available)
+        if missing:
+            raise RepoCacheError(
+                f"repository filter not found in organization: {', '.join(missing)}"
+            )
+        selected = tuple(
+            repository
+            for repository in active
+            if not requested or repository.name in requested
+        )
+        with_branches = tuple(
+            repository
+            for repository in selected
+            if repository.default_branch is not None
+        )
+        if with_branches:
+            report_progress(
+                f"Synchronizing {len(with_branches)} checkout(s) "
+                f"with {workers} worker(s)..."
+            )
+        outcomes: dict[str, SyncOutcome] = {}
+        for repository in selected:
+            checkout = cache_dir / org / repository.name
+            if repository.default_branch is None:
+                outcomes[repository.name] = SyncOutcome(repository, checkout)
+                continue
+            client.cloned.append(f"{org}/{repository.name}")
+            error = failures.get(repository.name)
+            if error is not None:
+                outcomes[repository.name] = SyncOutcome(repository, checkout, error)
+                continue
+            shutil.copytree(client.source, checkout)
+            outcomes[repository.name] = SyncOutcome(repository, checkout, None)
+        ordered = tuple(outcomes[repository.name] for repository in selected)
+        return SyncReport(org=org, cache_dir=cache_dir, outcomes=ordered)
+
+    monkeypatch.setattr(runner, "sync_org", fake_sync_org)
+    monkeypatch.setattr(runner, "restore_synced_default_branch", lambda **_: None)
 
 
 class RoundTripClient:
@@ -175,7 +231,9 @@ class CompliantRunClient(FakeRepositoryClient):
         self.closed = True
 
 
-def test_runner_clones_all_repositories(tmp_path: Path, capsys) -> None:
+def test_runner_clones_all_repositories(
+    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     (repository / "MODULE.bazel").write_text('bazel_dep(name = "score_docs_as_code")\n')
@@ -191,6 +249,7 @@ def test_runner_clones_all_repositories(tmp_path: Path, capsys) -> None:
         Repository("excluded", "main"),
     )
     client = FakeRepositoryClient(repository, repositories)
+    _install_fake_sync(monkeypatch, client)
 
     report = run_policies(
         client=client,
@@ -201,7 +260,6 @@ def test_runner_clones_all_repositories(tmp_path: Path, capsys) -> None:
         apply=False,
     )
 
-    assert client.authenticated
     assert client.cloned == ["eclipse-score/candidate", "eclipse-score/excluded"]
     assert report.summary.repositories == 2
     assert report.summary.evaluations == 2
@@ -277,7 +335,7 @@ def test_plan_apply_and_repeat_reuses_the_owned_policy_branch(tmp_path: Path) ->
 
 
 def test_runner_adds_policy_pull_request_status_for_markdown_reports(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "repository"
     source.mkdir()
@@ -295,6 +353,7 @@ def test_runner_adds_policy_pull_request_status_for_markdown_reports(
             )
         ),
     )
+    _install_fake_sync(monkeypatch, client)
 
     report = run_policies(
         client=client,
@@ -312,7 +371,9 @@ def test_runner_adds_policy_pull_request_status_for_markdown_reports(
     assert report.outcomes[0].pull_request_url.endswith("/7")
 
 
-def test_runner_counts_closed_pull_requests_as_compliant(tmp_path: Path) -> None:
+def test_runner_counts_closed_pull_requests_as_compliant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "repository"
     source.mkdir()
     (source / "required.txt").write_text("yes\n")
@@ -320,6 +381,7 @@ def test_runner_counts_closed_pull_requests_as_compliant(tmp_path: Path) -> None
         "example", "Example", None, None, (EnsureLine(Path("required.txt"), "yes", ()),)
     )
     client = CompliantRunClient(source, (Repository("candidate", "main"),))
+    _install_fake_sync(monkeypatch, client)
 
     report = run_policies(
         client=client,
@@ -339,7 +401,9 @@ def test_runner_counts_closed_pull_requests_as_compliant(tmp_path: Path) -> None
     assert client.closed
 
 
-def test_runner_syncs_a_repository_once_for_multiple_policies(tmp_path: Path) -> None:
+def test_runner_syncs_a_repository_once_for_multiple_policies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     first = Policy(
@@ -357,6 +421,7 @@ def test_runner_syncs_a_repository_once_for_multiple_policies(tmp_path: Path) ->
         ensure=(EnsureLine(Path("second.txt"), "second", ()),),
     )
     client = FakeRepositoryClient(repository, (Repository("candidate", "main"),))
+    _install_fake_sync(monkeypatch, client)
 
     report = run_policies(
         client=client,
@@ -374,7 +439,9 @@ def test_runner_syncs_a_repository_once_for_multiple_policies(tmp_path: Path) ->
     assert report.summary.drifted == 2
 
 
-def test_runner_excludes_archived_repositories(tmp_path: Path) -> None:
+def test_runner_excludes_archived_repositories(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "repository"
     source.mkdir()
     policy = Policy(
@@ -392,6 +459,7 @@ def test_runner_excludes_archived_repositories(tmp_path: Path) -> None:
             Repository("without-default", None),
         ),
     )
+    _install_fake_sync(monkeypatch, client)
 
     report = run_policies(
         client=client,
@@ -413,15 +481,17 @@ def test_runner_excludes_archived_repositories(tmp_path: Path) -> None:
     ]
 
 
-def test_runner_propagates_authentication_failures(tmp_path: Path) -> None:
+def test_runner_propagates_authentication_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "repository"
     source.mkdir()
+    client = FakeRepositoryClient(source, (Repository("active", "main"),))
 
-    class AuthenticationFailureClient(FakeRepositoryClient):
-        def ensure_authenticated(self) -> None:
-            raise RepoPolicySyncError("authentication failed")
+    def fake_sync_org(**_: object) -> SyncReport:
+        raise RepoCacheError("authentication failed")
 
-    client = AuthenticationFailureClient(source, (Repository("active", "main"),))
+    monkeypatch.setattr(runner, "sync_org", fake_sync_org)
 
     with pytest.raises(RepoPolicySyncError, match="authentication failed"):
         run_policies(
@@ -434,7 +504,9 @@ def test_runner_propagates_authentication_failures(tmp_path: Path) -> None:
         )
 
 
-def test_runner_counts_a_sync_failure_once_per_repository(tmp_path: Path) -> None:
+def test_runner_counts_a_sync_failure_once_per_repository(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "repository"
     source.mkdir()
     policies = (
@@ -449,7 +521,8 @@ def test_runner_counts_a_sync_failure_once_per_repository(tmp_path: Path) -> Non
             (EnsureLine(Path("second.txt"), "second", ()),),
         ),
     )
-    client = SyncFailureClient(source, (Repository("candidate", "main"),))
+    client = FakeRepositoryClient(source, (Repository("candidate", "main"),))
+    _install_fake_sync(monkeypatch, client, failures={"candidate": "checkout failed"})
 
     report = run_policies(
         client=client,
@@ -472,7 +545,9 @@ def test_runner_counts_a_sync_failure_once_per_repository(tmp_path: Path) -> Non
     ]
 
 
-def test_runner_reports_checkout_os_errors_without_a_traceback(tmp_path: Path) -> None:
+def test_runner_reports_checkout_os_errors_without_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     source = tmp_path / "repository"
     source.mkdir()
     policy = Policy(
@@ -482,7 +557,12 @@ def test_runner_reports_checkout_os_errors_without_a_traceback(tmp_path: Path) -
         None,
         (EnsureLine(Path("required.txt"), "yes", ()),),
     )
-    client = SyncOSErrorClient(source, (Repository("candidate", "main"),))
+    client = FakeRepositoryClient(source, (Repository("candidate", "main"),))
+    _install_fake_sync(
+        monkeypatch,
+        client,
+        failures={"candidate": "checkout cache is not accessible"},
+    )
 
     report = run_policies(
         client=client,
@@ -501,7 +581,7 @@ def test_runner_reports_checkout_os_errors_without_a_traceback(tmp_path: Path) -
 
 
 def test_runner_reports_policy_file_io_failures_without_aborting_other_evaluations(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "repository"
     source.mkdir()
@@ -512,6 +592,7 @@ def test_runner_reports_policy_file_io_failures_without_aborting_other_evaluatio
         source,
         (Repository("first", "main"), Repository("second", "main")),
     )
+    _install_fake_sync(monkeypatch, client)
     calls = 0
 
     def evaluate(*_: object, **__: object):
@@ -544,7 +625,7 @@ def test_runner_reports_policy_file_io_failures_without_aborting_other_evaluatio
 
 
 def test_runner_redacts_raw_policy_execution_errors(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "repository"
     source.mkdir()
@@ -552,6 +633,7 @@ def test_runner_redacts_raw_policy_execution_errors(
         "example", "Example", None, None, (EnsureLine(Path("required.txt"), "yes", ()),)
     )
     client = FakeRepositoryClient(source, (Repository("candidate", "main"),))
+    _install_fake_sync(monkeypatch, client)
 
     def evaluate(*_: object, **__: object):
         raise UnicodeError("authorization: Bearer ghp_secret_value_12345")
@@ -575,7 +657,7 @@ def test_runner_redacts_raw_policy_execution_errors(
 
 
 def test_runner_processes_one_policy_across_repositories_in_parallel(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = tmp_path / "repository"
     source.mkdir()
@@ -590,6 +672,7 @@ def test_runner_processes_one_policy_across_repositories_in_parallel(
         source,
         (Repository("first", "main"), Repository("second", "main")),
     )
+    _install_fake_sync(monkeypatch, client)
     barrier = threading.Barrier(2)
 
     def run_in_parallel(**kwargs: object) -> runner.RepositoryOutcome:
@@ -615,21 +698,6 @@ def test_runner_processes_one_policy_across_repositories_in_parallel(
     )
 
     assert report.summary.compliant == 2
-
-
-class SyncFailureClient(FakeRepositoryClient):
-    def sync_default_branch(
-        self, *, repository: str, branch: str, destination: Path
-    ) -> None:
-        self.cloned.append(repository)
-        raise RepoPolicySyncError("checkout failed")
-
-
-class SyncOSErrorClient(FakeRepositoryClient):
-    def sync_default_branch(
-        self, *, repository: str, branch: str, destination: Path
-    ) -> None:
-        raise PermissionError("checkout cache is not accessible")
 
 
 def test_existing_pull_request_is_closed_with_failure_details(tmp_path: Path) -> None:
@@ -955,7 +1023,7 @@ def test_existing_compliant_pull_request_updates_only_stale_body(
 
 
 def test_existing_compliant_conflicted_pull_request_is_recreated(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     checkout = tmp_path / "repository"
     checkout.mkdir()
@@ -968,6 +1036,11 @@ def test_existing_compliant_conflicted_pull_request_is_recreated(
         (EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
     )
     client = ImplicitRecreateClient(mergeable="CONFLICTING", body="stale body")
+    monkeypatch.setattr(
+        runner,
+        "restore_synced_default_branch",
+        lambda *, checkout: (checkout / ".bazelversion").write_text("8.5.0\n"),
+    )
 
     outcome = _run_repository(
         client=client,
@@ -1071,9 +1144,6 @@ class ImplicitRecreateClient:
 
     def switch_to_policy_branch(self, *, checkout: Path, **_: object) -> None:
         (checkout / ".bazelversion").write_text("8.6.0\n")
-
-    def restore_synced_default_branch(self, *, checkout: Path) -> None:
-        (checkout / ".bazelversion").write_text("8.5.0\n")
 
     def recreate_policy_branch(self, **_: object) -> None:
         self.recreated_branch = True

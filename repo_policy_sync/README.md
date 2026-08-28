@@ -101,7 +101,8 @@ input or execution errors. Apply mode exits `0` after successful remediation.
 
 ## Operational model
 
-Checkouts are cached under
+Repository checkouts are synchronized by the
+[`repo_cache`](../repo_cache/README.md) component and cached under
 `$XDG_CACHE_HOME/repo-cache/<owner>/<repository>` or
 `~/.cache/repo-cache/<owner>/<repository>`. The generic cache can be shared
 with other repository tools. Checkouts are disposable: each run refreshes the

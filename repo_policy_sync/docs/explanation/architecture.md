@@ -25,13 +25,22 @@ cli.py
        ├─ policy.py             YAML → validated Policy objects
        ├─ operations/           built-in operation registry and implementations
        ├─ engine.py             evaluate and apply policies to a checkout
-       └─ github.py             gh and Git process adapter
+       ├─ github.py             gh and Git process adapter for pull requests/branches
+       └─ repo_cache (external) lists org repositories and refreshes checkouts
 ```
 
-`models.py` contains the immutable values exchanged across these layers.
-`errors.py` defines expected user-facing errors. `cli.py` is the composition
-root: it creates the concrete GitHub client, selects a renderer, and translates
-failures into CLI exit codes.
+`models.py` contains the immutable values exchanged across these layers; it
+re-exports the `Repository` model from `repo_cache`. `errors.py` defines
+expected user-facing errors. `cli.py` is the composition root: it creates the
+concrete GitHub client, selects a renderer, and translates failures into CLI
+exit codes.
+
+Listing an organization's repositories and refreshing their checkouts is not
+implemented here — it is delegated to the separate
+[`repo_cache`](../../../repo_cache/README.md) component, which has no
+dependency on the rest of `repo_policy_sync`. `runner.py` calls
+`repo_cache.sync_org()` and `repo_cache.restore_synced_default_branch()`
+directly.
 
 ## Responsibilities
 
@@ -55,12 +64,14 @@ argument-parsing dependency.
 
 ### Orchestration and infrastructure
 
-`runner.py` discovers repositories, refreshes the selected cached checkouts
-in parallel, then coordinates one policy across independent repository
-checkouts in parallel through a small `RepositoryClient` protocol. It returns
-a structured `RunReport` rather than formatting output. `reporting.py` renders
-that report as a terminal table or a versioned JSON document. `github.py`
-implements the protocol with the pre-authenticated `gh` CLI and Git.
+`runner.py` calls `repo_cache.sync_org()` to discover repositories and
+refresh their cached checkouts in parallel, then coordinates one policy
+across independent repository checkouts in parallel through a small
+`RepositoryClient` protocol covering pull request, branch, and label
+operations. It returns a structured `RunReport` rather than formatting
+output. `reporting.py` renders that report as a terminal table or a
+versioned JSON document. `github.py` implements the protocol with the
+pre-authenticated `gh` CLI and Git.
 
 ## Invariants
 

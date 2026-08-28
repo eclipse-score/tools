@@ -23,10 +23,9 @@ import tempfile
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
-from urllib.parse import urlparse
 
 from .errors import CommandError, redact_sensitive_text
-from .models import Change, Policy, Repository, policy_branch_slug
+from .models import Change, Policy, policy_branch_slug
 
 TOOL_SLUG = "repo-policy-sync"
 AUTOMATION_LABELS = ("automation", TOOL_SLUG)
@@ -75,150 +74,6 @@ class CommitResult:
 
 class GitHubCli:
     """Run the minimal gh/Git command set required by this tool."""
-
-    def ensure_authenticated(self) -> None:
-        self._run(["gh", "auth", "status"])
-
-    def list_repositories(self, *, org: str) -> tuple[Repository, ...]:
-        """List every repository in an organization with its default branch."""
-
-        output = self._run(
-            ["gh", "api", "--paginate", "--slurp", f"/orgs/{org}/repos?per_page=100"]
-        )
-        try:
-            pages = json.loads(output)
-        except json.JSONDecodeError as exc:
-            raise CommandError(
-                f"gh returned invalid repository JSON for {org}"
-            ) from exc
-        if not isinstance(pages, list):
-            raise CommandError(f"gh returned invalid repository JSON for {org}")
-        repositories: list[Repository] = []
-        for page in pages:
-            if not isinstance(page, list):
-                raise CommandError(f"gh returned invalid repository JSON for {org}")
-            for raw in page:
-                if not isinstance(raw, dict):
-                    raise CommandError(f"gh returned invalid repository JSON for {org}")
-                name = raw.get("name")
-                default_branch = raw.get("default_branch")
-                archived = raw.get("archived", False)
-                if not isinstance(name, str) or not name:
-                    raise CommandError(
-                        f"gh returned a repository without a valid name for {org}"
-                    )
-                if default_branch is not None and not isinstance(default_branch, str):
-                    raise CommandError(
-                        f"gh returned an invalid default branch for {org}/{name}"
-                    )
-                if not isinstance(archived, bool):
-                    raise CommandError(
-                        f"gh returned an invalid archived state for {org}/{name}"
-                    )
-                repositories.append(Repository(name, default_branch, archived))
-        return tuple(repositories)
-
-    def sync_default_branch(
-        self, *, repository: str, branch: str, destination: Path
-    ) -> None:
-        """Clone once, then refresh a disposable cached checkout on later runs."""
-
-        if (destination / ".git").is_dir():
-            self._verify_cached_remote(repository=repository, checkout=destination)
-            self._run(
-                [
-                    "git",
-                    "-C",
-                    str(destination),
-                    "fetch",
-                    "--depth",
-                    "1",
-                    "origin",
-                    branch,
-                ]
-            )
-            self._run(
-                [
-                    "git",
-                    "-C",
-                    str(destination),
-                    "checkout",
-                    "--detach",
-                    "--force",
-                    "FETCH_HEAD",
-                ]
-            )
-            self._run(["git", "-C", str(destination), "clean", "-fdx"])
-            self._run(
-                [
-                    "git",
-                    "-C",
-                    str(destination),
-                    "update-ref",
-                    f"refs/{TOOL_SLUG}/default",
-                    "HEAD",
-                ]
-            )
-            return
-        if destination.exists():
-            raise CommandError(
-                f"checkout cache path exists but is not a Git repository: {destination}"
-            )
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        self._run(
-            [
-                "gh",
-                "repo",
-                "clone",
-                repository,
-                str(destination),
-                "--",
-                "--depth",
-                "1",
-                "--branch",
-                branch,
-            ]
-        )
-        self._run(
-            [
-                "git",
-                "-C",
-                str(destination),
-                "update-ref",
-                f"refs/{TOOL_SLUG}/default",
-                "HEAD",
-            ]
-        )
-
-    def _verify_cached_remote(self, *, repository: str, checkout: Path) -> None:
-        expected_url = self._run(
-            ["gh", "repo", "view", repository, "--json", "url", "--jq", ".url"]
-        )
-        actual_url = self._run(
-            ["git", "-C", str(checkout), "remote", "get-url", "origin"]
-        )
-        expected = _remote_identity(expected_url)
-        actual = _remote_identity(actual_url)
-        if expected is None or actual is None or expected != actual:
-            raise CommandError(
-                f"checkout cache remote does not match requested repository {repository}"
-            )
-
-    def restore_synced_default_branch(self, *, checkout: Path) -> None:
-        """Discard a preceding policy's local changes without fetching again."""
-
-        self._run(
-            [
-                "git",
-                "-C",
-                str(checkout),
-                "checkout",
-                "--detach",
-                "--force",
-                f"refs/{TOOL_SLUG}/default",
-            ]
-        )
-        self._run(["git", "-C", str(checkout), "clean", "-fdx"])
 
     def find_open_pull_request(
         self,
@@ -753,31 +608,6 @@ def policy_branch(policy_id: str) -> str:
     if not slug:
         raise ValueError(f"policy ID cannot produce a branch name: {policy_id!r}")
     return f"{TOOL_SLUG}/{slug}"
-
-
-def _remote_identity(value: str) -> tuple[str, str] | None:
-    """Normalize HTTPS, SSH, and scp-like Git remotes for safe comparison."""
-
-    value = value.strip()
-    if not value:
-        return None
-    if "://" in value:
-        parsed = urlparse(value)
-        host = parsed.hostname
-        path = parsed.path
-    else:
-        match = re.match(r"^(?:[^@]+@)?([^:]+):(.+)$", value)
-        if match is None:
-            return None
-        host, path = match.groups()
-    if not host or not path:
-        return None
-    normalized_path = path.strip("/")
-    if normalized_path.endswith(".git"):
-        normalized_path = normalized_path[:-4]
-    if not normalized_path:
-        return None
-    return host.lower(), normalized_path.lower()
 
 
 def policy_branches(policy: Policy) -> tuple[str, ...]:

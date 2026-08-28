@@ -69,6 +69,13 @@ Before adding a new utility here, check:
 
 If any of these gives you pause, raise it for discussion before merging.
 
+## Repository Cache
+
+The [`repo_cache`](repo_cache/README.md) component maintains a local,
+disposable Git checkout of every repository in a GitHub organization, for
+tools that need to operate across an entire organization without
+re-cloning on every run. Its entry point is `score-repo-cache`.
+
 ## Repository Policy Sync
 
 The [`repo_policy_sync`](repo_policy_sync/README.md) component evaluates and

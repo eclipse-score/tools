@@ -32,7 +32,6 @@ from repo_policy_sync.src.models import (
     EnsureLine,
     RemoveFile,
     Policy,
-    Repository,
 )
 from repo_policy_sync.src.policy import BUNDLED_POLICY_DIRECTORY, load_policy
 
@@ -127,32 +126,6 @@ def test_has_changes_detects_untracked_policy_files(
             "generated.txt",
         ]
     ]
-
-
-def test_cached_checkout_rejects_a_different_origin(
-    monkeypatch, tmp_path: Path
-) -> None:
-    (tmp_path / ".git").mkdir()
-    commands: list[list[str]] = []
-
-    def record(command: list[str]) -> str:
-        commands.append(command)
-        if command[:4] == ["gh", "repo", "view", "owner/repository"]:
-            return "https://github.com/owner/repository\n"
-        if command[-3:] == ["remote", "get-url", "origin"]:
-            return "git@github.com:other/repository.git\n"
-        return ""
-
-    monkeypatch.setattr(GitHubCli, "_run", staticmethod(record))
-
-    with pytest.raises(CommandError, match="does not match"):
-        GitHubCli().sync_default_branch(
-            repository="owner/repository",
-            branch="main",
-            destination=tmp_path,
-        )
-
-    assert not any(command[4:5] == ["fetch"] for command in commands)
 
 
 def test_commit_runs_pre_commit_after_staging_when_repository_configures_it(
@@ -393,79 +366,6 @@ def test_local_policy_branch_is_reused_after_a_failed_run(
     assert commands == [
         ["git", "-C", str(tmp_path), "switch", "-C", "repo-policy-sync/example"]
     ]
-
-
-def test_restore_synced_default_branch_never_fetches(
-    monkeypatch, tmp_path: Path
-) -> None:
-    commands: list[list[str]] = []
-
-    def record(command: list[str]) -> str:
-        commands.append(command)
-        return ""
-
-    monkeypatch.setattr(GitHubCli, "_run", staticmethod(record))
-
-    GitHubCli().restore_synced_default_branch(checkout=tmp_path)
-
-    assert commands == [
-        [
-            "git",
-            "-C",
-            str(tmp_path),
-            "checkout",
-            "--detach",
-            "--force",
-            "refs/repo-policy-sync/default",
-        ],
-        ["git", "-C", str(tmp_path), "clean", "-fdx"],
-    ]
-
-
-def test_list_repositories_reads_all_paginated_results(monkeypatch) -> None:
-    commands: list[list[str]] = []
-
-    def record(command: list[str]) -> str:
-        commands.append(command)
-        return (
-            '[[{"name":"first","default_branch":"main","archived":false}],'
-            '[{"name":"empty","default_branch":null,"archived":true}]]'
-        )
-
-    monkeypatch.setattr(GitHubCli, "_run", staticmethod(record))
-
-    repositories = GitHubCli().list_repositories(org="eclipse-score")
-
-    assert repositories == (
-        Repository("first", "main"),
-        Repository("empty", None, archived=True),
-    )
-    assert commands == [
-        ["gh", "api", "--paginate", "--slurp", "/orgs/eclipse-score/repos?per_page=100"]
-    ]
-
-
-@pytest.mark.parametrize(
-    "output, message",
-    [
-        ("not-json", "invalid repository JSON"),
-        ("{}", "invalid repository JSON"),
-        ("[{}]", "invalid repository JSON"),
-        ('[[{"name":"","default_branch":"main"}]]', "without a valid name"),
-        (
-            '[[{"name":"repo","default_branch":false}]]',
-            "invalid default branch",
-        ),
-        ('[[{"name":"repo","archived":"no"}]]', "invalid archived state"),
-    ],
-)
-def test_list_repositories_rejects_invalid_api_payloads(
-    monkeypatch, output: str, message: str
-) -> None:
-    monkeypatch.setattr(GitHubCli, "_run", staticmethod(lambda _: output))
-
-    with pytest.raises(CommandError, match=message):
-        GitHubCli().list_repositories(org="eclipse-score")
 
 
 def test_gh_command_failures_are_actionable(monkeypatch) -> None:

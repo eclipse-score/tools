@@ -5,6 +5,7 @@ requires-python = ">=3.12"
 [manifest]
 members = [
     "cr-checker",
+    "repo-cache",
     "repo-policy-sync",
     "tools",
 ]
@@ -213,18 +214,25 @@ wheels = [
 ]
 
 [[package]]
+name = "repo-cache"
+version = "0.1.0"
+source = { editable = "repo_cache" }
+
+[[package]]
 name = "repo-policy-sync"
 version = "0.1.0"
 source = { editable = "repo_policy_sync" }
 dependencies = [
     { name = "pre-commit" },
     { name = "pyyaml" },
+    { name = "repo-cache" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "pre-commit", specifier = ">=4.0.0" },
     { name = "pyyaml", specifier = ">=6.0" },
+    { name = "repo-cache", editable = "repo_cache" },
 ]
 
 [[package]]
@@ -262,6 +270,7 @@ dev = [
     { name = "cr-checker" },
     { name = "pyfakefs" },
     { name = "pytest" },
+    { name = "repo-cache" },
     { name = "repo-policy-sync" },
     { name = "ruff" },
 ]
@@ -273,6 +282,7 @@ dev = [
     { name = "cr-checker", editable = "cr_checker" },
     { name = "pyfakefs", specifier = ">=6.1.6" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "repo-cache", editable = "repo_cache" },
     { name = "repo-policy-sync", editable = "repo_policy_sync" },
     { name = "ruff", specifier = "==0.15.10" },
 ]

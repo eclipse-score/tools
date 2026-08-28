@@ -18,6 +18,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from repo_cache import Repository as Repository
+
 
 def policy_branch_slug(policy_id: str) -> str:
     """Normalize a policy identifier to the branch-name component it owns."""
@@ -124,13 +126,6 @@ class Policy:
     file_contains_condition: FileContainsCondition | None = None
     file_contains_any_condition: FileContainsAnyCondition | None = None
     legacy_names: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class Repository:
-    name: str
-    default_branch: str | None
-    archived: bool = False
 
 
 @dataclass(frozen=True)

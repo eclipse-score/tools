@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 [tool.uv.workspace]
 members = [
     "cr_checker",
+    "repo_cache",
     "repo_policy_sync",
 ]
 
@@ -19,15 +20,19 @@ dev = [
     "cr-checker",
     "pyfakefs>=6.1.6",
     "pytest>=9.1.1",
+    "repo-cache",
     "repo-policy-sync",
     "ruff==0.15.10",
 ]
 
 [tool.uv.sources]
 cr-checker = { workspace = true }
+repo-cache = { workspace = true }
 repo-policy-sync = { workspace = true }
 
 [tool.pytest.ini_options]
+
+addopts = "--import-mode=importlib"
 
 norecursedirs = [
     ".*",        # hidden folders like .git, .venv, .cache, etc.

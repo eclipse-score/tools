@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 
 
-def default_checkout_cache_directory() -> Path:
+def default_cache_directory() -> Path:
     """Return the standard user cache location without creating it."""
 
     xdg_cache_home = os.environ.get("XDG_CACHE_HOME")

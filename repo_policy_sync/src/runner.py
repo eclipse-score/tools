@@ -15,13 +15,19 @@
 
 from __future__ import annotations
 
-import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic
 from typing import Callable, Protocol
+
+from repo_cache import (
+    DEFAULT_SYNC_WORKERS,
+    RepoCacheError,
+    restore_synced_default_branch,
+    sync_org,
+)
 
 from .engine import apply_policy, evaluate_policy
 from .errors import RepoPolicySyncError, redact_sensitive_text
@@ -34,22 +40,11 @@ from .github import (
 )
 from .models import Change, Policy, Repository
 
-DEFAULT_SYNC_WORKERS = max(1, os.cpu_count() or 1)
 DEFAULT_POLICY_WORKERS = DEFAULT_SYNC_WORKERS
 
 
 class RepositoryClient(Protocol):
     """The small gh/Git boundary required by the organization workflow."""
-
-    def ensure_authenticated(self) -> None: ...
-
-    def list_repositories(self, *, org: str) -> tuple[Repository, ...]: ...
-
-    def sync_default_branch(
-        self, *, repository: str, branch: str, destination: Path
-    ) -> None: ...
-
-    def restore_synced_default_branch(self, *, checkout: Path) -> None: ...
 
     def find_open_pull_request(
         self,
@@ -197,33 +192,29 @@ def run_policies(
     terminal table, machine-readable JSON, or their own integration output.
     """
 
-    if sync_workers < 1:
-        raise RepoPolicySyncError("sync worker count must be at least 1")
     if policy_workers < 1:
         raise RepoPolicySyncError("policy worker count must be at least 1")
     if recreate and not apply:
         raise RepoPolicySyncError("--recreate requires apply mode")
     started = monotonic()
     report_progress = progress or _write_progress
-    report_progress("Checking gh authentication...")
-    client.ensure_authenticated()
-    repositories = client.list_repositories(org=org)
-    active_repositories = tuple(
-        repository for repository in repositories if not repository.archived
-    )
-    _validate_requested_repositories(active_repositories, repository_names)
-    report_progress(f"Found {len(active_repositories)} active repositories.")
-    report_progress(f"Using checkout cache at {checkout_cache_directory}.")
+    try:
+        sync_report = sync_org(
+            org=org,
+            cache_dir=checkout_cache_directory,
+            repos=repository_names,
+            workers=sync_workers,
+            progress=report_progress,
+        )
+    except RepoCacheError as exc:
+        raise RepoPolicySyncError(str(exc)) from exc
 
-    selected_repositories = _select_repositories(active_repositories, repository_names)
-    sync_failures = _sync_repositories(
-        client=client,
-        org=org,
-        repositories=selected_repositories,
-        checkout_cache_directory=checkout_cache_directory,
-        workers=sync_workers,
-        progress=report_progress,
+    selected_repositories = tuple(
+        outcome.repository for outcome in sync_report.outcomes
     )
+    sync_failures = {
+        outcome.repository.name: outcome.error for outcome in sync_report.failures
+    }
 
     synchronized = len(selected_repositories) - len(sync_failures)
     skipped = sum(
@@ -390,7 +381,7 @@ def _run_policy_in_repository(
     allow_dirty_pr: bool,
     include_pull_request_status: bool,
 ) -> RepositoryOutcome:
-    client.restore_synced_default_branch(checkout=checkout)
+    restore_synced_default_branch(checkout=checkout)
     if (
         repository.default_branch is None
     ):  # pragma: no cover - filtered before submission
@@ -616,7 +607,7 @@ def _run_repository(
                 # The checkout currently contains the unchanged PR branch. Reset
                 # it to the freshly synchronized default branch before rebuilding
                 # the conflicted PR with the current policy.
-                client.restore_synced_default_branch(checkout=checkout)
+                restore_synced_default_branch(checkout=checkout)
                 return _recreate_existing_pull_request(
                     client=client,
                     organization=org,
@@ -931,79 +922,6 @@ def _recreate_existing_pull_request(
         changes=applied.changes,
         pull_request_url=existing_pr.url,
         policy_pr_status="open",
-    )
-
-
-def _sync_repositories(
-    *,
-    client: RepositoryClient,
-    org: str,
-    repositories: tuple[Repository, ...],
-    checkout_cache_directory: Path,
-    workers: int,
-    progress: Callable[[str], None],
-) -> dict[str, str]:
-    """Refresh each checkout concurrently before any policy can modify one."""
-
-    repositories_with_branches = tuple(
-        repository
-        for repository in repositories
-        if repository.default_branch is not None
-    )
-    if not repositories_with_branches:
-        return {}
-    progress(
-        f"Synchronizing {len(repositories_with_branches)} checkout(s) with {workers} worker(s)..."
-    )
-    failures: dict[str, str] = {}
-    with ThreadPoolExecutor(
-        max_workers=workers, thread_name_prefix=TOOL_SLUG
-    ) as executor:
-        futures = {
-            executor.submit(
-                client.sync_default_branch,
-                repository=f"{org}/{repository.name}",
-                branch=repository.default_branch,
-                destination=checkout_cache_directory / org / repository.name,
-            ): repository
-            for repository in repositories_with_branches
-        }
-        for index, future in enumerate(as_completed(futures), start=1):
-            repository = futures[future]
-            try:
-                future.result()
-            except (RepoPolicySyncError, OSError) as exc:
-                failures[repository.name] = redact_sensitive_text(
-                    str(exc) or exc.__class__.__name__
-                )
-                status = "failed"
-            else:
-                status = "done"
-            progress(
-                f"  [{index}/{len(repositories_with_branches)}] {repository.name}: {status}"
-            )
-    return failures
-
-
-def _validate_requested_repositories(
-    repositories: tuple[Repository, ...], names: tuple[str, ...]
-) -> None:
-    available = {repository.name for repository in repositories}
-    missing = sorted(set(names) - available)
-    if missing:
-        raise RepoPolicySyncError(
-            f"repository filter not found in organization: {', '.join(missing)}"
-        )
-
-
-def _select_repositories(
-    repositories: tuple[Repository, ...], names: tuple[str, ...]
-) -> tuple[Repository, ...]:
-    requested = set(names)
-    return tuple(
-        repository
-        for repository in repositories
-        if not requested or repository.name in requested
     )
 
 
