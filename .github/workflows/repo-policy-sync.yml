@@ -12,7 +12,18 @@
 # *******************************************************************************
 name: Repository policy sync
 on:
+  schedule:
+    - cron: "0 0 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Policy sync mode
+        required: true
+        default: plan
+        type: choice
+        options:
+          - plan
+          - apply
 permissions:
   contents: read
   pull-requests: read
@@ -20,17 +31,17 @@ jobs:
   policy-sync:
     runs-on: ubuntu-24.04
     env:
-      GH_TOKEN: ${{ github.token }}
+      MODE: ${{ inputs.mode || 'plan' }}
+      GH_TOKEN: ${{ inputs.mode == 'apply' && secrets.SCORE_BOT_CLASSIC_PAT || github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.0
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
-      - name: Generate policy reports
+      - name: Run policy sync
         id: sync
-        continue-on-error: true
         run: >-
-          uv run score-repo-policy-sync plan --config repo_policy_sync/eclipse-score.toml --json-output repo-policy-sync-report.json --markdown-output "$GITHUB_STEP_SUMMARY"
+          uv run score-repo-policy-sync "$MODE" --config repo_policy_sync/eclipse-score.toml --json-output repo-policy-sync-report.json --markdown-output "$GITHUB_STEP_SUMMARY"
       - name: Upload JSON report
         if: always()
         uses: actions/upload-artifact@v7
@@ -42,6 +53,6 @@ jobs:
         if: always()
         run: |
           if [[ "${{ steps.sync.outcome }}" != "success" ]]; then
-            echo "Repository policy sync detected drift or failed to complete." >&2
+            echo "Repository policy sync failed to complete." >&2
             exit 1
           fi

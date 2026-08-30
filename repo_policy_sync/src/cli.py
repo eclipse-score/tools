@@ -320,7 +320,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(output)
     if report.summary.sync_failures or report.summary.evaluation_failures:
         return 2
-    return 1 if report.summary.drifted and not applying else 0
+    return 0
 
 
 def _write_progress(message: str) -> None:

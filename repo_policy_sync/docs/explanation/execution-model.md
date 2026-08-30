@@ -68,8 +68,7 @@ parallel. Repositories remain isolated in separate checkouts; use
 
 | Status | Meaning |
 | --- | --- |
-| `0` | Plan mode found no policy drift, or apply mode completed without errors. |
-| `1` | Plan mode found one or more required changes. |
+| `0` | Plan or apply mode completed without input, authentication, GitHub, Git, or policy execution errors. Plan mode may still report policy drift. |
 | `2` | Input, authentication, GitHub, Git, or execution error. |
 
 ## Current boundaries

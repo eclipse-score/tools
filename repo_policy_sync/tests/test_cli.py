@@ -96,7 +96,7 @@ def test_default_output_is_a_table(monkeypatch, capsys) -> None:
                 "--quiet",
             )
         )
-        == 1
+        == 0
     )
 
     captured = capsys.readouterr()

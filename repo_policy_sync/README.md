@@ -100,9 +100,9 @@ suited for pull requests, issues, and wikis. Its cells use `✅` for compliant,
 `⚠️`/`⏭️` for errors or skipped evaluations. Open, merged, and automatically
 closed policy pull requests are shown as linked GitHub-logo badges in the
 affected cells; change and error details are kept in a collapsible section.
-Plan mode exits `1`
-when policy drift is found, `0` when no policy drift is found, and `2` for
-input or execution errors. Apply mode exits `0` after successful remediation.
+Plan mode exits `0` after successfully evaluating policies, regardless of
+whether drift is found, and `2` for input or execution errors. Apply mode
+exits `0` after successful remediation.
 
 ## Operational model
 

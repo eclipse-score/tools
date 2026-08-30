@@ -27,7 +27,7 @@ are CLI-only.
 
 | Command | Description |
 | --- | --- |
-| `plan` | Evaluate policies and report matching policy pull requests without changing repositories. Exit status `1` indicates drift. |
+| `plan` | Evaluate policies and report matching policy pull requests without changing repositories. Drift is reported in the output and does not affect the exit status. |
 | `apply` | Apply policies and create or update policy-owned pull requests. |
 
 ## Typical
@@ -67,8 +67,7 @@ repository with `--repo` fails validation instead of silently ignoring it.
 
 | Status | Meaning |
 | --- | --- |
-| `0` | The plan found no required changes, or apply mode completed without errors. |
-| `1` | Plan mode found one or more required changes. |
+| `0` | Plan or apply mode completed without input, authentication, GitHub, Git, or policy execution errors. Plan mode may still report policy drift. |
 | `2` | Invalid input or an authentication, GitHub, Git, or policy execution error occurred. |
 
 ## JSON report
