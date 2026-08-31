@@ -37,7 +37,7 @@ are CLI-only.
 | `--org NAME` | GitHub organization to scan. May be set in TOML. |
 | `--policy NAME` | Select a policy by directory name from local or bundled policies. Repeat to select more than one; when present, only the selected policies run. Defaults to all local and bundled policies. |
 | `--repo NAME` | Restrict the run to an exact repository name. Repeat to select more than one. |
-| *(stdout)* | Prints the terminal policy-evaluation table by default; its status column shows policy pull-request state and number instead of the plain compliance status when that state is actionable. |
+| *(stdout)* | Always prints the terminal policy-evaluation table; its status column shows policy pull-request state and number instead of the plain compliance status when that state is actionable. |
 
 ## Rare
 
@@ -51,7 +51,6 @@ are CLI-only.
 | `--recreate` | On `apply`, rebuild one existing policy-owned pull request from its repository's current default branch. Requires exactly one `--repo` and exactly one `--policy`. |
 | `--allow-dirty-pr`, `--no-allow-dirty-pr` | After the automatic formatting-fix retry, commit and push changes even if pre-commit still fails; create or keep the pull request as a draft and add a comment with the failure. |
 | `--quiet`, `--no-quiet` | Suppress progress messages on standard error. The report remains on standard output. |
-| `--summary-only` | Print the terminal summary and failure causes without one row per policy evaluation. |
 
 ## Debugging only
 

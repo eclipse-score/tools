@@ -68,14 +68,6 @@ def test_render_table_includes_each_outcome_and_summary() -> None:
     assert "When" not in output
 
 
-def test_render_table_can_omit_redundant_outcome_rows() -> None:
-    output = render_table(_report(), include_outcomes=False)
-
-    assert "📋 Policy evaluations" not in output
-    assert "example-policy" not in output
-    assert "📊 Summary" in output
-
-
 def test_render_table_groups_failure_causes() -> None:
     report = RunReport(
         summary=RunSummary(
