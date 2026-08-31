@@ -27,9 +27,7 @@ from .operations._validation import (
     validate_repository_path,
 )
 
-_NUMERIC_VERSION = re.compile(
-    r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z"
-)
+_NUMERIC_VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 _VALUE_NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 
 
@@ -41,17 +39,13 @@ def parse_value_bindings(raw: object, source: Path) -> tuple[ValueBinding, ...]:
     bindings: list[ValueBinding] = []
     for name, value in raw.items():
         if not isinstance(name, str) or _VALUE_NAME.fullmatch(name) is None:
-            raise PolicyError(
-                f"policy {source}: value names must use lower_snake_case"
-            )
+            raise PolicyError(f"policy {source}: value names must use lower_snake_case")
         if not isinstance(value, dict):
             raise PolicyError(f"policy {source}: values.{name} must be a mapping")
         expect_keys(value, {"type", "dockerfile", "image"}, source)
         value_type = required_string(value, "type", source)
         if value_type != "dockerfile_image_version":
-            raise PolicyError(
-                f"policy {source}: unsupported value type {value_type!r}"
-            )
+            raise PolicyError(f"policy {source}: unsupported value type {value_type!r}")
         # The source stays attached to the policy. A value reference can
         # therefore never accidentally read a similarly named value from
         # another policy.

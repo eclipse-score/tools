@@ -283,9 +283,7 @@ def _matches_value_exists_condition(root: Path, policy: Policy) -> bool:
         None,
     )
     if binding is None:
-        raise RepoPolicySyncError(
-            f"unknown policy value reference: {condition.name!r}"
-        )
+        raise RepoPolicySyncError(f"unknown policy value reference: {condition.name!r}")
     return value_source_exists(root, binding)
 
 

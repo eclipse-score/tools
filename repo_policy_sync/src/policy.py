@@ -195,16 +195,14 @@ def load_policy(path: Path) -> Policy:
             and operation.version.name not in value_names
         ):
             raise PolicyError(
-                f"policy {path}: unknown value reference "
-                f"{operation.version.name!r}"
+                f"policy {path}: unknown value reference {operation.version.name!r}"
             )
     if (
         value_exists_condition is not None
         and value_exists_condition.name not in value_names
     ):
         raise PolicyError(
-            f"policy {path}: unknown value reference "
-            f"{value_exists_condition.name!r}"
+            f"policy {path}: unknown value reference {value_exists_condition.name!r}"
         )
     after_apply = _parse_after_apply(raw.get("after_apply", []), path)
     return Policy(

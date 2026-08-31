@@ -660,8 +660,7 @@ def test_value_policy_pull_request_explains_value_trigger() -> None:
 
     assert (
         "`.devcontainer/Dockerfile` contains exactly one "
-        "`ghcr.io/eclipse-score/devcontainer:vX.Y.Z` FROM instruction"
-        in body
+        "`ghcr.io/eclipse-score/devcontainer:vX.Y.Z` FROM instruction" in body
     )
 
 
