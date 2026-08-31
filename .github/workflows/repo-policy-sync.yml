@@ -38,6 +38,19 @@ jobs:
         uses: actions/checkout@v7.0.0
       - name: Setup uv
         uses: astral-sh/setup-uv@v7
+      - name: Configure bot git identity
+        run: |
+          git config user.name "eclipse-score-bot"
+          git config user.email "187756813+eclipse-score-bot@users.noreply.github.com"
+      - name: Require bot token for apply mode
+        if: env.MODE == 'apply'
+        env:
+          SCORE_BOT_CLASSIC_PAT: ${{ secrets.SCORE_BOT_CLASSIC_PAT }}
+        run: |
+          if [[ -z "$SCORE_BOT_CLASSIC_PAT" ]]; then
+            echo "SCORE_BOT_CLASSIC_PAT is required to apply policies across repositories." >&2
+            exit 1
+          fi
       - name: Run policy sync
         id: sync
         run: >-

@@ -468,28 +468,16 @@ def test_create_pull_request_creates_missing_automation_labels(monkeypatch) -> N
     ] == [
         "/repos/owner/repo/labels",
         "/repos/owner/repo/labels",
+        "/repos/owner/repo/issues/1/labels",
+        "/repos/owner/repo/issues/1/labels",
     ]
     assert [
-        command[6]
+        command[-1]
         for command in commands
-        if command[:4] == ["gh", "api", "--method", "POST"]
+        if command[4] == "/repos/owner/repo/issues/1/labels"
     ] == [
-        "name=automation",
-        "name=repo-policy-sync",
-    ]
-    assert [
-        command[8]
-        for command in commands
-        if command[:4] == ["gh", "api", "--method", "POST"]
-    ] == [
-        "color=EDEDED",
-        "color=EDEDED",
-    ]
-    assert [
-        command[-1] for command in commands if command[:3] == ["gh", "pr", "edit"]
-    ] == [
-        "automation",
-        "repo-policy-sync",
+        "labels[]=automation",
+        "labels[]=repo-policy-sync",
     ]
 
 
@@ -508,7 +496,7 @@ def test_create_pull_request_keeps_existing_automation_labels(monkeypatch) -> No
             return '[[{"name":"automation"},{"name":"repo-policy-sync"}]]'
         if command[:3] == ["gh", "pr", "create"]:
             return "https://github.example/owner/repo/pull/1\n"
-        if command[:3] == ["gh", "pr", "edit"]:
+        if command[:2] == ["gh", "api"]:
             return ""
         raise AssertionError(command)
 
@@ -524,9 +512,12 @@ def test_create_pull_request_keeps_existing_automation_labels(monkeypatch) -> No
         head_oid="a" * 40,
     )
 
-    assert not any(
-        command[:4] == ["gh", "api", "--method", "POST"] for command in commands
-    )
+    assert not any(command[4] == "/repos/owner/repo/labels" for command in commands)
+    assert [
+        command[-1]
+        for command in commands
+        if command[4] == "/repos/owner/repo/issues/1/labels"
+    ] == ["labels[]=automation", "labels[]=repo-policy-sync"]
 
 
 def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
@@ -543,9 +534,23 @@ def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
             return '[[{"name":"automation"},{"name":"repo-policy-sync"}]]'
         if command[:3] == ["gh", "pr", "create"]:
             return "https://github.example/owner/repo/pull/1\n"
-        if command[:3] == ["gh", "pr", "edit"] and command[-1] == "repo-policy-sync":
-            raise CommandError("gh pr edit: permission denied")
-        if command[:3] == ["gh", "pr", "edit"]:
+        if command[:5] == [
+            "gh",
+            "api",
+            "--method",
+            "POST",
+            "/repos/owner/repo/issues/1/labels",
+        ] and command[-1] == "labels[]=automation":
+            return ""
+        if command[:5] == [
+            "gh",
+            "api",
+            "--method",
+            "POST",
+            "/repos/owner/repo/issues/1/labels",
+        ] and command[-1] == "labels[]=repo-policy-sync":
+            raise CommandError("gh api: permission denied")
+        if command[:2] == ["gh", "api"]:
             return ""
         raise AssertionError(command)
 
@@ -578,7 +583,7 @@ def test_create_pull_request_can_create_a_draft(monkeypatch) -> None:
             return '[[{"name":"automation"},{"name":"repo-policy-sync"}]]'
         if command[:3] == ["gh", "pr", "create"]:
             return "https://github.example/owner/repo/pull/1\n"
-        if command[:3] == ["gh", "pr", "edit"]:
+        if command[:2] == ["gh", "api"]:
             return ""
         raise AssertionError(command)
 
@@ -667,12 +672,12 @@ def test_existing_pull_request_is_updated_with_the_current_template(
 
     assert commands[0][:7] == [
         "gh",
-        "pr",
-        "edit",
-        "https://github.example/owner/repo/pull/1",
-        "--repo",
-        "owner/repo",
-        "--title",
+        "api",
+        "--method",
+        "PATCH",
+        "/repos/owner/repo/pulls/1",
+        "-f",
+        "title=Current title",
     ]
     assert "## Policy" in commands[0][-1]
 

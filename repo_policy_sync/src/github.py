@@ -540,15 +540,47 @@ class GitHubCli:
         # and could be duplicated or overwritten. Only the cosmetic "automation"
         # label may fail without aborting.
         warnings: list[str] = []
+        pull_request = PullRequest(
+            number=_pull_request_number(output), url=output
+        )
         for label in AUTOMATION_LABELS:
             if label == TOOL_SLUG:
-                self._run(["gh", "pr", "edit", output, "--add-label", label])
+                self._add_pull_request_label(
+                    repository=repository, pull_request=pull_request, label=label
+                )
                 continue
             try:
-                self._run(["gh", "pr", "edit", output, "--add-label", label])
+                self._add_pull_request_label(
+                    repository=repository, pull_request=pull_request, label=label
+                )
             except CommandError as exc:
                 warnings.append(f"label {label!r} was not applied: {exc}")
-        return PullRequest(number=0, url=output, warnings=tuple(warnings))
+        return PullRequest(
+            number=pull_request.number, url=output, warnings=tuple(warnings)
+        )
+
+    def _add_pull_request_label(
+        self, *, repository: str, pull_request: PullRequest, label: str
+    ) -> None:
+        """Add a label through REST with the cross-repository bot's repo scope.
+
+        GitHub CLI's pull-request commands are GraphQL-backed and require
+        ``read:org`` for organization-owned repositories. The bot deliberately
+        has only the narrower ``repo`` scope, which is sufficient for this
+        REST endpoint.
+        """
+
+        self._run(
+            [
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                f"/repos/{repository}/issues/{pull_request.number}/labels",
+                "-f",
+                f"labels[]={label}",
+            ]
+        )
 
     def _ensure_automation_labels(self, *, repository: str) -> None:
         """Create the labels applied to generated pull requests when they are absent."""
@@ -615,18 +647,20 @@ class GitHubCli:
     ) -> None:
         """Keep an existing policy-owned pull request's explanation current."""
 
+        # GitHub CLI's pull-request edit command is GraphQL-backed and needs
+        # read:org for organization-owned repositories. The cross-repository
+        # bot deliberately has only repo scope, which is sufficient here.
         self._run(
             [
                 "gh",
-                "pr",
-                "edit",
-                pull_request.url,
-                "--repo",
-                repository,
-                "--title",
-                policy.title,
-                "--body",
-                _pull_request_body(policy, changes, head_oid=head_oid, failure=failure),
+                "api",
+                "--method",
+                "PATCH",
+                f"/repos/{repository}/pulls/{pull_request.number}",
+                "-f",
+                f"title={policy.title}",
+                "-f",
+                f"body={_pull_request_body(policy, changes, head_oid=head_oid, failure=failure)}",
             ]
         )
 
@@ -744,6 +778,13 @@ def _policy_head_marker_from_body(body: str) -> str | None:
     )
     match = re.search(rf"<!-- (?:{tool_slugs})-head: ([0-9a-f]{{40}}) -->", body)
     return match.group(1) if match else None
+
+
+def _pull_request_number(url: str) -> int:
+    match = re.search(r"/pull/(\d+)/?$", url)
+    if match is None:
+        raise CommandError(f"gh did not return a valid pull-request URL: {url}")
+    return int(match.group(1))
 
 
 def _pull_request_body(
