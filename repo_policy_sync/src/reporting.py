@@ -248,9 +248,9 @@ def _markdown_pr_badge(status: str, url: str) -> str:
 
 
 def _markdown_details_section(outcomes: tuple[RepositoryOutcome, ...]) -> list[str]:
-    detailed = tuple(
-        outcome for outcome in outcomes if _markdown_details(outcome) != "—"
-    )
+    """Render error details without duplicating the policy pull-request list."""
+
+    detailed = tuple(outcome for outcome in outcomes if outcome.error)
     if not detailed:
         return []
 
@@ -264,21 +264,10 @@ def _markdown_details_section(outcomes: tuple[RepositoryOutcome, ...]) -> list[s
         lines.append(
             f"- `{_markdown_cell(outcome.repository)}` / "
             f"`{_markdown_cell(outcome.policy_id)}`: "
-            f"{_markdown_cell(_markdown_details(outcome))}"
+            f"{_markdown_cell(outcome.error or 'unknown error')}"
         )
     lines.extend(["", "</details>"])
     return lines
-
-
-def _markdown_details(outcome: RepositoryOutcome) -> str:
-    if outcome.error:
-        return outcome.error
-    if outcome.status == "skipped":
-        return "No default branch; evaluation skipped."
-    details = _format_changes(outcome.changes)
-    if outcome.warnings:
-        details = "; ".join(part for part in (details, *outcome.warnings) if part)
-    return details or "—"
 
 
 def _markdown_url(value: str) -> str:

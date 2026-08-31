@@ -328,7 +328,7 @@ def test_render_markdown_distinguishes_compliance_and_policy_pr_status() -> None
     assert "`✅ 1 closed`" in output
 
 
-def test_render_markdown_uses_policies_as_matrix_columns_and_keeps_details_compact() -> (
+def test_render_markdown_uses_policies_as_matrix_columns_and_keeps_only_errors_in_details() -> (
     None
 ):
     report = RunReport(
@@ -368,7 +368,7 @@ def test_render_markdown_uses_policies_as_matrix_columns_and_keeps_details_compa
     assert "| Repository | policy-a | policy-b |" in output
     assert "| first | ❌ | N/A |" in output
     assert "| second | ✅ | ⚠️ |" in output
-    assert "<summary>Details (2)</summary>" in output
-    assert ".gitignore: add generated files" in output
+    assert "<summary>Details (1)</summary>" in output
+    assert ".gitignore: add generated files" not in output
     assert "Bazel failed" in output
     assert "| Repository | Policy | Status |" not in output

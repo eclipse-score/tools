@@ -40,8 +40,8 @@ jobs:
         uses: astral-sh/setup-uv@v7
       - name: Configure bot git identity
         run: |
-          git config user.name "eclipse-score-bot"
-          git config user.email "187756813+eclipse-score-bot@users.noreply.github.com"
+          git config --global user.name "eclipse-score-bot"
+          git config --global user.email "187756813+eclipse-score-bot@users.noreply.github.com"
       - name: Require bot token for apply mode
         if: env.MODE == 'apply'
         env:
