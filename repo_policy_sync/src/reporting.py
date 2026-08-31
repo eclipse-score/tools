@@ -20,7 +20,7 @@ import shutil
 import unicodedata
 from collections import Counter
 
-from .models import Change
+from .models import Change, Policy
 from .runner import RepositoryOutcome, RunReport, RunSummary
 
 
@@ -75,6 +75,7 @@ def render_json(report: RunReport) -> str:
                 "pull_requests_closed": summary.pull_requests_closed,
                 "duration_seconds": summary.duration_seconds,
             },
+            "policies": [_policy_to_json(policy) for policy in report.policies],
             "outcomes": [
                 {
                     "policy_id": outcome.policy_id,
@@ -146,6 +147,17 @@ def _change_to_json(change: Change) -> dict[str, str | None]:
         "path": str(change.path),
         "description": change.description,
         "rationale": change.rationale,
+    }
+
+
+def _policy_to_json(policy: Policy) -> dict[str, object]:
+    """Serialize the policy metadata needed to interpret an outcome."""
+
+    return {
+        "id": policy.id,
+        "title": policy.title,
+        "description": policy.description,
+        "legacy_names": list(policy.legacy_names),
     }
 
 

@@ -75,10 +75,12 @@ repository with `--repo` fails validation instead of silently ignoring it.
 `--json-output PATH` writes one JSON document to `PATH`. The top-level
 `schema_version` currently has value `2`. The `summary` object separately
 reports repository synchronization, policy evaluation, pull-request activity
-(including automatic closures), and elapsed duration; each `outcomes` element
-includes the policy, repository, applicability result, status, planned or
-applied changes, pull request URL, policy pull-request status, warnings, and
-error. `--markdown-output PATH`
+(including automatic closures), and elapsed duration. The `policies` array
+contains the selected policy metadata (`id`, `title`, `description`, and
+`legacy_names`). Each `outcomes` element references its policy by `policy_id`
+and includes the repository, applicability result, status, planned or applied
+changes, pull request URL, policy pull-request status, warnings, and error.
+`--markdown-output PATH`
 writes the compact Markdown matrix to `PATH`. JSON and Markdown output paths
 can be supplied together so all reports are generated from one run.
 

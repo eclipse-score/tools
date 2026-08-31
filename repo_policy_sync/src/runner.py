@@ -156,6 +156,7 @@ class RunReport:
 
     summary: RunSummary
     outcomes: tuple[RepositoryOutcome, ...]
+    policies: tuple[Policy, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -277,7 +278,7 @@ def run_policies(
             if outcome.pull_request_closed_by_run:
                 pull_requests_closed += 1
     return RunReport(
-        RunSummary(
+        summary=RunSummary(
             repositories=len(selected_repositories),
             synchronized=synchronized,
             sync_failures=len(sync_failures),
@@ -294,7 +295,8 @@ def run_policies(
             pull_requests_closed=pull_requests_closed,
             duration_seconds=monotonic() - started,
         ),
-        tuple(outcomes),
+        outcomes=tuple(outcomes),
+        policies=policies,
     )
 
 

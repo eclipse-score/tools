@@ -265,6 +265,7 @@ def test_runner_clones_all_repositories(
     assert report.summary.repositories == 2
     assert report.summary.evaluations == 2
     assert report.summary.drifted == 2
+    assert report.policies == (policy,)
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "Synchronizing 2 checkout(s)" in captured.err

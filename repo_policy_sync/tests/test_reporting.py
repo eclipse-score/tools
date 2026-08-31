@@ -11,9 +11,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
+import json
 from pathlib import Path
 
-from repo_policy_sync.src.models import Change
+from repo_policy_sync.src.models import Change, Policy
 from repo_policy_sync.src.reporting import render_json, render_markdown, render_table
 from repo_policy_sync.src.runner import RepositoryOutcome, RunReport, RunSummary
 
@@ -212,6 +213,35 @@ def test_render_json_is_machine_readable_and_versioned() -> None:
     assert '"schema_version": 2' in output
     assert '"drifted": 1' in output
     assert '"path": ".gitignore"' in output
+
+
+def test_render_json_includes_selected_policy_metadata() -> None:
+    base_report = _report()
+    report = RunReport(
+        summary=base_report.summary,
+        outcomes=base_report.outcomes,
+        policies=(
+            Policy(
+                id="example-policy",
+                title="Keep generated files out of version control",
+                description="Ensure generated build output is ignored.",
+                bazel_condition=None,
+                ensure=(),
+                legacy_names=("old-example-policy",),
+            ),
+        ),
+    )
+
+    document = json.loads(render_json(report))
+
+    assert document["policies"] == [
+        {
+            "description": "Ensure generated build output is ignored.",
+            "id": "example-policy",
+            "legacy_names": ["old-example-policy"],
+            "title": "Keep generated files out of version control",
+        }
+    ]
 
 
 def test_render_markdown_distinguishes_compliance_and_policy_pr_status() -> None:
