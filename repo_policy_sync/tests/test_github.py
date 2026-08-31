@@ -534,21 +534,29 @@ def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
             return '[[{"name":"automation"},{"name":"repo-policy-sync"}]]'
         if command[:3] == ["gh", "pr", "create"]:
             return "https://github.example/owner/repo/pull/1\n"
-        if command[:5] == [
-            "gh",
-            "api",
-            "--method",
-            "POST",
-            "/repos/owner/repo/issues/1/labels",
-        ] and command[-1] == "labels[]=automation":
+        if (
+            command[:5]
+            == [
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                "/repos/owner/repo/issues/1/labels",
+            ]
+            and command[-1] == "labels[]=automation"
+        ):
             return ""
-        if command[:5] == [
-            "gh",
-            "api",
-            "--method",
-            "POST",
-            "/repos/owner/repo/issues/1/labels",
-        ] and command[-1] == "labels[]=repo-policy-sync":
+        if (
+            command[:5]
+            == [
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                "/repos/owner/repo/issues/1/labels",
+            ]
+            and command[-1] == "labels[]=repo-policy-sync"
+        ):
             raise CommandError("gh api: permission denied")
         if command[:2] == ["gh", "api"]:
             return ""

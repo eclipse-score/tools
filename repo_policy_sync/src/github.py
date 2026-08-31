@@ -540,9 +540,7 @@ class GitHubCli:
         # and could be duplicated or overwritten. Only the cosmetic "automation"
         # label may fail without aborting.
         warnings: list[str] = []
-        pull_request = PullRequest(
-            number=_pull_request_number(output), url=output
-        )
+        pull_request = PullRequest(number=_pull_request_number(output), url=output)
         for label in AUTOMATION_LABELS:
             if label == TOOL_SLUG:
                 self._add_pull_request_label(
