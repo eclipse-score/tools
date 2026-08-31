@@ -24,31 +24,34 @@ from .models import Change, Policy
 from .runner import RepositoryOutcome, RunReport, RunSummary
 
 
-def render_table(report: RunReport) -> str:
-    """Render a concise table suitable for interactive terminal use."""
+def render_table(report: RunReport, *, include_outcomes: bool = True) -> str:
+    """Render a terminal report, optionally omitting the outcome-by-outcome table."""
 
-    rows = [
-        (
-            outcome.policy_id,
-            outcome.repository,
-            _status_label(outcome),
-            _actions_label(outcome),
+    lines: list[str] = []
+    if include_outcomes:
+        rows = [
+            (
+                outcome.policy_id,
+                outcome.repository,
+                _status_label(outcome),
+                _actions_label(outcome),
+            )
+            for outcome in report.outcomes
+        ]
+        if not rows:
+            rows.append(("—", "—", "—", "No policy evaluations."))
+        lines.extend(
+            (
+                "📋 Policy evaluations",
+                _render_box_table(
+                    ("Policy", "Repository", "Status", "Actions"),
+                    rows,
+                    column_limits=(24, 24, 44, 48),
+                ),
+            )
         )
-        for outcome in report.outcomes
-    ]
-    if not rows:
-        rows.append(("—", "—", "—", "No policy evaluations."))
-
-    lines = [
-        "📋 Policy evaluations",
-        _render_box_table(
-            ("Policy", "Repository", "Status", "Actions"),
-            rows,
-            column_limits=(24, 24, 44, 48),
-        ),
-    ]
     lines.extend(_summary_lines(report))
-    return "\n".join(lines)
+    return "\n".join(lines).lstrip()
 
 
 def render_json(report: RunReport) -> str:

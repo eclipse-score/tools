@@ -142,6 +142,30 @@ def test_all_reports_can_be_written_from_one_run(
     assert observed["include_pull_request_status"] is True
 
 
+def test_summary_only_omits_individual_evaluations(monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "load_policies", lambda _: ())
+    monkeypatch.setattr(cli, "run_policies", lambda **_: _empty_report())
+
+    assert (
+        cli.main(
+            (
+                "plan",
+                "--org",
+                "eclipse-score",
+                "--policy-dir",
+                "repo_policy_sync/policies",
+                "--quiet",
+                "--summary-only",
+            )
+        )
+        == 0
+    )
+
+    output = capsys.readouterr().out
+    assert "📋 Policy evaluations" not in output
+    assert "📊 Summary" in output
+
+
 def test_json_report_requests_pull_request_status(
     monkeypatch, tmp_path: Path, capsys
 ) -> None:

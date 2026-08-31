@@ -132,6 +132,11 @@ def _add_common_arguments(
         default=None,
         help="Suppress progress messages on standard error.",
     )
+    rare.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Print only the summary and failure causes, not every evaluation.",
+    )
     debugging.add_argument(
         "--cache-dir",
         type=Path,
@@ -306,7 +311,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     markdown_output = (
         render_markdown(report) if args.markdown_output is not None else None
     )
-    output = render_table(report)
+    output = render_table(report, include_outcomes=not args.summary_only)
 
     try:
         if args.json_output is not None:

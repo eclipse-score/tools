@@ -54,7 +54,7 @@ jobs:
       - name: Run policy sync
         id: sync
         run: >-
-          uv run score-repo-policy-sync "$MODE" --config repo_policy_sync/eclipse-score.toml --json-output repo-policy-sync-report.json --markdown-output "$GITHUB_STEP_SUMMARY"
+          uv run score-repo-policy-sync "$MODE" --config repo_policy_sync/eclipse-score.toml --quiet --summary-only --json-output repo-policy-sync-report.json --markdown-output "$GITHUB_STEP_SUMMARY"
       - name: Upload JSON report
         if: always()
         uses: actions/upload-artifact@v7
