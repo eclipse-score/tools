@@ -43,6 +43,12 @@ title: "chore(docs): remove legacy score_docs_as_code configuration"
 description: Replace legacy documentation configuration.
 legacy_names: [old-policy-name]
 
+values:
+  devcontainer_version:
+    type: dockerfile_image_version
+    dockerfile: .devcontainer/Dockerfile
+    image: ghcr.io/eclipse-score/devcontainer
+
 when:
   bazel:
     direct_module_dependencies: [score_docs_as_code]
@@ -59,8 +65,8 @@ ensure:
 ```
 
 `title` and a non-empty `ensure` list are required. `description`,
-`legacy_names`, and `when` are optional. `legacy_names` is a list of former
-policy IDs whose pull-request markers are still recognized for this policy.
+`legacy_names`, `values`, and `when` are optional. `legacy_names` is a list of
+former policy IDs whose pull-request markers are still recognized for this policy.
 Pull requests are located through the `repo-policy-sync` label and then matched
 by marker, so this also supports historical branch names and the former
 `repo-sync` marker format. New pull requests use the current directory name
@@ -77,6 +83,14 @@ IDs are normalized to lowercase branch slugs by replacing non-alphanumeric
 characters with hyphens. The loaded policy catalogue must not contain two
 different IDs with the same normalized slug (for example, `foo_bar` and
 `foo-bar`).
+
+`values` defines named, policy-local values derived from repository files.
+Value names use lower snake case. The currently supported source type,
+`dockerfile_image_version`, extracts one `FROM image:vX.Y.Z` tag and exposes
+the numeric `X.Y.Z` version. Operations can consume a value explicitly with
+`version: {ref: value_name}`. References are resolved after ordinary `when`
+conditions match and before operations are evaluated or applied; they are not
+string interpolation and are not shared between policies.
 
 ## Follow-up commands
 
@@ -133,9 +147,15 @@ contain `*`, `?`, or `[` glob syntax; for example, `**/BUILD` checks every
 matching file. A repository that does not match is neither an error nor a
 change.
 
+`when.value_exists` requires a named value from `values` to be available. For a
+`dockerfile_image_version` source, this means the source file contains exactly
+one matching `FROM image:vX.Y.Z` instruction. Value source availability is
+checked as part of the policy conditions; the value is materialized for
+operation fields only after the policy matches.
+
 ## Built-in operations
 
-The [built-in operations catalogue](../../operations/README.md) provides a
+The [built-in operations catalogue](../../src/operations/README.md) provides a
 quick overview of every supported operation. This section remains the
 authoritative reference for their schemas and detailed behavior.
 
@@ -201,3 +221,19 @@ numeric version. Lower versions are replaced with `minimum_version`; equal and
 higher versions are unchanged. A missing file is compliant. A file containing
 any other format is rejected so the policy cannot accidentally overwrite an
 unknown version scheme.
+
+### `ensure_bazel_dependency`
+
+```yaml
+- type: ensure_bazel_dependency
+  module_file: MODULE.bazel
+  module_name: score_devcontainer
+  version: 1.9.0
+```
+
+Ensures that `module_file` contains one direct `bazel_dep` with the configured
+module name and numeric version. Existing dependencies are left unchanged;
+commented-out dependencies do not count. Duplicate dependencies and malformed
+existing versions are rejected. The version may be a literal `X.Y.Z` string or
+an explicit reference to a policy-local value source, for example
+`version: {ref: devcontainer_version}`.

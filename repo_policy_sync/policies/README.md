@@ -31,6 +31,7 @@ use the [documentation index](../docs/README.md).
 | `docs-as-code-gitignore` | Update `score_docs_as_code` Git ignore entries and remove legacy configuration files. | One-time cleanup |
 | `minimal-bazel-module-declaration` | Keep `MODULE.bazel` limited to the repository-owned module name by removing version metadata. | One-time cleanup |
 | `minimum-bazel-version` | Upgrade repositories to at least Bazel `8.6.0` and regenerate the lockfile when required. | Baseline maintenance |
+| `score-devcontainer-dependency-alignment` | Declare the direct SCORE devcontainer Bazel dependency using the Dockerfile image version. | One-time integration |
 
 The policy definitions and their executable before/after cases are the
 authoritative detail. The [policy format reference](../docs/reference/policy-format.md)

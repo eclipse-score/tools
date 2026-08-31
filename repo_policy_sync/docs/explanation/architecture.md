@@ -23,6 +23,7 @@ cli.py
   ├─ reporting.py              table and versioned JSON renderers
   └─ runner.py                 organization-level execution and report assembly
        ├─ policy.py             YAML → validated Policy objects
+       ├─ values.py             policy-local value sources and references
        ├─ operations/           built-in operation registry and implementations
        ├─ engine.py             evaluate and apply policies to a checkout
        ├─ github.py             gh and Git process adapter for pull requests/branches
@@ -46,9 +47,13 @@ directly.
 
 ### Policy loading and operations
 
-`policy.py` validates policy metadata and conditions. It delegates each
-`ensure[].type` to the explicit registry in `operations/`. An operation owns
-its YAML validation, compliance check, remediation description, and application.
+`policy.py` validates policy metadata and conditions. `values.py` validates
+policy-local value sources and resolves them only after applicability conditions
+match. It passes plain resolved values into operations through explicit
+references; operation handlers do not know where those values came from.
+`policy.py` delegates each `ensure[].type` to the explicit registry in
+`operations/`. An operation owns its YAML validation, compliance check,
+remediation description, and application.
 
 The registry is intentionally built in. It makes supported operations visible
 and testable without runtime discovery, third-party code loading, or an

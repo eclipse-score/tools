@@ -101,7 +101,53 @@ class EnsureMinimumVersion:
     rationale: str | None = None
 
 
-EnsureOperation = EnsureLine | RemoveFile | ReplaceRegex | EnsureMinimumVersion
+@dataclass(frozen=True)
+class ValueReference:
+    """A reference to a named value derived by the containing policy."""
+
+    name: str
+
+
+@dataclass(frozen=True)
+class DockerfileImageVersionSource:
+    """A Dockerfile image tag used as a policy value source."""
+
+    dockerfile: Path
+    image: str
+
+
+@dataclass(frozen=True)
+class ValueBinding:
+    """Bind a policy-local name to a derived value source."""
+
+    name: str
+    source: DockerfileImageVersionSource
+
+
+@dataclass(frozen=True)
+class ValueExistsCondition:
+    """A condition requiring a named policy value to be available."""
+
+    name: str
+
+
+@dataclass(frozen=True)
+class EnsureBazelDependency:
+    """Ensure a direct bzlmod dependency exists at a configured version."""
+
+    module_file: Path
+    module_name: str
+    version: str | ValueReference
+    rationale: str | None = None
+
+
+EnsureOperation = (
+    EnsureLine
+    | RemoveFile
+    | ReplaceRegex
+    | EnsureMinimumVersion
+    | EnsureBazelDependency
+)
 
 
 @dataclass(frozen=True)
@@ -126,6 +172,8 @@ class Policy:
     file_contains_condition: FileContainsCondition | None = None
     file_contains_any_condition: FileContainsAnyCondition | None = None
     legacy_names: tuple[str, ...] = ()
+    values: tuple[ValueBinding, ...] = ()
+    value_exists_condition: ValueExistsCondition | None = None
 
 
 @dataclass(frozen=True)

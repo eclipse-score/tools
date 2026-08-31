@@ -841,6 +841,27 @@ def _policy_trigger(policy: Policy, changes: tuple[Change, ...]) -> str:
             reasons.append(
                 f"`MODULE.bazel` declares at least one of these direct Bazel dependencies: {any_dependencies}"
             )
+    value_exists_condition = policy.value_exists_condition
+    if value_exists_condition is not None:
+        value_binding = next(
+            (
+                binding
+                for binding in policy.values
+                if binding.name == value_exists_condition.name
+            ),
+            None,
+        )
+        if value_binding is None:
+            reasons.append(
+                f"the policy value `{value_exists_condition.name}` is available"
+            )
+        else:
+            source = value_binding.source
+            reasons.append(
+                f"the policy value `{value_exists_condition.name}` is available "
+                f"because `{source.dockerfile}` contains exactly one "
+                f"`{source.image}:vX.Y.Z` FROM instruction"
+            )
     if reasons:
         return f"This repository matches this policy because {' and '.join(reasons)}."
     return f"This policy applies to configuration in {targets}."

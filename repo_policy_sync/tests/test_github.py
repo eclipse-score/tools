@@ -645,6 +645,26 @@ def test_module_policy_pull_request_includes_the_matching_rationale() -> None:
     ) in body
 
 
+def test_value_policy_pull_request_explains_value_trigger() -> None:
+    policy = load_policy(
+        BUNDLED_POLICY_DIRECTORY
+        / "score-devcontainer-dependency-alignment"
+        / "policy.yml"
+    )
+
+    body = _pull_request_body(
+        policy,
+        (Change(Path("MODULE.bazel"), "add dependency"),),
+        head_oid="a" * 40,
+    )
+
+    assert (
+        "`.devcontainer/Dockerfile` contains exactly one "
+        "`ghcr.io/eclipse-score/devcontainer:vX.Y.Z` FROM instruction"
+        in body
+    )
+
+
 def test_existing_pull_request_is_updated_with_the_current_template(
     monkeypatch,
 ) -> None:

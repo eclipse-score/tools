@@ -59,10 +59,17 @@ def starlark_call_ranges(text: str, function_name: str) -> tuple[tuple[int, int]
     return tuple(ranges)
 
 
-def _mask_starlark(text: str) -> str:
+def mask_starlark_comments(text: str) -> str:
+    """Mask comments while preserving strings and source offsets."""
+
+    return _mask_starlark(text, mask_strings=False)
+
+
+def _mask_starlark(text: str, *, mask_strings: bool = True) -> str:
     # Comments and strings can contain text that looks like a real call. Replace
     # them with spaces while retaining newlines and character positions for the
-    # offset calculations in starlark_call_ranges.
+    # offset calculations in starlark_call_ranges. Callers that need to inspect
+    # string arguments can preserve strings while still masking comments.
     masked = list(text)
     index = 0
     while index < len(text):
@@ -76,21 +83,23 @@ def _mask_starlark(text: str) -> str:
             continue
         quote = text[index]
         delimiter = quote * 3 if text.startswith(quote * 3, index) else quote
-        for offset in range(len(delimiter)):
-            masked[index + offset] = " "
+        if mask_strings:
+            for offset in range(len(delimiter)):
+                masked[index + offset] = " "
         index += len(delimiter)
         escaped = False
         while index < len(text):
             character = text[index]
-            if character not in "\r\n":
+            if mask_strings and character not in "\r\n":
                 masked[index] = " "
             if escaped:
                 escaped = False
             elif character == "\\":
                 escaped = True
             elif text.startswith(delimiter, index):
-                for offset in range(len(delimiter)):
-                    masked[index + offset] = " "
+                if mask_strings:
+                    for offset in range(len(delimiter)):
+                        masked[index + offset] = " "
                 index += len(delimiter)
                 break
             index += 1

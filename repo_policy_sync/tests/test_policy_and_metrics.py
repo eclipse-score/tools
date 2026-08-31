@@ -88,6 +88,112 @@ ensure:
         load_policy(policy_path)
 
 
+def test_load_policy_accepts_policy_value_reference(fake_repo: Path) -> None:
+    policy_path = fake_repo / "example" / "policy.yml"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        """title: Example
+values:
+  devcontainer_version:
+    type: dockerfile_image_version
+    dockerfile: .devcontainer/Dockerfile
+    image: ghcr.io/eclipse-score/devcontainer
+ensure:
+  - type: ensure_bazel_dependency
+    module_file: MODULE.bazel
+    module_name: score_devcontainer
+    version:
+      ref: devcontainer_version
+""",
+        encoding="utf-8",
+    )
+
+    policy = load_policy(policy_path)
+
+    assert policy.values[0].name == "devcontainer_version"
+    assert policy.ensure[0].version.name == "devcontainer_version"
+
+
+def test_load_policy_rejects_unknown_policy_value_reference(fake_repo: Path) -> None:
+    policy_path = fake_repo / "example" / "policy.yml"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        """title: Example
+ensure:
+  - type: ensure_bazel_dependency
+    module_file: MODULE.bazel
+    module_name: score_devcontainer
+    version:
+      ref: missing_version
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PolicyError, match="unknown value reference"):
+        load_policy(policy_path)
+
+
+def test_load_policy_rejects_unemittable_bazel_module_name(fake_repo: Path) -> None:
+    policy_path = fake_repo / "example" / "policy.yml"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        """title: Example
+ensure:
+  - type: ensure_bazel_dependency
+    module_file: MODULE.bazel
+    module_name: 'foo"bar'
+    version: 1.0.0
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PolicyError, match="module_name"):
+        load_policy(policy_path)
+
+
+def test_load_policy_accepts_value_exists_condition(fake_repo: Path) -> None:
+    policy_path = fake_repo / "example" / "policy.yml"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        """title: Example
+values:
+  version:
+    type: dockerfile_image_version
+    dockerfile: Dockerfile
+    image: example/image
+when:
+  value_exists: version
+ensure:
+  - type: remove_file
+    path: obsolete-file
+""",
+        encoding="utf-8",
+    )
+
+    policy = load_policy(policy_path)
+
+    assert policy.value_exists_condition is not None
+    assert policy.value_exists_condition.name == "version"
+
+
+def test_load_policy_rejects_unknown_value_exists_condition(fake_repo: Path) -> None:
+    policy_path = fake_repo / "example" / "policy.yml"
+    policy_path.parent.mkdir()
+    policy_path.write_text(
+        """title: Example
+when:
+  value_exists: missing_version
+ensure:
+  - type: remove_file
+    path: obsolete-file
+""",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(PolicyError, match="unknown value reference"):
+        load_policy(policy_path)
+
+
 @pytest.mark.parametrize(
     ("operation", "message"),
     [
