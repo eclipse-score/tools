@@ -23,15 +23,17 @@ import tempfile
 from pathlib import Path
 
 from .bazel import (
+    mask_starlark_comments,
     matches_bazel_dependency_condition,
     parse_bazel_version,
     starlark_call_ranges,
 )
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
-from .models import Change, Evaluation, Policy
+from .models import Change, EnsureOperation, Evaluation, Policy
 from .operations import apply as apply_operation
-from .operations import describe_changes
+from .operations import describe_changes, resolve_operation
 from .operations._validation import validate_repository_path
+from .values import resolve_values, value_source_exists
 
 _NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*[\"']([^\"']+)[\"']")
@@ -54,10 +56,27 @@ def evaluate_policy(
 ) -> Evaluation:
     """Evaluate a policy against a checked-out repository without changing it."""
 
+    evaluation, _ = _evaluate_policy_with_operations(
+        root, policy, organization=organization
+    )
+    return evaluation
+
+
+def _evaluate_policy_with_operations(
+    root: Path, policy: Policy, *, organization: str | None = None
+) -> tuple[Evaluation, tuple[EnsureOperation, ...]]:
+    """Evaluate a policy and retain the materialized operations for applying it."""
+
     if not _matches_conditions(root, policy):
-        return Evaluation(applies=False, changes=())
+        return Evaluation(applies=False, changes=()), ()
+    # Resolve values only after applicability is established. The same
+    # materialized operation tuple is then used for both planning and apply.
+    values = resolve_values(root, policy.values)
+    operations = tuple(
+        resolve_operation(operation, values) for operation in policy.ensure
+    )
     changes: list[Change] = []
-    for operation in policy.ensure:
+    for operation in operations:
         changes.extend(describe_changes(root, operation, organization=organization))
     if changes:
         changes.extend(
@@ -67,7 +86,7 @@ def evaluate_policy(
                 root, command, {change.path for change in changes}
             )
         )
-    return Evaluation(applies=True, changes=tuple(changes))
+    return Evaluation(applies=True, changes=tuple(changes)), operations
 
 
 def apply_policy(
@@ -79,10 +98,12 @@ def apply_policy(
 ) -> Evaluation:
     """Apply a matching policy and return the changes that were made."""
 
-    evaluation = evaluate_policy(root, policy, organization=organization)
+    evaluation, operations = _evaluate_policy_with_operations(
+        root, policy, organization=organization
+    )
     if not evaluation.applies:
         return evaluation
-    for operation in policy.ensure:
+    for operation in operations:
         apply_operation(root, operation, organization=organization)
     if evaluation.changes or force_after_apply:
         changed_paths = {change.path for change in evaluation.changes}
@@ -164,6 +185,7 @@ def _matches_conditions(root: Path, policy: Policy) -> bool:
         and _matches_file_exists_condition(root, policy)
         and _matches_file_contains_condition(root, policy)
         and _matches_file_contains_any_condition(root, policy)
+        and _matches_value_exists_condition(root, policy)
     )
 
 
@@ -178,7 +200,7 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
     text = module_file.read_text(encoding="utf-8")
     dependencies: dict[str, tuple[int, int, int] | None] = {}
     for start, end in starlark_call_ranges(text, "bazel_dep"):
-        body = text[start:end]
+        body = mask_starlark_comments(text[start:end])
         name_match = _NAME_ARGUMENT.search(body)
         if name_match is None:
             continue
@@ -250,6 +272,19 @@ def _matches_file_contains_any_condition(root: Path, policy: Policy) -> bool:
         for item in condition.conditions
         for path in _condition_paths(root, item.path)
     )
+
+
+def _matches_value_exists_condition(root: Path, policy: Policy) -> bool:
+    condition = policy.value_exists_condition
+    if condition is None:
+        return True
+    binding = next(
+        (binding for binding in policy.values if binding.name == condition.name),
+        None,
+    )
+    if binding is None:
+        raise RepoPolicySyncError(f"unknown policy value reference: {condition.name!r}")
+    return value_source_exists(root, binding)
 
 
 def _condition_paths(root: Path, path: Path) -> tuple[Path, ...]:

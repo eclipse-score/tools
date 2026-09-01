@@ -26,7 +26,10 @@ from repo_policy_sync.src.models import (
     EnsureLine,
     EnsureMinimumVersion,
     RemoveFile,
+    DockerfileImageVersionSource,
     Policy,
+    ValueBinding,
+    ValueExistsCondition,
 )
 
 
@@ -73,9 +76,68 @@ def test_policy_does_not_apply_without_direct_dependency(fake_repo: Path) -> Non
     assert evaluation.changes == ()
 
 
+def test_value_exists_condition_skips_missing_source(fake_repo: Path) -> None:
+    policy = Policy(
+        id="example",
+        title="Example",
+        description=None,
+        bazel_condition=None,
+        ensure=(EnsureLine(Path("README.md"), "managed", ()),),
+        values=(
+            ValueBinding(
+                "version",
+                DockerfileImageVersionSource(Path("Dockerfile"), "example/image"),
+            ),
+        ),
+        value_exists_condition=ValueExistsCondition("version"),
+    )
+
+    evaluation = evaluate_policy(fake_repo, policy)
+
+    assert evaluation.applies is False
+    assert evaluation.changes == ()
+
+
+def test_value_exists_condition_accepts_crlf_dockerfile(fake_repo: Path) -> None:
+    dockerfile = fake_repo / "Dockerfile"
+    dockerfile.write_bytes(b"FROM example/image:v1.2.3\r\n")
+    policy = Policy(
+        id="example",
+        title="Example",
+        description=None,
+        bazel_condition=None,
+        ensure=(EnsureLine(Path("README.md"), "managed", ()),),
+        values=(
+            ValueBinding(
+                "version",
+                DockerfileImageVersionSource(Path("Dockerfile"), "example/image"),
+            ),
+        ),
+        value_exists_condition=ValueExistsCondition("version"),
+    )
+
+    evaluation = evaluate_policy(fake_repo, policy)
+
+    assert evaluation.applies is True
+    assert evaluation.changes[0].path == Path("README.md")
+
+
 def test_bazel_condition_ignores_commented_dependency(fake_repo: Path) -> None:
     (fake_repo / "MODULE.bazel").write_text(
         '# bazel_dep(name = "score_docs_as_code", version = "1.0.0")\n'
+    )
+
+    assert evaluate_policy(fake_repo, _policy()).applies is False
+
+
+def test_bazel_condition_ignores_commented_arguments(fake_repo: Path) -> None:
+    (fake_repo / "MODULE.bazel").write_text(
+        """bazel_dep(
+    # name = "score_docs_as_code",
+    name = "other",
+    version = "1.0.0",
+)
+"""
     )
 
     assert evaluate_policy(fake_repo, _policy()).applies is False

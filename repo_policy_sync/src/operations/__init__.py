@@ -15,10 +15,14 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import fields, replace
 from pathlib import Path
 from typing import Any, Protocol
 
-from ..models import Change, EnsureOperation
+from ..errors import RepoPolicySyncError
+from ..models import Change, EnsureOperation, ValueReference
+from .ensure_bazel_dependency import EnsureBazelDependencyOperation
 from .ensure_line import EnsureLineOperation
 from .ensure_minimum_version import EnsureMinimumVersionOperation
 from .remove_file import RemoveFileOperation
@@ -49,6 +53,7 @@ class OperationHandler(Protocol):
 
 
 _HANDLERS: tuple[OperationHandler, ...] = (
+    EnsureBazelDependencyOperation(),
     EnsureLineOperation(),
     EnsureMinimumVersionOperation(),
     RemoveFileOperation(),
@@ -92,6 +97,30 @@ def apply(
     """Apply one operation from a repository root."""
 
     _handler_for(operation).apply(root, operation, organization=organization)
+
+
+def resolve_operation(
+    operation: EnsureOperation, values: Mapping[str, str]
+) -> EnsureOperation:
+    """Materialize policy-local references in an operation.
+
+    References are intentionally plain data rather than workflow steps. This
+    keeps operation handlers independent of value-source details and lets the
+    engine use identical inputs while describing and applying changes.
+    """
+
+    replacements: dict[str, str] = {}
+    for field in fields(operation):
+        value = getattr(operation, field.name)
+        if not isinstance(value, ValueReference):
+            continue
+        try:
+            replacements[field.name] = values[value.name]
+        except KeyError as exc:
+            raise RepoPolicySyncError(
+                f"unknown policy value reference: {value.name!r}"
+            ) from exc
+    return replace(operation, **replacements) if replacements else operation
 
 
 def _handler_for(operation: EnsureOperation) -> OperationHandler:

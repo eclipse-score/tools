@@ -35,7 +35,7 @@ Complete factual descriptions of supported interfaces.
 - [CLI reference](reference/cli.md)
 - [Configuration reference](reference/configuration.md)
 - [Policy format reference](reference/policy-format.md)
-- [Built-in operations catalogue](../operations/README.md)
+- [Built-in operations catalogue](../src/operations/README.md)
 - [Bundled policy overview](../policies/README.md)
 
 ## Explanation

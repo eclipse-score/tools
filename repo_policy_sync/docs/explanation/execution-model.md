@@ -27,7 +27,9 @@ owns one deterministic branch and one pull request per repository.
    deterministic path order.
 2. Refresh each selected repository’s disposable checkout to its current default branch.
 3. Evaluate the policy against that checkout. The checkout is the
-   authority for applicability and compliance.
+   authority for applicability and compliance. Conditions are checked first;
+   once they match, policy-local values are resolved and passed into the
+   operations that reference them.
 4. In plan mode, report required changes and make no remote changes.
 5. In apply mode, reuse a policy-owned pull request when present, otherwise
    create a policy branch, apply the policy, run the configured pre-commit hooks
@@ -56,9 +58,11 @@ parallel. Repositories remain isolated in separate checkouts; use
 ## Supported behavior
 
 - `when.bazel` dependency-presence and version conditions,
-  `when.file_exists`, and `when.file_contains` conditions;
+  `when.file_exists`, `when.file_contains`, and `when.value_exists` conditions;
+- policy-local derived values, including Dockerfile image-version sources,
+  which can be passed explicitly into operations;
 - the explicitly registered `ensure_line`, `ensure_minimum_version`,
-  `remove_file`, and `replace_regex` operations;
+  `remove_file`, `replace_regex`, and `ensure_bazel_dependency` operations;
 - fixed `automation` and `repo-policy-sync` labels, policy titles, descriptions, and
   per-operation rationales;
 - terminal-table output, a compact repository-by-policy Markdown matrix, and a

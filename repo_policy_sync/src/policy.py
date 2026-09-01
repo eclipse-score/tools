@@ -30,11 +30,15 @@ from .models import (
     FileContainsAnyCondition,
     FileContainsCondition,
     FileExistsCondition,
+    EnsureBazelDependency,
     Policy,
+    ValueReference,
+    ValueExistsCondition,
     policy_branch_slug,
 )
 from .operations import parse_operation
 from .operations._validation import safe_relative_path
+from .values import parse_value_bindings
 
 # Policy definitions belong to the consuming repository. Keep the default
 # relative to the caller's working directory so `./policies` is enough.
@@ -149,6 +153,7 @@ def load_policy(path: Path) -> Policy:
             "title",
             "description",
             "legacy_names",
+            "values",
             "when",
             "ensure",
             "after_apply",
@@ -175,11 +180,30 @@ def load_policy(path: Path) -> Policy:
         file_exists_condition,
         file_contains_condition,
         file_contains_any_condition,
+        value_exists_condition,
     ) = _parse_condition(raw.get("when"), path)
     ensure_raw = raw.get("ensure")
     if not isinstance(ensure_raw, list) or not ensure_raw:
         raise PolicyError(f"policy {path}: ensure must be a non-empty list")
     ensure = tuple(parse_operation(item, path) for item in ensure_raw)
+    values = parse_value_bindings(raw.get("values", {}), path)
+    value_names = {binding.name for binding in values}
+    for operation in ensure:
+        if (
+            isinstance(operation, EnsureBazelDependency)
+            and isinstance(operation.version, ValueReference)
+            and operation.version.name not in value_names
+        ):
+            raise PolicyError(
+                f"policy {path}: unknown value reference {operation.version.name!r}"
+            )
+    if (
+        value_exists_condition is not None
+        and value_exists_condition.name not in value_names
+    ):
+        raise PolicyError(
+            f"policy {path}: unknown value reference {value_exists_condition.name!r}"
+        )
     after_apply = _parse_after_apply(raw.get("after_apply", []), path)
     return Policy(
         id=policy_id,
@@ -192,6 +216,8 @@ def load_policy(path: Path) -> Policy:
         file_contains_condition=file_contains_condition,
         file_contains_any_condition=file_contains_any_condition,
         legacy_names=legacy_names,
+        values=values,
+        value_exists_condition=value_exists_condition,
     )
 
 
@@ -202,20 +228,27 @@ def _parse_condition(
     FileExistsCondition | None,
     FileContainsCondition | None,
     FileContainsAnyCondition | None,
+    ValueExistsCondition | None,
 ]:
     if raw is None:
-        return None, None, None, None
+        return None, None, None, None, None
     if not isinstance(raw, dict):
         raise PolicyError(f"policy {source}: when must be a mapping")
     if (
         not set(raw).issubset(
-            {"bazel", "file_exists", "file_contains", "file_contains_any"}
+            {
+                "bazel",
+                "file_exists",
+                "file_contains",
+                "file_contains_any",
+                "value_exists",
+            }
         )
         or not raw
     ):
         raise PolicyError(
             f"policy {source}: only when.bazel, when.file_exists, when.file_contains, "
-            "and when.file_contains_any are supported"
+            "when.file_contains_any, and when.value_exists are supported"
         )
     bazel_condition = None
     if "bazel" in raw:
@@ -285,11 +318,17 @@ def _parse_condition(
                 for item in file_contains_any
             )
         )
+    value_exists_condition = None
+    if "value_exists" in raw:
+        value_exists_condition = ValueExistsCondition(
+            _required_string(raw, "value_exists", source)
+        )
     return (
         bazel_condition,
         file_exists_condition,
         file_contains_condition,
         file_contains_any_condition,
+        value_exists_condition,
     )
 
 
