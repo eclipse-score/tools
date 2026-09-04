@@ -13,7 +13,10 @@
 name: Repository policy sync
 on:
   schedule:
-    - cron: "0 0 * * *"
+    # Check for policy drift every hour in plan mode without changing repositories.
+    - cron: "0 * * * *"
+    # Apply policy changes once per day, separately from the hourly plan.
+    - cron: "30 0 * * *"
   workflow_dispatch:
     inputs:
       mode:
@@ -28,11 +31,46 @@ permissions:
   contents: read
   pull-requests: read
 jobs:
-  policy-sync:
+  plan:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '0 * * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'plan')
     runs-on: ubuntu-24.04
     env:
-      MODE: ${{ inputs.mode || 'plan' }}
-      GH_TOKEN: ${{ inputs.mode == 'apply' && secrets.SCORE_BOT_CLASSIC_PAT || github.token }}
+      MODE: plan
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+      - name: Run policy sync in plan mode
+        id: sync
+        run: >-
+          uv run score-repo-policy-sync "$MODE" --config repo_policy_sync/eclipse-score.toml --json-output repo-policy-sync-report.json --markdown-output "$GITHUB_STEP_SUMMARY"
+      - name: Upload JSON report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: repo-policy-sync-plan-report
+          path: repo-policy-sync-report.json
+          if-no-files-found: error
+      - name: Report policy sync status
+        if: always()
+        run: |
+          if [[ "${{ steps.sync.outcome }}" != "success" ]]; then
+            echo "Repository policy sync failed to complete." >&2
+            exit 1
+          fi
+
+  apply:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '30 0 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'apply')
+    runs-on: ubuntu-24.04
+    env:
+      MODE: apply
+      GH_TOKEN: ${{ secrets.SCORE_BOT_CLASSIC_PAT }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.0
@@ -43,7 +81,6 @@ jobs:
           git config --global user.name "eclipse-score-bot"
           git config --global user.email "187756813+eclipse-score-bot@users.noreply.github.com"
       - name: Require bot token for apply mode
-        if: env.MODE == 'apply'
         env:
           SCORE_BOT_CLASSIC_PAT: ${{ secrets.SCORE_BOT_CLASSIC_PAT }}
         run: |
@@ -52,9 +89,8 @@ jobs:
             exit 1
           fi
       - name: Configure Git authentication for apply mode
-        if: env.MODE == 'apply'
         run: gh auth setup-git --hostname github.com
-      - name: Run policy sync
+      - name: Run policy sync in apply mode
         id: sync
         run: >-
           uv run score-repo-policy-sync "$MODE" --config repo_policy_sync/eclipse-score.toml --json-output repo-policy-sync-report.json --markdown-output "$GITHUB_STEP_SUMMARY"
@@ -62,7 +98,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: repo-policy-sync-report
+          name: repo-policy-sync-apply-report
           path: repo-policy-sync-report.json
           if-no-files-found: error
       - name: Report policy sync status
