@@ -59,7 +59,10 @@ def create_parser() -> argparse.ArgumentParser:
         action="append",
         default=None,
         metavar="NAME",
-        help="Exact repository name to include. Repeat to include more repositories.",
+        help=(
+            "Repository name or shell-style glob pattern to include. Repeat to "
+            "include more repositories."
+        ),
     )
     sync_command.add_argument(
         "--cache-dir",

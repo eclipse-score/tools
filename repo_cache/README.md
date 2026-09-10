@@ -35,7 +35,7 @@ uvx --from "git+https://github.com/eclipse-score/score_tools#subdirectory=repo_c
 
 ```bash
 score-repo-cache list --org eclipse-score
-score-repo-cache sync --org eclipse-score --repo score --repo score_tools
+score-repo-cache sync --org eclipse-score --repo score --repo 'score_*'
 ```
 
 `sync` clones each selected repository's default branch into
@@ -43,7 +43,10 @@ score-repo-cache sync --org eclipse-score --repo score --repo score_tools
 and resets an existing checkout back to a clean state if it was already
 cloned there. Repositories with no Git references are reported as empty and
 do not make the command fail; checkout, authentication, and other operational
-errors remain failures.
+errors remain failures. `--repo` values without `*`, `?`, or `[` are exact
+names; values containing those characters use case-sensitive Python
+`fnmatch` semantics. A pattern matching no active repository is reported
+separately from an exact name that is absent.
 
 ## Library
 

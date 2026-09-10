@@ -632,6 +632,46 @@ def test_runner_propagates_authentication_failures(
         )
 
 
+def test_runner_rejects_recreate_when_a_repository_pattern_selects_multiple(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = tmp_path / "repository"
+    source.mkdir()
+    client = FakeRepositoryClient(
+        source,
+        (Repository("score-one", "main"), Repository("score-two", "main")),
+    )
+    report = SyncReport(
+        org="eclipse-score",
+        cache_dir=tmp_path / "cache",
+        outcomes=(
+            SyncOutcome(
+                client.repositories[0],
+                tmp_path / "cache" / "eclipse-score" / "score-one",
+            ),
+            SyncOutcome(
+                client.repositories[1],
+                tmp_path / "cache" / "eclipse-score" / "score-two",
+            ),
+        ),
+    )
+    monkeypatch.setattr(runner, "sync_org", lambda **_: report)
+
+    with pytest.raises(
+        RepoPolicySyncError,
+        match="exactly one repository after repository patterns are expanded",
+    ):
+        run_policies(
+            client=client,
+            org="eclipse-score",
+            policies=(),
+            repository_names=("score-*",),
+            checkout_cache_directory=tmp_path / "cache",
+            apply=True,
+            recreate=True,
+        )
+
+
 def test_runner_counts_a_sync_failure_once_per_repository(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

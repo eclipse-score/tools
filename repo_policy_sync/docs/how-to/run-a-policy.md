@@ -57,13 +57,24 @@ policy directories and command-line overrides.
 
 Limit a rollout to selected policy and repository names with repeatable
 `--policy` and `--repo` options. `--policy` selects an exact allowlist across
-local and bundled policies; no other policy is run:
+local and bundled policies; no other policy is run. Repository selections may
+be exact names or case-sensitive Python `fnmatch` patterns:
 
 ```bash
 uv run score-repo-policy-sync plan \
   --org eclipse-score \
   --repo reference_integration \
   --policy-dir policies \
+  --policy minimum-bazel-version
+```
+
+For example, quote a shell pattern to include all repositories with a common
+prefix:
+
+```bash
+uv run score-repo-policy-sync plan \
+  --org eclipse-score \
+  --repo 'score*' \
   --policy minimum-bazel-version
 ```
 
@@ -138,8 +149,9 @@ tool's ownership marker. Plan mode leaves the PR open. A changed or missing
 marker stops the run without closing the PR so it can be reviewed manually.
 
 Use `apply --recreate` only to rebuild one existing policy pull request from
-the current default branch. It requires exactly one `--repo` and one
-`--policy`; see the [CLI reference](../reference/cli.md) for all constraints.
+the current default branch. It requires exactly one `--repo` selection, one
+repository after any pattern is expanded, and one `--policy`; see the [CLI
+reference](../reference/cli.md) for all constraints.
 
 ## Recovering from failures
 

@@ -36,7 +36,7 @@ are CLI-only.
 | --- | --- |
 | `--org NAME` | GitHub organization to scan. May be set in TOML. |
 | `--policy NAME` | Select a policy by directory name from local or bundled policies. Repeat to select more than one; when present, only the selected policies run. Defaults to all local and bundled policies. |
-| `--repo NAME` | Restrict the run to an exact repository name. Repeat to select more than one. |
+| `--repo NAME` | Restrict the run to a repository name or shell-style glob pattern. Repeat to select more than one. |
 | *(stdout)* | Always prints the terminal policy-evaluation table; its status column shows policy pull-request state and number instead of the plain compliance status when that state is actionable. |
 
 ## Rare
@@ -48,7 +48,7 @@ are CLI-only.
 | `--markdown-output PATH` | Also write the Markdown report to `PATH`. |
 | `--policy-dir PATH` | Local policy directory. Repeat to combine directories. Defaults to `./policies` in the current working directory when present. |
 | `--exclude-policy NAME` | Exclude one local or bundled policy. Applied after any explicit `--policy` selection; repeat to exclude more than one. |
-| `--recreate` | On `apply`, rebuild one existing policy-owned pull request from its repository's current default branch. Requires exactly one `--repo` and exactly one `--policy`. |
+| `--recreate` | On `apply`, rebuild one existing policy-owned pull request from its repository's current default branch. Requires exactly one `--repo` selection, exactly one selected repository after pattern expansion, and exactly one `--policy`. |
 | `--allow-dirty-pr`, `--no-allow-dirty-pr` | After the automatic formatting-fix retry, commit and push changes even if pre-commit still fails; create or keep the pull request as a draft and add a comment with the failure. |
 | `--quiet`, `--no-quiet` | Suppress progress messages on standard error. The report remains on standard output. |
 
@@ -62,6 +62,14 @@ are CLI-only.
 
 Archived repositories are excluded from every run. Selecting an archived
 repository with `--repo` fails validation instead of silently ignoring it.
+
+Repository selections use case-sensitive Python `fnmatch` semantics when the
+value contains `*`, `?`, or `[`; otherwise the value is an exact repository
+name. `*` matches any sequence of characters, `?` matches one character, and
+bracket expressions such as `[ab]` or `[!ab]` match one character from or not
+from the specified set. Quote patterns passed through a shell, for example
+`--repo 'score*'`. A pattern that matches no active repository is reported as
+an unmatched pattern, separately from an exact name that is absent.
 
 ## Exit status
 

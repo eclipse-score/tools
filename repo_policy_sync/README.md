@@ -75,6 +75,17 @@ uv run score-repo-policy-sync plan \
   --repo reference_integration
 ```
 
+`--repo` and the TOML `repos` values accept exact names and case-sensitive
+Python `fnmatch` patterns. Use `*`, `?`, or bracket expressions such as
+`[ab]`; quote patterns in shell commands:
+
+```bash
+uv run score-repo-policy-sync plan \
+  --org eclipse-score \
+  --repo 'score*' \
+  --repo 'vsps_?'
+```
+
 To exclude a policy for a repository or rollout:
 
 ```bash

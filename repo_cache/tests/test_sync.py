@@ -146,6 +146,70 @@ def test_sync_org_rejects_an_unknown_repository_filter(
         sync_org(org="acme", cache_dir=tmp_path, repos=("missing",))
 
 
+def test_sync_org_expands_repository_patterns_before_checkout(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repositories = (
+        Repository("score_tools", "main"),
+        Repository("score_checker", "main"),
+        Repository("other", "main"),
+    )
+    _stub_listing(monkeypatch, repositories)
+    synced: list[str] = []
+    monkeypatch.setattr(
+        sync_module,
+        "sync_default_branch",
+        lambda *, repository, branch, destination: synced.append(repository),
+    )
+
+    report = sync_org(org="acme", cache_dir=tmp_path, repos=("score_*",))
+
+    assert synced == ["acme/score_tools", "acme/score_checker"]
+    assert [outcome.repository.name for outcome in report.outcomes] == [
+        "score_tools",
+        "score_checker",
+    ]
+
+
+def test_sync_org_supports_fnmatch_character_classes_in_repository_patterns(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repositories = (
+        Repository("vsps_a", "main"),
+        Repository("vsps_b", "main"),
+        Repository("vsps_c", "main"),
+    )
+    _stub_listing(monkeypatch, repositories)
+    synced: list[str] = []
+    monkeypatch.setattr(
+        sync_module,
+        "sync_default_branch",
+        lambda *, repository, branch, destination: synced.append(repository),
+    )
+
+    sync_org(org="acme", cache_dir=tmp_path, repos=("vsps_[ab]",))
+
+    assert synced == ["acme/vsps_a", "acme/vsps_b"]
+
+
+def test_sync_org_distinguishes_an_unmatched_pattern_from_an_unknown_exact_name(
+    monkeypatch, tmp_path: Path
+) -> None:
+    _stub_listing(monkeypatch, (Repository("score_tools", "main"),))
+
+    with pytest.raises(RepoCacheError) as error:
+        sync_org(
+            org="acme",
+            cache_dir=tmp_path,
+            repos=("missing", "unknown-*"),
+        )
+
+    assert str(error.value) == (
+        "repository filter not found in organization: missing; "
+        "repository pattern matched no active repositories: unknown-*"
+    )
+
+
 def test_sync_org_rejects_fewer_than_one_worker(tmp_path: Path) -> None:
     with pytest.raises(RepoCacheError, match="at least 1"):
         sync_org(org="acme", cache_dir=tmp_path, workers=0)

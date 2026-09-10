@@ -526,6 +526,44 @@ policy_workers = 3
     assert any(path.parent.name == "minimum-bazel-version" for path in loaded_paths)
 
 
+def test_repository_patterns_are_forwarded_from_cli_and_toml(
+    monkeypatch, tmp_path: Path
+) -> None:
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        """[score-repo-policy-sync]
+org = "eclipse-score"
+repos = ["score*"]
+""",
+        encoding="utf-8",
+    )
+    observed = {}
+    monkeypatch.setattr(cli, "load_policies", lambda _: ())
+    monkeypatch.setattr(
+        cli,
+        "run_policies",
+        lambda **kwargs: observed.update(kwargs) or _empty_report(),
+    )
+
+    assert cli.main(("plan", "--config", str(config_path), "--quiet")) == 0
+    assert observed["repository_names"] == ("score*",)
+
+    assert (
+        cli.main(
+            (
+                "plan",
+                "--config",
+                str(config_path),
+                "--repo",
+                "vsps_?",
+                "--quiet",
+            )
+        )
+        == 0
+    )
+    assert observed["repository_names"] == ("vsps_?",)
+
+
 def test_configurable_defaults_are_left_unset_for_config_merging() -> None:
     args = cli.create_parser().parse_args(("plan", "--org", "eclipse-score"))
 

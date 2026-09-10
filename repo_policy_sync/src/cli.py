@@ -93,7 +93,10 @@ def _add_common_arguments(
         "--repo",
         action="append",
         default=None,
-        help="Exact repository name to include. Repeat to include more repositories.",
+        help=(
+            "Repository name or shell-style glob pattern to include. Repeat to "
+            "include more repositories."
+        ),
     )
     rare.add_argument(
         "--config",

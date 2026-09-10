@@ -64,3 +64,10 @@ directory exists. Setting it to `[]` disables local policy directories.
 `exclude_policies` accepts local or bundled policy directory names. When an option is present on the command line, its value replaces the
 corresponding TOML value, including list-valued options. Unknown policy names
 and unknown TOML fields are errors.
+
+Values in `repos` use the same repository selection rules as `--repo`: values
+without `*`, `?`, or `[` are exact names, while values containing those
+characters use case-sensitive Python `fnmatch` semantics. For example,
+`repos = ["score*"]` selects every active repository whose name starts with
+`score`. A pattern that matches no active repository is diagnosed separately
+from an exact repository name that is not present.
