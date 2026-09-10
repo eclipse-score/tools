@@ -1,0 +1,3 @@
+module(name = "example")
+
+bazel_dep(name = "unrelated_dependency", version = "1.0.0")

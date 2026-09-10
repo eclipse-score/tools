@@ -1,0 +1,10 @@
+module(name = "example")
+
+bazel_dep(name = "score_bazel_cpp_toolchains", version = "1.0.0", dev_dependency = True)
+bazel_dep(name = "aspect_rules_py", version = "1.0.0", dev_dependency = True)
+bazel_dep(name = "buildifier_prebuilt", version = "1.0.0", dev_dependency = True)
+bazel_dep(name = "aspect_rules_lint", version = "1.0.0", dev_dependency = True)
+bazel_dep(name = "toolchains_llvm", version = "1.0.0", dev_dependency = True)
+bazel_dep(name = "score_rules_imagefs", version = "1.0.0", dev_dependency = True)
+bazel_dep(name = "score_docs_as_code", version = "1.0.0")
+bazel_dep(name = "unrelated_dependency", version = "1.0.0")
