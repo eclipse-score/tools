@@ -237,3 +237,22 @@ commented-out dependencies do not count. Duplicate dependencies and malformed
 existing versions are rejected. The version may be a literal `X.Y.Z` string or
 an explicit reference to a policy-local value source, for example
 `version: {ref: devcontainer_version}`.
+
+### `ensure_bazel_dependency_dev_dependency`
+
+```yaml
+- type: ensure_bazel_dependency_dev_dependency
+  module_file: MODULE.bazel
+  module_name: vsps_quality_packages
+  dev_dependency: false
+```
+
+Ensures that one existing direct `bazel_dep` has the configured development-only
+setting. With `dev_dependency: true`, the operation adds the attribute when it
+is missing and changes an explicit `False` to `True`. With
+`dev_dependency: false`, it removes an explicit boolean `dev_dependency`
+attribute, including an explicit `False`; an omitted attribute is the compliant
+production form. Commented
+calls and arguments do not count. Duplicate target dependencies or duplicate
+`dev_dependency` arguments are rejected. The operation preserves the existing
+argument order and formatting style as far as possible, and is idempotent.

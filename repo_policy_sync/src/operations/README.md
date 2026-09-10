@@ -27,6 +27,7 @@ authoritative source for the complete schema, validation rules, and examples.
 | Operation | Use it for | Main behavior | Tests |
 | --- | --- | --- | --- |
 | `ensure_bazel_dependency` | Declaring a direct bzlmod dependency | Adds a `bazel_dep` with the configured module name and version when it is missing. | [`test_ensure_bazel_dependency.py`](../../tests/operations/test_ensure_bazel_dependency.py) |
+| `ensure_bazel_dependency_dev_dependency` | Controlling whether a direct bzlmod dependency is development-only | Adds or changes `dev_dependency = True`, or removes the attribute when configured as false. | [`test_ensure_bazel_dependency_dev_dependency.py`](../../tests/operations/test_ensure_bazel_dependency_dev_dependency.py) |
 | `ensure_line` | Keeping one exact line in a text file | Inserts the desired line, removes configured replacements and duplicates, and creates a missing file. | [`test_ensure_line.py`](../../tests/operations/test_ensure_line.py) |
 | `ensure_minimum_version` | Maintaining a simple version file such as `.bazelversion` | Replaces a lower `major.minor.patch` value; equal or higher versions and missing files are compliant. | [`test_ensure_minimum_version.py`](../../tests/operations/test_ensure_minimum_version.py) |
 | `remove_file` | Removing an obsolete file | Deletes an existing file; a missing file is compliant and directories are rejected. | [`test_remove_file.py`](../../tests/operations/test_remove_file.py) |

@@ -23,6 +23,9 @@ from typing import Any, Protocol
 from ..errors import RepoPolicySyncError
 from ..models import Change, EnsureOperation, ValueReference
 from .ensure_bazel_dependency import EnsureBazelDependencyOperation
+from .ensure_bazel_dependency_dev_dependency import (
+    EnsureBazelDependencyDevDependencyOperation,
+)
 from .ensure_line import EnsureLineOperation
 from .ensure_minimum_version import EnsureMinimumVersionOperation
 from .remove_file import RemoveFileOperation
@@ -54,6 +57,7 @@ class OperationHandler(Protocol):
 
 _HANDLERS: tuple[OperationHandler, ...] = (
     EnsureBazelDependencyOperation(),
+    EnsureBazelDependencyDevDependencyOperation(),
     EnsureLineOperation(),
     EnsureMinimumVersionOperation(),
     RemoveFileOperation(),
