@@ -28,7 +28,7 @@ use the [documentation index](../docs/README.md).
 
 | Policy | Responsibility | Typical lifecycle |
 | --- | --- | --- |
-| `bazel-dependency-dev-dependency-alignment` | Keep selected Bazel toolchain and validation dependencies development-only while keeping `score_docs_as_code` in the normal dependency graph. | Baseline maintenance |
+| `dev-dependency-alignment` | Keep selected Bazel toolchain and validation dependencies development-only while keeping `score_docs_as_code` in the normal dependency graph. | Baseline maintenance |
 | `docs-as-code-gitignore` | Update `score_docs_as_code` Git ignore entries and remove legacy configuration files. | One-time cleanup |
 | `minimal-bazel-module-declaration` | Keep `MODULE.bazel` limited to the repository-owned module name by removing version metadata. | One-time cleanup |
 | `minimum-bazel-version` | Upgrade repositories to at least Bazel `8.6.0` and regenerate the lockfile when required. | Baseline maintenance |
