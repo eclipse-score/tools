@@ -87,7 +87,7 @@ class EnsureBazelDependencyDevDependencyOperation:
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
         _, dependency = _find_dependency(root, operation)
-        if _is_compliant(dependency, operation.dev_dependency):
+        if dependency is None or _is_compliant(dependency, operation.dev_dependency):
             return ()
         if operation.dev_dependency:
             description = (
@@ -109,7 +109,7 @@ class EnsureBazelDependencyDevDependencyOperation:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
         path = root / _MODULE_FILE
         text, dependency = _find_dependency(root, operation)
-        if _is_compliant(dependency, operation.dev_dependency):
+        if dependency is None or _is_compliant(dependency, operation.dev_dependency):
             return
         if operation.dev_dependency:
             updated = _set_dev_dependency(text, dependency)
@@ -120,7 +120,7 @@ class EnsureBazelDependencyDevDependencyOperation:
 
 def _find_dependency(
     root: Path, operation: EnsureBazelDependencyDevDependency
-) -> tuple[str, _DependencyCall]:
+) -> tuple[str, _DependencyCall | None]:
     path = root / _MODULE_FILE
     validate_repository_path(root, path)
     if not path.is_file():
@@ -160,9 +160,10 @@ def _find_dependency(
             f"{operation.module_name!r}"
         )
     if not calls:
-        raise RepoPolicySyncError(
-            f"{_MODULE_FILE} contains no bazel_dep for {operation.module_name!r}"
-        )
+        # A policy can list several optional dependencies in one condition.
+        # The condition selects repositories containing at least one target;
+        # each operation is then a no-op for the other absent targets.
+        return text, None
     return text, calls[0]
 
 

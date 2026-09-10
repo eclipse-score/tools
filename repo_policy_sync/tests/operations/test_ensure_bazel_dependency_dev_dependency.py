@@ -141,6 +141,20 @@ def test_ensure_dev_dependency_ignores_commented_arguments(tmp_path: Path) -> No
     assert describe_changes(tmp_path, _operation()) == ()
 
 
+def test_ensure_dev_dependency_ignores_missing_target_dependency(
+    tmp_path: Path,
+) -> None:
+    module = tmp_path / "MODULE.bazel"
+    original = 'bazel_dep(name = "other_dependency", version = "1.0.0")\n'
+    module.write_text(original, encoding="utf-8")
+
+    operation = _operation()
+    assert describe_changes(tmp_path, operation) == ()
+    apply(tmp_path, operation)
+
+    assert module.read_text(encoding="utf-8") == original
+
+
 def test_ensure_dev_dependency_rejects_duplicate_target_dependencies(
     tmp_path: Path,
 ) -> None:

@@ -256,4 +256,7 @@ attribute, including an explicit `False`; an omitted attribute is the compliant
 production form. Commented
 calls and arguments do not count. Duplicate target dependencies or duplicate
 `dev_dependency` arguments are rejected. The operation preserves the existing
-argument order and formatting style as far as possible, and is idempotent.
+argument order and formatting style as far as possible, and is idempotent. If
+the named dependency is absent, the operation is compliant without making a
+change; this allows one policy to govern a set of optional dependencies selected
+by `when.bazel.any_direct_module_dependencies`.
