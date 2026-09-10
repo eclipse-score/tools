@@ -145,7 +145,6 @@ class EnsureBazelDependency:
 class EnsureBazelDependencyDevDependency:
     """Ensure the ``dev_dependency`` setting of a direct bzlmod dependency."""
 
-    module_file: Path
     module_name: str
     dev_dependency: bool
     rationale: str | None = None

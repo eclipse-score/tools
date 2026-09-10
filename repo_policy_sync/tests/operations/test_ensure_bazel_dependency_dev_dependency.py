@@ -27,7 +27,6 @@ def _operation(dev_dependency: object = False):
     return EnsureBazelDependencyDevDependencyOperation().parse(
         {
             "type": "ensure_bazel_dependency_dev_dependency",
-            "module_file": "MODULE.bazel",
             "module_name": "example_dependency",
             "dev_dependency": dev_dependency,
         },

@@ -31,10 +31,13 @@ from ._validation import (
     expect_keys,
     optional_string,
     required_string,
-    safe_relative_path,
     validate_repository_path,
 )
 
+# bzlmod dependency declarations belong to the repository-root MODULE.bazel.
+# Keep this path internal to the operation so every policy can focus on the
+# dependency whose setting it governs instead of repeating an invariant path.
+_MODULE_FILE = Path("MODULE.bazel")
 _MODULE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
 _NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _DEV_DEPENDENCY_ARGUMENT = re.compile(r"\bdev_dependency\s*=\s*(True|False)\b")
@@ -58,7 +61,7 @@ class EnsureBazelDependencyDevDependencyOperation:
     ) -> EnsureBazelDependencyDevDependency:
         expect_keys(
             raw,
-            {"type", "module_file", "module_name", "dev_dependency", "rationale"},
+            {"type", "module_name", "dev_dependency", "rationale"},
             source,
         )
         module_name = required_string(raw, "module_name", source)
@@ -70,9 +73,6 @@ class EnsureBazelDependencyDevDependencyOperation:
         if not isinstance(dev_dependency, bool):
             raise PolicyError(f"policy {source}: dev_dependency must be a boolean")
         return EnsureBazelDependencyDevDependency(
-            module_file=safe_relative_path(
-                required_string(raw, "module_file", source), source
-            ),
             module_name=module_name,
             dev_dependency=dev_dependency,
             rationale=optional_string(raw, "rationale", source),
@@ -86,8 +86,7 @@ class EnsureBazelDependencyDevDependencyOperation:
         organization: str | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
-        path = root / operation.module_file
-        _, dependency = _find_dependency(root, path, operation)
+        _, dependency = _find_dependency(root, operation)
         if _is_compliant(dependency, operation.dev_dependency):
             return ()
         if operation.dev_dependency:
@@ -98,7 +97,7 @@ class EnsureBazelDependencyDevDependencyOperation:
             description = (
                 f"remove dev_dependency from Bazel dependency {operation.module_name!r}"
             )
-        return (Change(operation.module_file, description, operation.rationale),)
+        return (Change(_MODULE_FILE, description, operation.rationale),)
 
     def apply(
         self,
@@ -108,8 +107,8 @@ class EnsureBazelDependencyDevDependencyOperation:
         organization: str | None = None,
     ) -> None:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
-        path = root / operation.module_file
-        text, dependency = _find_dependency(root, path, operation)
+        path = root / _MODULE_FILE
+        text, dependency = _find_dependency(root, operation)
         if _is_compliant(dependency, operation.dev_dependency):
             return
         if operation.dev_dependency:
@@ -120,11 +119,12 @@ class EnsureBazelDependencyDevDependencyOperation:
 
 
 def _find_dependency(
-    root: Path, path: Path, operation: EnsureBazelDependencyDevDependency
+    root: Path, operation: EnsureBazelDependencyDevDependency
 ) -> tuple[str, _DependencyCall]:
+    path = root / _MODULE_FILE
     validate_repository_path(root, path)
     if not path.is_file():
-        raise RepoPolicySyncError(f"{operation.module_file} must exist")
+        raise RepoPolicySyncError(f"{_MODULE_FILE} must exist")
     text = path.read_text(encoding="utf-8")
     calls: list[_DependencyCall] = []
     for start, end in starlark_call_ranges(text, "bazel_dep"):
@@ -138,13 +138,13 @@ def _find_dependency(
             continue
         if len(name_matches) != 1:
             raise RepoPolicySyncError(
-                f"{operation.module_file} bazel_dep for {operation.module_name!r} "
+                f"{_MODULE_FILE} bazel_dep for {operation.module_name!r} "
                 "must declare name exactly once"
             )
         dev_matches = list(_DEV_DEPENDENCY_ARGUMENT.finditer(body))
         if len(dev_matches) > 1:
             raise RepoPolicySyncError(
-                f"{operation.module_file} bazel_dep for {operation.module_name!r} "
+                f"{_MODULE_FILE} bazel_dep for {operation.module_name!r} "
                 "must declare dev_dependency at most once"
             )
         calls.append(
@@ -156,13 +156,12 @@ def _find_dependency(
         )
     if len(calls) > 1:
         raise RepoPolicySyncError(
-            f"{operation.module_file} must contain at most one bazel_dep for "
+            f"{_MODULE_FILE} must contain at most one bazel_dep for "
             f"{operation.module_name!r}"
         )
     if not calls:
         raise RepoPolicySyncError(
-            f"{operation.module_file} contains no bazel_dep for "
-            f"{operation.module_name!r}"
+            f"{_MODULE_FILE} contains no bazel_dep for {operation.module_name!r}"
         )
     return text, calls[0]
 

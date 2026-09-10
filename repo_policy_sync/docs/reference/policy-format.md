@@ -242,14 +242,15 @@ an explicit reference to a policy-local value source, for example
 
 ```yaml
 - type: ensure_bazel_dependency_dev_dependency
-  module_file: MODULE.bazel
   module_name: vsps_quality_packages
   dev_dependency: false
 ```
 
-Ensures that one existing direct `bazel_dep` has the configured development-only
-setting. With `dev_dependency: true`, the operation adds the attribute when it
-is missing and changes an explicit `False` to `True`. With
+Ensures that one existing direct `bazel_dep` in the repository-root
+`MODULE.bazel` has the configured development-only setting. The module file is
+fixed because bzlmod declares repository dependencies in that conventional
+root file. With `dev_dependency: true`, the operation adds the attribute when
+it is missing and changes an explicit `False` to `True`. With
 `dev_dependency: false`, it removes an explicit boolean `dev_dependency`
 attribute, including an explicit `False`; an omitted attribute is the compliant
 production form. Commented
