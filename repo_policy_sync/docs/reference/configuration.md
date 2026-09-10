@@ -69,5 +69,7 @@ Values in `repos` use the same repository selection rules as `--repo`: values
 without `*`, `?`, or `[` are exact names, while values containing those
 characters use case-sensitive Python `fnmatch` semantics. For example,
 `repos = ["score*"]` selects every active repository whose name starts with
-`score`. A pattern that matches no active repository is diagnosed separately
-from an exact repository name that is not present.
+`score`. A pattern that matches no repository eligible for synchronization is
+diagnosed separately from an exact repository name that is not present. When
+`--recreate` is used, the expanded selection must contain exactly one
+repository before checkout.

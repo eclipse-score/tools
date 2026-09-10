@@ -206,6 +206,7 @@ def run_policies(
             cache_dir=checkout_cache_directory,
             repos=repository_names,
             workers=sync_workers,
+            max_selected_repositories=1 if recreate else None,
             progress=report_progress,
         )
     except RepoCacheError as exc:

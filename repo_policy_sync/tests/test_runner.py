@@ -82,6 +82,7 @@ def _install_fake_sync(
         repos=(),
         include_archived: bool = False,
         workers: int = 1,
+        max_selected_repositories: int | None = None,
         progress=None,
     ) -> SyncReport:
         report_progress = progress or (lambda _: None)
@@ -102,6 +103,14 @@ def _install_fake_sync(
             for repository in active
             if not requested or repository.name in requested
         )
+        if (
+            max_selected_repositories is not None
+            and len(selected) > max_selected_repositories
+        ):
+            raise RepoCacheError(
+                f"repository selection matched {len(selected)} repositories; "
+                f"at most {max_selected_repositories} allowed"
+            )
         with_branches = tuple(
             repository
             for repository in selected

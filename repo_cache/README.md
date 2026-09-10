@@ -45,8 +45,8 @@ cloned there. Repositories with no Git references are reported as empty and
 do not make the command fail; checkout, authentication, and other operational
 errors remain failures. `--repo` values without `*`, `?`, or `[` are exact
 names; values containing those characters use case-sensitive Python
-`fnmatch` semantics. A pattern matching no active repository is reported
-separately from an exact name that is absent.
+`fnmatch` semantics. A pattern matching no repository eligible for
+synchronization is reported separately from an exact name that is absent.
 
 ## Library
 

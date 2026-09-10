@@ -65,6 +65,7 @@ def sync_org(
     repos: Sequence[str] = (),
     include_archived: bool = False,
     workers: int = DEFAULT_SYNC_WORKERS,
+    max_selected_repositories: int | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> SyncReport:
     """List an organization's repositories and sync each into `cache_dir/org/<name>`.
@@ -72,15 +73,23 @@ def sync_org(
     Raises RepoCacheError for an authentication failure or an unknown `repos`
     name or pattern. Repository names without glob metacharacters are matched
     exactly. Names containing ``*``, ``?``, or ``[`` use case-sensitive
-    :func:`fnmatch.fnmatchcase` matching against active repositories. Per-
-    repository sync failures are captured in `SyncOutcome.error` rather than
-    raised, so one broken repository does not abort the rest.
+    :func:`fnmatch.fnmatchcase` matching against repositories eligible for
+    synchronization. Per-repository sync failures are captured in
+    `SyncOutcome.error` rather than raised, so one broken repository does not
+    abort the rest.
     Empty repositories are reported in `SyncReport.empty_repositories` instead
     of being treated as failures.
+
+    ``max_selected_repositories`` limits the number of repositories selected
+    after exact and pattern matching. The limit is checked before any checkout
+    synchronization starts, which lets callers protect operations that are
+    only safe for a single repository.
     """
 
     if workers < 1:
         raise RepoCacheError("sync worker count must be at least 1")
+    if max_selected_repositories is not None and max_selected_repositories < 1:
+        raise RepoCacheError("maximum selected repository count must be at least 1")
 
     report_progress = progress or (lambda _: None)
 
@@ -88,13 +97,13 @@ def sync_org(
     ensure_authenticated()
 
     repositories = list_repositories(org=org)
-    active_repositories = tuple(
+    eligible_repositories = tuple(
         repository
         for repository in repositories
         if include_archived or not repository.archived
     )
 
-    available = {repository.name for repository in active_repositories}
+    available = {repository.name for repository in eligible_repositories}
     exact_names = {name for name in repos if not _has_glob_pattern(name)}
     patterns = tuple(name for name in repos if _has_glob_pattern(name))
     missing = sorted(exact_names - available)
@@ -115,21 +124,30 @@ def sync_org(
             )
         if unmatched_patterns:
             diagnostics.append(
-                "repository pattern matched no active repositories: "
+                "repository pattern matched no repositories eligible for synchronization: "
                 + ", ".join(unmatched_patterns)
             )
         raise RepoCacheError("; ".join(diagnostics))
 
-    report_progress(f"Found {len(active_repositories)} active repositories.")
-    report_progress(f"Using checkout cache at {cache_dir}.")
-
     selected_repositories = tuple(
         repository
-        for repository in active_repositories
+        for repository in eligible_repositories
         if not repos
         or repository.name in exact_names
         or any(fnmatchcase(repository.name, pattern) for pattern in patterns)
     )
+    if (
+        max_selected_repositories is not None
+        and len(selected_repositories) > max_selected_repositories
+    ):
+        raise RepoCacheError(
+            f"repository selection matched {len(selected_repositories)} repositories; "
+            f"at most {max_selected_repositories} allowed"
+        )
+
+    report_progress(f"Found {len(eligible_repositories)} eligible repositories.")
+    report_progress(f"Using checkout cache at {cache_dir}.")
+
     repositories_with_branches = tuple(
         repository
         for repository in selected_repositories

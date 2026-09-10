@@ -68,8 +68,11 @@ value contains `*`, `?`, or `[`; otherwise the value is an exact repository
 name. `*` matches any sequence of characters, `?` matches one character, and
 bracket expressions such as `[ab]` or `[!ab]` match one character from or not
 from the specified set. Quote patterns passed through a shell, for example
-`--repo 'score*'`. A pattern that matches no active repository is reported as
-an unmatched pattern, separately from an exact name that is absent.
+`--repo 'score*'`. A pattern that matches no repository eligible for
+synchronization is reported as an unmatched pattern, separately from an exact
+name that is absent. For
+`--recreate`, the repository count is checked after pattern expansion and
+before any checkout begins.
 
 ## Exit status
 
