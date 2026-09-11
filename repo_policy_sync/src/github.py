@@ -513,6 +513,7 @@ class GitHubCli:
         changes: tuple[Change, ...],
         head_oid: str,
         draft: bool = False,
+        tool_revision: str,
     ) -> PullRequest:
         self._ensure_automation_labels(repository=repository)
         create_command = [
@@ -528,7 +529,12 @@ class GitHubCli:
             "--title",
             policy.title,
             "--body",
-            _pull_request_body(policy, changes, head_oid=head_oid),
+            _pull_request_body(
+                policy,
+                changes,
+                head_oid=head_oid,
+                tool_revision=tool_revision,
+            ),
         ]
         if draft:
             create_command.insert(3, "--draft")
@@ -642,6 +648,7 @@ class GitHubCli:
         changes: tuple[Change, ...],
         head_oid: str,
         failure: str | None = None,
+        tool_revision: str,
     ) -> None:
         """Keep an existing policy-owned pull request's explanation current."""
 
@@ -658,7 +665,7 @@ class GitHubCli:
                 "-f",
                 f"title={policy.title}",
                 "-f",
-                f"body={_pull_request_body(policy, changes, head_oid=head_oid, failure=failure)}",
+                f"body={_pull_request_body(policy, changes, head_oid=head_oid, failure=failure, tool_revision=tool_revision)}",
             ]
         )
 
@@ -830,6 +837,7 @@ def _pull_request_body(
     changes: tuple[Change, ...],
     *,
     head_oid: str,
+    tool_revision: str,
     failure: str | None = None,
 ) -> str:
     """Build the concise, policy-centred pull-request template."""
@@ -855,7 +863,7 @@ def _pull_request_body(
         "policy_description": description,
         "policy_trigger": _policy_trigger(policy, changes),
         "changes": change_lines,
-        "tool_revision": _tool_revision(),
+        "tool_revision": tool_revision,
         "failure_section": _failure_section(failure),
     }
     for key, value in values.items():

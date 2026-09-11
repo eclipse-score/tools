@@ -458,6 +458,7 @@ def test_create_pull_request_creates_missing_automation_labels(monkeypatch) -> N
         policy=policy,
         changes=(),
         head_oid="a" * 40,
+        tool_revision="test-revision",
     )
 
     assert pull_request.url == "https://github.example/owner/repo/pull/1"
@@ -511,6 +512,7 @@ def test_create_pull_request_keeps_existing_automation_labels(monkeypatch) -> No
         policy=policy,
         changes=(),
         head_oid="a" * 40,
+        tool_revision="test-revision",
     )
 
     assert not any(command[4] == "/repos/owner/repo/labels" for command in commands)
@@ -574,6 +576,7 @@ def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
             policy=policy,
             changes=(),
             head_oid="a" * 40,
+            tool_revision="test-revision",
         )
 
 
@@ -607,15 +610,13 @@ def test_create_pull_request_can_create_a_draft(monkeypatch) -> None:
         changes=(),
         head_oid="a" * 40,
         draft=True,
+        tool_revision="test-revision",
     )
 
     assert commands[1][:4] == ["gh", "pr", "create", "--draft"]
 
 
-def test_pull_request_template_explains_policy_trigger_and_changes(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "repo_policy_sync.src.github._tool_revision", lambda: "abc1234-dirty"
-    )
+def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
     policy = Policy(
         "score-docs-as-code.cleanup",
         "Update docs files",
@@ -625,7 +626,10 @@ def test_pull_request_template_explains_policy_trigger_and_changes(monkeypatch) 
     )
 
     body = _pull_request_body(
-        policy, (Change(Path(".gitignore"), "add '_build'"),), head_oid="a" * 40
+        policy,
+        (Change(Path(".gitignore"), "add '_build'"),),
+        head_oid="a" * 40,
+        tool_revision="abc1234-dirty",
     )
 
     assert "<!-- repo-policy-sync-policy: score-docs-as-code.cleanup -->" in body
@@ -703,6 +707,7 @@ def test_module_policy_pull_request_includes_the_matching_rationale() -> None:
         policy,
         (Change(operation.path, "replace matching text", operation.rationale),),
         head_oid="a" * 40,
+        tool_revision="test-revision",
     )
 
     assert "- `MODULE.bazel`: replace matching text" in body
@@ -723,6 +728,7 @@ def test_value_policy_pull_request_explains_value_trigger() -> None:
         policy,
         (Change(Path("MODULE.bazel"), "add dependency"),),
         head_oid="a" * 40,
+        tool_revision="test-revision",
     )
 
     assert (
@@ -749,6 +755,7 @@ def test_existing_pull_request_is_updated_with_the_current_template(
         policy=policy,
         changes=(Change(Path(".gitignore"), "add '_build'"),),
         head_oid="a" * 40,
+        tool_revision="test-revision",
     )
 
     assert commands[0][:7] == [
@@ -767,7 +774,11 @@ def test_pull_request_template_includes_automation_failure() -> None:
     policy = Policy("example", "Example", None, None, ())
 
     body = _pull_request_body(
-        policy, (), head_oid="a" * 40, failure="bazel mod deps: command failed"
+        policy,
+        (),
+        head_oid="a" * 40,
+        failure="bazel mod deps: command failed",
+        tool_revision="test-revision",
     )
 
     assert "## Automation failure" in body

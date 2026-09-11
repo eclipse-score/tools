@@ -179,6 +179,7 @@ class RoundTripClient:
         policy: Policy,
         changes: tuple,
         head_oid: str,
+        tool_revision: str,
         **_: object,
     ) -> PullRequest:
         self.create_calls += 1
@@ -187,7 +188,12 @@ class RoundTripClient:
             url=f"https://github.example/{repository}/pull/1",
             expected_head_oid=head_oid,
             branch=branch,
-            body=_pull_request_body(policy, changes, head_oid=head_oid),
+            body=_pull_request_body(
+                policy,
+                changes,
+                head_oid=head_oid,
+                tool_revision=tool_revision,
+            ),
             mergeable="MERGEABLE",
         )
         return self.pull_request
@@ -639,6 +645,36 @@ def test_runner_propagates_authentication_failures(
             checkout_cache_directory=tmp_path / "cache",
             apply=False,
         )
+
+
+def test_apply_resolves_tool_revision_before_repository_synchronization(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = FakeRepositoryClient(tmp_path, (Repository("candidate", "main"),))
+    sync_called = False
+
+    def fail_tool_revision() -> str:
+        raise RepoPolicySyncError("tool revision unavailable")
+
+    def unexpected_sync(**_: object) -> SyncReport:
+        nonlocal sync_called
+        sync_called = True
+        raise AssertionError("repository synchronization must not start")
+
+    monkeypatch.setattr(runner, "_tool_revision", fail_tool_revision)
+    monkeypatch.setattr(runner, "sync_org", unexpected_sync)
+
+    with pytest.raises(RepoPolicySyncError, match="tool revision unavailable"):
+        run_policies(
+            client=client,
+            org="eclipse-score",
+            policies=(),
+            repository_names=(),
+            checkout_cache_directory=tmp_path / "cache",
+            apply=True,
+        )
+
+    assert not sync_called
 
 
 def test_runner_rejects_recreate_when_a_repository_pattern_selects_multiple(
@@ -1283,7 +1319,12 @@ def test_existing_compliant_pull_request_is_left_alone_with_current_body(
     change = runner.evaluate_policy(checkout, policy).changes
     client = ImplicitRecreateClient(
         mergeable="MERGEABLE",
-        body=_pull_request_body(policy, change, head_oid="a" * 40),
+        body=_pull_request_body(
+            policy,
+            change,
+            head_oid="a" * 40,
+            tool_revision="test-revision",
+        ),
     )
 
     outcome = _run_repository(
@@ -1294,6 +1335,7 @@ def test_existing_compliant_pull_request_is_left_alone_with_current_body(
         policy=policy,
         checkout=checkout,
         apply=True,
+        tool_revision="test-revision",
     )
 
     assert outcome.status == "pull-request-open"

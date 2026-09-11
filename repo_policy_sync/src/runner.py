@@ -36,6 +36,7 @@ from .github import (
     PolicyPullRequestStatus,
     TOOL_SLUG,
     _pull_request_body,
+    _tool_revision,
     policy_branches,
 )
 from .models import Change, Policy, Repository
@@ -107,6 +108,7 @@ class RepositoryClient(Protocol):
         changes: tuple[Change, ...],
         head_oid: str,
         draft: bool = False,
+        tool_revision: str,
     ) -> object: ...
 
     def update_pull_request(
@@ -118,6 +120,7 @@ class RepositoryClient(Protocol):
         changes: tuple[Change, ...],
         head_oid: str,
         failure: str | None = None,
+        tool_revision: str,
     ) -> None: ...
 
     def close_pull_request(self, *, repository: str, pull_request: object) -> None: ...
@@ -187,6 +190,7 @@ def run_policies(
     policy_workers: int = DEFAULT_POLICY_WORKERS,
     progress: Callable[[str], None] | None = None,
     include_pull_request_status: bool = False,
+    tool_revision: str | None = None,
 ) -> RunReport:
     """Synchronize repositories, then process each policy across repositories in parallel.
 
@@ -198,6 +202,10 @@ def run_policies(
         raise RepoPolicySyncError("policy worker count must be at least 1")
     if recreate and not apply:
         raise RepoPolicySyncError("--recreate requires apply mode")
+    if apply and tool_revision is None:
+        # Resolve provenance before repository synchronization or any policy
+        # branch can be changed remotely by the apply workflow.
+        tool_revision = _tool_revision()
     started = monotonic()
     report_progress = progress or _write_progress
     try:
@@ -251,6 +259,7 @@ def run_policies(
             workers=policy_workers,
             progress=report_progress,
             include_pull_request_status=include_pull_request_status,
+            tool_revision=tool_revision,
         )
         outcomes.extend(policy_outcomes)
         for outcome in policy_outcomes:
@@ -324,6 +333,7 @@ def _run_policy_across_repositories(
     workers: int,
     progress: Callable[[str], None],
     include_pull_request_status: bool,
+    tool_revision: str | None,
 ) -> tuple[RepositoryOutcome, ...]:
     """Evaluate or apply one policy in independent repository checkouts concurrently."""
 
@@ -358,6 +368,7 @@ def _run_policy_across_repositories(
                     recreate=recreate,
                     allow_dirty_pr=allow_dirty_pr,
                     include_pull_request_status=include_pull_request_status,
+                    tool_revision=tool_revision,
                 )
             ] = (index, repository)
         for completed, future in enumerate(as_completed(futures), start=1):
@@ -390,6 +401,7 @@ def _run_policy_in_repository(
     recreate: bool,
     allow_dirty_pr: bool,
     include_pull_request_status: bool,
+    tool_revision: str | None,
 ) -> RepositoryOutcome:
     restore_synced_default_branch(checkout=checkout)
     if (
@@ -407,6 +419,7 @@ def _run_policy_in_repository(
         recreate=recreate,
         allow_dirty_pr=allow_dirty_pr,
         include_pull_request_status=include_pull_request_status,
+        tool_revision=tool_revision,
     )
 
 
@@ -422,7 +435,12 @@ def _run_repository(
     recreate: bool = False,
     allow_dirty_pr: bool = False,
     include_pull_request_status: bool = False,
+    tool_revision: str | None = None,
 ) -> RepositoryOutcome:
+    if apply and tool_revision is None:
+        # Keep direct private callers safe as well as the organization-level
+        # entry point: provenance must be known before branch mutation.
+        tool_revision = _tool_revision()
     full_name = f"{org}/{repository}"
     policy_pr_status = (
         _find_policy_pull_request_status(
@@ -461,6 +479,7 @@ def _run_repository(
                         changes=(),
                         head_oid=existing_pr.expected_head_oid,
                         failure=str(exc),
+                        tool_revision=tool_revision,
                     )
                     client.close_pull_request(
                         repository=full_name, pull_request=existing_pr
@@ -508,6 +527,7 @@ def _run_repository(
             policy=policy,
             checkout=checkout,
             allow_dirty_pr=allow_dirty_pr,
+            tool_revision=tool_revision,
         )
     if not evaluation.changes:
         existing_pr = (
@@ -615,6 +635,7 @@ def _run_repository(
                     changes=evaluation.changes,
                     head_oid=existing_pr.expected_head_oid,
                     failure=str(exc),
+                    tool_revision=tool_revision,
                 )
                 client.close_pull_request(
                     repository=full_name, pull_request=existing_pr
@@ -637,12 +658,14 @@ def _run_repository(
                     existing_pr=existing_pr,
                     changes=evaluation.changes,
                     allow_dirty_pr=allow_dirty_pr,
+                    tool_revision=tool_revision,
                 )
             if _pull_request_body_changed(
                 existing_pr,
                 policy=policy,
                 changes=evaluation.changes,
                 head_oid=existing_pr.expected_head_oid,
+                tool_revision=tool_revision,
             ):
                 client.update_pull_request(
                     repository=full_name,
@@ -650,6 +673,7 @@ def _run_repository(
                     policy=policy,
                     changes=evaluation.changes,
                     head_oid=existing_pr.expected_head_oid,
+                    tool_revision=tool_revision,
                 )
                 return RepositoryOutcome(
                     repository,
@@ -686,6 +710,7 @@ def _run_repository(
             changes=applied.changes,
             head_oid=head_oid,
             draft=pre_commit_failure is not None,
+            tool_revision=tool_revision,
         )
         if pre_commit_failure is not None:
             _comment_dirty_pull_request(
@@ -710,6 +735,7 @@ def _run_repository(
         policy=policy,
         changes=applied.changes,
         head_oid=head_oid,
+        tool_revision=tool_revision,
     )
     if pre_commit_failure is not None:
         _mark_dirty_pull_request(
@@ -796,11 +822,17 @@ def _pull_request_body_changed(
     policy: Policy,
     changes: tuple[Change, ...],
     head_oid: str,
+    tool_revision: str,
 ) -> bool:
     """Return whether the generated explanation differs from the PR body."""
 
     body = getattr(pull_request, "body", None)
-    return body != _pull_request_body(policy, changes, head_oid=head_oid)
+    return body != _pull_request_body(
+        policy,
+        changes,
+        head_oid=head_oid,
+        tool_revision=tool_revision,
+    )
 
 
 def _commit_result_parts(result: CommitResult) -> tuple[str, str | None]:
@@ -833,6 +865,7 @@ def _recreate_repository(
     policy: Policy,
     checkout: Path,
     allow_dirty_pr: bool = False,
+    tool_revision: str | None = None,
 ) -> RepositoryOutcome:
     """Rebuild an existing policy branch from the freshly synced default branch."""
 
@@ -856,6 +889,7 @@ def _recreate_repository(
         checkout=checkout,
         existing_pr=existing_pr,
         allow_dirty_pr=allow_dirty_pr,
+        tool_revision=tool_revision,
     )
 
 
@@ -870,6 +904,7 @@ def _recreate_existing_pull_request(
     existing_pr: object,
     changes: tuple[Change, ...] | None = None,
     allow_dirty_pr: bool = False,
+    tool_revision: str | None = None,
 ) -> RepositoryOutcome:
     """Rebuild one known policy PR from the freshly synchronized default branch."""
 
@@ -896,6 +931,7 @@ def _recreate_existing_pull_request(
             policy=policy,
             changes=body_changes,
             head_oid=existing_pr.expected_head_oid,
+            tool_revision=tool_revision,
         ):
             client.update_pull_request(
                 repository=full_name,
@@ -903,6 +939,7 @@ def _recreate_existing_pull_request(
                 policy=policy,
                 changes=body_changes,
                 head_oid=existing_pr.expected_head_oid,
+                tool_revision=tool_revision,
             )
         return RepositoryOutcome(
             repository,
@@ -927,6 +964,7 @@ def _recreate_existing_pull_request(
         policy=policy,
         changes=applied.changes,
         head_oid=head_oid,
+        tool_revision=tool_revision,
     )
     if pre_commit_failure is not None:
         _mark_dirty_pull_request(
