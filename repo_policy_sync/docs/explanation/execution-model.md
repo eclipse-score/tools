@@ -48,7 +48,10 @@ owns one deterministic branch and one pull request per repository.
    mode leaves the pull request open.
 
    Pre-commit runs use a credential-reduced environment and temporary home
-   directory. Hooks are still arbitrary repository code, so apply mode requires
+   directory. To keep authenticated nested Git fetches working, the runner
+   copies only global `url.*.insteadOf` rewrites into a temporary Git config;
+   GitHub token variables and unrelated user configuration are not passed to
+   hooks. Hooks are still arbitrary repository code, so apply mode requires
    trusted target repositories.
 
 Checkout synchronization and each policy's repository processing run in

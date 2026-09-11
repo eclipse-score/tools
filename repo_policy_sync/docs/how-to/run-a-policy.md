@@ -120,10 +120,11 @@ workflow must use the `plan` command and must not use `apply`.
 
 Apply mode runs the target repository's configured pre-commit hooks on the
 policy-changed paths before publishing changes. Treat apply mode as
-trusted-repository execution:
-repository hooks can execute arbitrary code. The runner removes the usual
-GitHub token and user configuration environment, disables Git prompts, and
-uses a temporary home directory, but this is not a sandbox.
+trusted-repository execution: repository hooks can execute arbitrary code. The
+runner removes the usual GitHub token and user configuration environment,
+disables Git prompts, and uses a temporary home directory. It copies only
+global `url.*.insteadOf` rewrites into a temporary Git config so authenticated
+nested Git fetches continue to work; this is not a sandbox.
 
 For CI or another programmatic consumer, write the versioned JSON report to a
 file while retaining the standard table output:

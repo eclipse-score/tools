@@ -46,6 +46,8 @@ _PRE_COMMIT_ENVIRONMENT_KEYS = {
     "USER",
     "LOGNAME",
 }
+_GIT_URL_REWRITE_KEY = re.compile(r"^url\..*\.insteadof$", re.IGNORECASE)
+_GIT_URL_REWRITE_PATTERN = r"^url\..*\.insteadof$"
 PULL_REQUEST_TEMPLATE_PLACEHOLDERS = (
     "policy_id",
     "policy_description",
@@ -57,6 +59,81 @@ PULL_REQUEST_TEMPLATE_PLACEHOLDERS = (
     "policy_head_marker",
 )
 _PULL_REQUEST_TEMPLATE_PLACEHOLDER = re.compile(r"\{\{([^{}]*)\}\}")
+
+
+def _copy_global_git_url_rewrites(home: Path) -> Path | None:
+    """Copy global Git URL rewrites into an isolated configuration file.
+
+    Apply workflows commonly authenticate private dependencies by configuring
+    a token-bearing `url.*.insteadOf` rule globally. Pre-commit gets a fresh
+    home directory and system configuration is disabled, so those rules would
+    otherwise disappear before a hook starts Bazel or another nested Git
+    client. Only URL rewrites are copied: user identity, aliases, credential
+    helpers, and unrelated Git configuration remain unavailable to hooks.
+    """
+
+    rewrites = _read_global_git_url_rewrites()
+    if not rewrites:
+        return None
+
+    config = home / ".gitconfig"
+    for key, value in rewrites:
+        result = subprocess.run(
+            ["git", "config", "--file", str(config), "--add", key, value],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip()
+            detail = redact_sensitive_text(detail)
+            raise CommandError(
+                "could not prepare Git URL rewrites for pre-commit"
+                + (f": {detail}" if detail else "")
+            )
+    return config
+
+
+def _read_global_git_url_rewrites() -> tuple[tuple[str, str], ...]:
+    """Read only global Git URL rewrites without inheriting user config."""
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "config",
+                "--global",
+                "--get-regexp",
+                _GIT_URL_REWRITE_PATTERN,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        # The regular pre-commit command will report a missing Git executable
+        # in the usual way. A missing executable must not turn this optional
+        # credential hand-off into a less useful error.
+        return ()
+
+    # `git config --get-regexp` returns 1 when no key matches. Other failures
+    # indicate that the existing Git configuration could not be inspected and
+    # should not be silently converted into an authentication failure later.
+    if result.returncode == 1:
+        return ()
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        detail = redact_sensitive_text(detail)
+        raise CommandError(
+            "could not read global Git URL rewrites" + (f": {detail}" if detail else "")
+        )
+
+    rewrites: list[tuple[str, str]] = []
+    for line in result.stdout.splitlines():
+        key, separator, value = line.partition(" ")
+        if separator and _GIT_URL_REWRITE_KEY.fullmatch(key):
+            rewrites.append((key, value))
+    return tuple(rewrites)
 
 
 @dataclass(frozen=True)
@@ -420,6 +497,12 @@ class GitHubCli:
             if key in _PRE_COMMIT_ENVIRONMENT_KEYS or key.startswith("LC_")
         }
         with tempfile.TemporaryDirectory(prefix=f"{TOOL_SLUG}-pre-commit-") as home:
+            # The normal apply workflow authenticates nested Git fetches by
+            # installing a narrowly scoped `url.*.insteadOf` rewrite in the
+            # runner's global Git configuration. Keep that mechanism
+            # available to trusted hooks while preserving the isolated home
+            # directory and reduced environment used for pre-commit.
+            git_config = _copy_global_git_url_rewrites(Path(home))
             environment.update(
                 {
                     "HOME": home,
@@ -429,6 +512,8 @@ class GitHubCli:
                     "GIT_TERMINAL_PROMPT": "0",
                 }
             )
+            if git_config is not None:
+                environment["GIT_CONFIG_GLOBAL"] = str(git_config)
             command = ["pre-commit", "run", "--all-files"]
             if paths is not None:
                 command = ["pre-commit", "run", "--files", *paths]

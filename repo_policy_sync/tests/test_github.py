@@ -232,6 +232,86 @@ def test_pre_commit_does_not_inherit_credentials_or_user_configuration(
     assert observed["GIT_TERMINAL_PROMPT"] == "0"
 
 
+def test_pre_commit_carries_only_global_git_url_rewrites(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """Authenticated nested Git fetches work without exposing user config."""
+
+    (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
+    user_home = tmp_path / "user-home"
+    user_home.mkdir()
+    global_config = user_home / ".gitconfig"
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "--file",
+            str(global_config),
+            "--add",
+            "url.https://x-access-token:github-token@github.com/.insteadOf",
+            "https://github.com/",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "config",
+            "--file",
+            str(global_config),
+            "user.name",
+            "test user",
+        ],
+        check=True,
+    )
+    monkeypatch.setenv("HOME", str(user_home))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.delenv("GIT_CONFIG_GLOBAL", raising=False)
+    observed: dict[str, str] = {}
+
+    def record(
+        command: list[str],
+        *,
+        cwd: Path | None = None,
+        env: dict[str, str] | None = None,
+    ) -> str:
+        if command[0] == "pre-commit":
+            assert env is not None
+            observed.update(env)
+            config = Path(env["GIT_CONFIG_GLOBAL"])
+            rewrites = subprocess.run(
+                [
+                    "git",
+                    "config",
+                    "--file",
+                    str(config),
+                    "--get-regexp",
+                    "^url\\..*\\.insteadof$",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            assert "github-token" in rewrites.stdout
+            assert (
+                subprocess.run(
+                    ["git", "config", "--file", str(config), "--get", "user.name"],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                ).returncode
+                != 0
+            )
+        return ""
+
+    monkeypatch.setattr(GitHubCli, "_run", staticmethod(record))
+
+    assert GitHubCli().run_pre_commit(checkout=tmp_path)
+
+    assert observed["GIT_CONFIG_NOSYSTEM"] == "1"
+    assert observed["GIT_TERMINAL_PROMPT"] == "0"
+
+
 def test_pre_commit_failure_stops_commit_and_push(monkeypatch, tmp_path: Path) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     (tmp_path / ".gitignore").write_text("\n")
