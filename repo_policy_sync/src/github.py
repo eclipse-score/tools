@@ -881,7 +881,10 @@ def _pull_request_body(
         _validate_pull_request_template(
             pull_request_template, source="provided pull-request template"
         )
-        template = pull_request_template
+        template = _PULL_REQUEST_TEMPLATE_PLACEHOLDER.sub(
+            lambda match: f"{{{{ {match.group(1).strip()} }}}}",
+            pull_request_template,
+        )
     values = {
         "policy_marker": _policy_marker(policy.id),
         "policy_head_marker": _policy_head_marker(head_oid),
