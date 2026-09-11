@@ -23,6 +23,7 @@ import tempfile
 from pathlib import Path
 
 from .bazel import (
+    BAZEL_NAME_ARGUMENT,
     mask_starlark_comments,
     matches_bazel_dependency_condition,
     parse_bazel_version,
@@ -35,7 +36,6 @@ from .operations import describe_changes, resolve_operation
 from .operations._validation import validate_repository_path
 from .values import resolve_values, value_source_exists
 
-_NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*[\"']([^\"']+)[\"']")
 _REDUCED_ENVIRONMENT_KEYS = {
     "CI",
@@ -201,7 +201,7 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
     dependencies: dict[str, tuple[int, int, int] | None] = {}
     for start, end in starlark_call_ranges(text, "bazel_dep"):
         body = mask_starlark_comments(text[start:end])
-        name_match = _NAME_ARGUMENT.search(body)
+        name_match = BAZEL_NAME_ARGUMENT.search(body)
         if name_match is None:
             continue
         version_match = _VERSION_ARGUMENT.search(body)

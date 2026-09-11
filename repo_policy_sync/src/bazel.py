@@ -21,6 +21,8 @@ from .models import BazelDependencyCondition
 
 BazelVersion = tuple[int, int, int]
 
+BAZEL_MODULE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
+BAZEL_NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 _CONDITION = re.compile(
     r"\A\s*([A-Za-z0-9_][A-Za-z0-9_.-]*)\s*(==|!=|<=|>=|<|>)\s*"

@@ -20,7 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..bazel import mask_starlark_comments, starlark_call_ranges
+from ..bazel import (
+    BAZEL_MODULE_NAME,
+    BAZEL_NAME_ARGUMENT,
+    mask_starlark_comments,
+    starlark_call_ranges,
+)
 from ..errors import PolicyError, RepoPolicySyncError
 from ..models import Change, EnsureBazelDependency, EnsureOperation, ValueReference
 from ._validation import (
@@ -32,8 +37,6 @@ from ._validation import (
 )
 
 _NUMERIC_VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
-_MODULE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
-_NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*([\"'])([^\"']*)\1")
 
 
@@ -53,7 +56,7 @@ class EnsureBazelDependencyOperation:
             source,
         )
         module_name = required_string(raw, "module_name", source)
-        if _MODULE_NAME.fullmatch(module_name) is None:
+        if BAZEL_MODULE_NAME.fullmatch(module_name) is None:
             raise PolicyError(
                 f"policy {source}: module_name must be a valid Bazel module name"
             )
@@ -149,7 +152,7 @@ def _module_dependency(
         # A commented dependency is documentation, not an installed direct
         # dependency, so only ranges returned from active source are examined.
         body = mask_starlark_comments(text[start:end])
-        name_matches = list(_NAME_ARGUMENT.finditer(body))
+        name_matches = list(BAZEL_NAME_ARGUMENT.finditer(body))
         if any(
             name_match.group(1) == operation.module_name for name_match in name_matches
         ):

@@ -63,6 +63,20 @@ def test_parse_rejects_non_boolean_dev_dependency(dev_dependency: object) -> Non
             True,
         ),
         (
+            """bazel_dep(
+    name = "example_dependency",
+    version = "1.0.0"  # pinned
+)
+""",
+            """bazel_dep(
+    name = "example_dependency",
+    version = "1.0.0",  # pinned
+    dev_dependency = True,
+)
+""",
+            True,
+        ),
+        (
             'bazel_dep(name = "example_dependency", version = "1.0.0", dev_dependency = False)\n',
             'bazel_dep(name = "example_dependency", version = "1.0.0", dev_dependency = True)\n',
             True,

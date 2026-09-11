@@ -20,7 +20,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..bazel import mask_starlark_comments, starlark_call_ranges
+from ..bazel import (
+    BAZEL_MODULE_NAME,
+    BAZEL_NAME_ARGUMENT,
+    mask_starlark_comments,
+    starlark_call_ranges,
+)
 from ..errors import PolicyError, RepoPolicySyncError
 from ..models import (
     Change,
@@ -38,8 +43,6 @@ from ._validation import (
 # Keep this path internal to the operation so every policy can focus on the
 # dependency whose setting it governs instead of repeating an invariant path.
 _MODULE_FILE = Path("MODULE.bazel")
-_MODULE_NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.-]*\Z")
-_NAME_ARGUMENT = re.compile(r"\bname\s*=\s*[\"']([^\"']+)[\"']")
 _DEV_DEPENDENCY_ARGUMENT = re.compile(r"\bdev_dependency\s*=\s*(True|False)\b")
 
 
@@ -65,7 +68,7 @@ class EnsureBazelDependencyDevDependencyOperation:
             source,
         )
         module_name = required_string(raw, "module_name", source)
-        if _MODULE_NAME.fullmatch(module_name) is None:
+        if BAZEL_MODULE_NAME.fullmatch(module_name) is None:
             raise PolicyError(
                 f"policy {source}: module_name must be a valid Bazel module name"
             )
@@ -131,7 +134,7 @@ def _find_dependency(
         body = mask_starlark_comments(text[start:end])
         name_matches = [
             match
-            for match in _NAME_ARGUMENT.finditer(body)
+            for match in BAZEL_NAME_ARGUMENT.finditer(body)
             if match.group(1) == operation.module_name
         ]
         if not name_matches:
@@ -193,14 +196,24 @@ def _set_dev_dependency(text: str, dependency: _DependencyCall) -> str:
             + text[dependency.body_end :]
         )
 
-    content = body.rstrip(" \t\r\n")
-    trailing = body[len(content) :]
+    # Find the last active token so a separator is inserted before an inline
+    # comment rather than being swallowed by it.
+    masked_body = mask_starlark_comments(body)
+    active_end = len(masked_body.rstrip(" \t\r\n"))
+    content = body[:active_end]
+    trailing = body[active_end:]
     newline = "\r\n" if "\r\n" in trailing else "\n"
-    close_indent = trailing.rsplit("\n", 1)[-1] if "\n" in trailing else ""
+    if "\n" in trailing:
+        trailing_before_close, close_indent = trailing.rsplit("\n", 1)
+        trailing_before_close += "\n"
+    else:
+        trailing_before_close = ""
+        close_indent = ""
     argument_indent = _argument_indent(body)
-    separator = "" if content.endswith(",") else ","
+    active_content = masked_body[:active_end]
+    separator = "" if active_content.rstrip(" \t\r\n").endswith(",") else ","
     insertion = (
-        f"{separator}{newline}{argument_indent}dev_dependency = True,"
+        f"{separator}{trailing_before_close}{argument_indent}dev_dependency = True,"
         f"{newline}{close_indent}"
     )
     return (
