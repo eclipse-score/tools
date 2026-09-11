@@ -24,7 +24,7 @@ from repo_cache import default_cache_directory
 
 from .config import load_config
 from .errors import PolicyError, RepoPolicySyncError
-from .github import GitHubCli
+from .github import GitHubCli, load_pull_request_template
 from .policy import (
     BUNDLED_POLICY_DIRECTORY,
     DEFAULT_POLICY_DIRECTORY,
@@ -124,6 +124,14 @@ def _add_common_arguments(
         help="Local policy directory; repeat to combine directories (default: ./policies if present).",
     )
     rare.add_argument(
+        "--pull-request-template",
+        type=Path,
+        help=(
+            "Pull-request body template; relative paths are resolved from the "
+            "current working directory and override the TOML configuration."
+        ),
+    )
+    rare.add_argument(
         "--exclude-policy",
         action="append",
         metavar="NAME",
@@ -203,6 +211,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.cache_dir is not None
             else (config.cache_directory or default_cache_directory())
         )
+        pull_request_template_path = (
+            args.pull_request_template
+            if args.pull_request_template is not None
+            else config.pull_request_template
+        )
+        pull_request_template = load_pull_request_template(pull_request_template_path)
         sync_workers = (
             args.sync_workers
             if args.sync_workers is not None
@@ -286,6 +300,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             apply=applying,
             recreate=recreate,
             allow_dirty_pr=allow_dirty_pr,
+            pull_request_template=pull_request_template,
             sync_workers=sync_workers,
             policy_workers=policy_workers,
             # apply already looks up an open PR itself whenever it might act on

@@ -34,6 +34,7 @@ recreate = true
 allow_dirty_pr = true
 quiet = true
 cache_dir = ".cache/repo-sync"
+pull_request_template = "templates/custom-pull-request.md"
 sync_workers = 2
 policy_workers = 3
 """,
@@ -51,6 +52,9 @@ policy_workers = 3
     assert config.allow_dirty_pr is True
     assert config.quiet is True
     assert config.cache_directory == fake_repo / ".cache/repo-sync"
+    assert (
+        config.pull_request_template == fake_repo / "templates/custom-pull-request.md"
+    )
     assert config.sync_workers == 2
     assert config.policy_workers == 3
 

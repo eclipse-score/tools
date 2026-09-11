@@ -24,9 +24,14 @@ from repo_policy_sync.src.github import (
     PullRequest,
     _pull_request_body,
     _tool_revision,
+    load_pull_request_template,
     policy_branches,
 )
-from repo_policy_sync.src.errors import CommandError, redact_sensitive_text
+from repo_policy_sync.src.errors import (
+    CommandError,
+    RepoPolicySyncError,
+    redact_sensitive_text,
+)
 from repo_policy_sync.src.models import (
     BazelCondition,
     Change,
@@ -35,6 +40,22 @@ from repo_policy_sync.src.models import (
     Policy,
 )
 from repo_policy_sync.src.policy import BUNDLED_POLICY_DIRECTORY, load_policy
+
+
+def _custom_pull_request_template() -> str:
+    return "\n".join(
+        (
+            "custom",
+            "{{ policy_id }}",
+            "{{ policy_description }}",
+            "{{ policy_trigger }}",
+            "{{ changes }}",
+            "{{ tool_revision }}",
+            "{{ failure_section }}",
+            "{{ policy_marker }}",
+            "{{ policy_head_marker }}",
+        )
+    )
 
 
 def test_commit_stages_deleted_policy_files(monkeypatch, tmp_path: Path) -> None:
@@ -459,10 +480,15 @@ def test_create_pull_request_creates_missing_automation_labels(monkeypatch) -> N
         changes=(),
         head_oid="a" * 40,
         tool_revision="test-revision",
+        pull_request_template=_custom_pull_request_template(),
     )
 
     assert pull_request.url == "https://github.example/owner/repo/pull/1"
     assert pull_request.warnings == ()
+    create_command = next(
+        command for command in commands if command[:3] == ["gh", "pr", "create"]
+    )
+    assert "custom" in create_command[create_command.index("--body") + 1]
     assert [
         command[4]
         for command in commands
@@ -697,6 +723,38 @@ def test_tool_revision_rejects_missing_git_metadata(monkeypatch) -> None:
         _tool_revision()
 
 
+def test_custom_pull_request_template_is_loaded_and_rendered(tmp_path: Path) -> None:
+    template_path = tmp_path / "pull-request.md"
+    template_path.write_text(_custom_pull_request_template(), encoding="utf-8")
+    template = load_pull_request_template(template_path)
+    policy = Policy("example", "Example", "Description", None, ())
+
+    body = _pull_request_body(
+        policy,
+        (Change(Path(".gitignore"), "add '_build'"),),
+        head_oid="a" * 40,
+        pull_request_template=template,
+    )
+
+    assert body.startswith("custom\nexample\nDescription\n")
+    assert "- `.gitignore`: add '_build'" in body
+    assert "<!-- repo-policy-sync-policy: example -->" in body
+    assert "<!-- repo-policy-sync-head: " + "a" * 40 + " -->" in body
+
+
+def test_pull_request_template_requires_supported_placeholders(tmp_path: Path) -> None:
+    template_path = tmp_path / "invalid.md"
+    template_path.write_text(
+        "{{ policy_id }}\n{{ unknown-placeholder }}\n", encoding="utf-8"
+    )
+
+    with pytest.raises(
+        RepoPolicySyncError,
+        match="missing placeholders: policy_description.*unknown placeholders: unknown-placeholder",
+    ):
+        load_pull_request_template(template_path)
+
+
 def test_module_policy_pull_request_includes_the_matching_rationale() -> None:
     policy = load_policy(
         BUNDLED_POLICY_DIRECTORY / "minimal-bazel-module-declaration" / "policy.yml"
@@ -748,6 +806,7 @@ def test_existing_pull_request_is_updated_with_the_current_template(
 
     monkeypatch.setattr(GitHubCli, "_run", staticmethod(record))
     policy = Policy("example", "Current title", "Current description", None, ())
+    template = _custom_pull_request_template()
 
     GitHubCli().update_pull_request(
         repository="owner/repo",
@@ -756,6 +815,7 @@ def test_existing_pull_request_is_updated_with_the_current_template(
         changes=(Change(Path(".gitignore"), "add '_build'"),),
         head_oid="a" * 40,
         tool_revision="test-revision",
+        pull_request_template=template,
     )
 
     assert commands[0][:7] == [
@@ -767,7 +827,7 @@ def test_existing_pull_request_is_updated_with_the_current_template(
         "-f",
         "title=Current title",
     ]
-    assert "## Policy" in commands[0][-1]
+    assert commands[0][-1].startswith("body=custom\n")
 
 
 def test_pull_request_template_includes_automation_failure() -> None:

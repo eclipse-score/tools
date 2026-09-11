@@ -47,6 +47,7 @@ are CLI-only.
 | `--json-output PATH` | Also write the versioned JSON report to `PATH`. |
 | `--markdown-output PATH` | Also write the Markdown report to `PATH`. |
 | `--policy-dir PATH` | Local policy directory. Repeat to combine directories. Defaults to `./policies` in the current working directory when present. |
+| `--pull-request-template PATH` | Pull-request body template. Relative paths are resolved from the current working directory and override `pull_request_template` from TOML. |
 | `--exclude-policy NAME` | Exclude one local or bundled policy. Applied after any explicit `--policy` selection; repeat to exclude more than one. |
 | `--recreate` | On `apply`, rebuild one existing policy-owned pull request from its repository's current default branch. Requires exactly one `--repo` selection, exactly one selected repository after pattern expansion, and exactly one `--policy`. |
 | `--allow-dirty-pr`, `--no-allow-dirty-pr` | After the automatic formatting-fix retry, commit and push changes even if pre-commit still fails; create or keep the pull request as a draft and add a comment with the failure. |

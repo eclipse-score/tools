@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 
-from .errors import CommandError, redact_sensitive_text
+from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .models import Change, Policy, policy_branch_slug
 
 TOOL_SLUG = "repo-policy-sync"
@@ -46,6 +46,17 @@ _PRE_COMMIT_ENVIRONMENT_KEYS = {
     "USER",
     "LOGNAME",
 }
+PULL_REQUEST_TEMPLATE_PLACEHOLDERS = (
+    "policy_id",
+    "policy_description",
+    "policy_trigger",
+    "changes",
+    "tool_revision",
+    "failure_section",
+    "policy_marker",
+    "policy_head_marker",
+)
+_PULL_REQUEST_TEMPLATE_PLACEHOLDER = re.compile(r"\{\{([^{}]*)\}\}")
 
 
 @dataclass(frozen=True)
@@ -514,6 +525,7 @@ class GitHubCli:
         head_oid: str,
         draft: bool = False,
         tool_revision: str,
+        pull_request_template: str | None = None,
     ) -> PullRequest:
         self._ensure_automation_labels(repository=repository)
         create_command = [
@@ -534,6 +546,7 @@ class GitHubCli:
                 changes,
                 head_oid=head_oid,
                 tool_revision=tool_revision,
+                pull_request_template=pull_request_template,
             ),
         ]
         if draft:
@@ -649,6 +662,7 @@ class GitHubCli:
         head_oid: str,
         failure: str | None = None,
         tool_revision: str,
+        pull_request_template: str | None = None,
     ) -> None:
         """Keep an existing policy-owned pull request's explanation current."""
 
@@ -665,7 +679,16 @@ class GitHubCli:
                 "-f",
                 f"title={policy.title}",
                 "-f",
-                f"body={_pull_request_body(policy, changes, head_oid=head_oid, failure=failure, tool_revision=tool_revision)}",
+                f"body={
+                    _pull_request_body(
+                        policy,
+                        changes,
+                        head_oid=head_oid,
+                        failure=failure,
+                        tool_revision=tool_revision,
+                        pull_request_template=pull_request_template,
+                    )
+                }",
             ]
         )
 
@@ -839,8 +862,9 @@ def _pull_request_body(
     head_oid: str,
     tool_revision: str,
     failure: str | None = None,
+    pull_request_template: str | None = None,
 ) -> str:
-    """Build the concise, policy-centred pull-request template."""
+    """Build a policy pull-request body from the selected validated template."""
 
     description = (
         policy.description
@@ -851,11 +875,13 @@ def _pull_request_body(
         + (f"\n  - {change.rationale}" if change.rationale else "")
         for change in changes
     )
-    template = (
-        files("repo_policy_sync")
-        .joinpath("templates/pull_request.md")
-        .read_text(encoding="utf-8")
-    )
+    if pull_request_template is None:
+        template = load_pull_request_template()
+    else:
+        _validate_pull_request_template(
+            pull_request_template, source="provided pull-request template"
+        )
+        template = pull_request_template
     values = {
         "policy_marker": _policy_marker(policy.id),
         "policy_head_marker": _policy_head_marker(head_oid),
@@ -869,6 +895,57 @@ def _pull_request_body(
     for key, value in values.items():
         template = template.replace(f"{{{{ {key} }}}}", value)
     return template
+
+
+def load_pull_request_template(path: Path | None = None) -> str:
+    """Read and validate a packaged or user-provided pull-request template."""
+
+    source = (
+        str(path) if path is not None else "repo_policy_sync/templates/pull_request.md"
+    )
+    try:
+        template = (
+            path.read_text(encoding="utf-8")
+            if path is not None
+            else files("repo_policy_sync")
+            .joinpath("templates/pull_request.md")
+            .read_text(encoding="utf-8")
+        )
+    except OSError as exc:
+        raise RepoPolicySyncError(
+            f"could not read pull-request template {source}: {exc}"
+        ) from exc
+    except UnicodeError as exc:
+        raise RepoPolicySyncError(
+            f"could not decode pull-request template {source} as UTF-8: {exc}"
+        ) from exc
+    _validate_pull_request_template(template, source=source)
+    return template
+
+
+def _validate_pull_request_template(template: str, *, source: str) -> None:
+    """Reject templates that cannot render complete, safe policy PR bodies."""
+
+    placeholders = tuple(
+        placeholder.strip()
+        for placeholder in _PULL_REQUEST_TEMPLATE_PLACEHOLDER.findall(template)
+    )
+    supported = set(PULL_REQUEST_TEMPLATE_PLACEHOLDERS)
+    unknown = sorted(set(placeholders) - supported)
+    missing = [
+        placeholder
+        for placeholder in PULL_REQUEST_TEMPLATE_PLACEHOLDERS
+        if placeholder not in placeholders
+    ]
+    if unknown or missing:
+        problems = []
+        if missing:
+            problems.append(f"missing placeholders: {', '.join(missing)}")
+        if unknown:
+            problems.append(f"unknown placeholders: {', '.join(unknown)}")
+        raise RepoPolicySyncError(
+            f"invalid pull-request template {source}: {'; '.join(problems)}"
+        )
 
 
 def _failure_section(failure: str | None) -> str:

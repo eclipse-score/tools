@@ -39,6 +39,7 @@ class PolicySyncConfig:
     allow_dirty_pr: bool | None = None
     quiet: bool | None = None
     cache_directory: Path | None = None
+    pull_request_template: Path | None = None
     sync_workers: int | None = None
     policy_workers: int | None = None
 
@@ -93,6 +94,7 @@ def load_config(path: Path | None = None) -> PolicySyncConfig:
         "allow_dirty_pr",
         "quiet",
         "cache_dir",
+        "pull_request_template",
         "sync_workers",
         "policy_workers",
     }
@@ -130,6 +132,16 @@ def load_config(path: Path | None = None) -> PolicySyncConfig:
             config_path,
             _string_value(section["cache_dir"], "cache_dir", config_path),
         )
+    pull_request_template = None
+    if "pull_request_template" in section:
+        pull_request_template = _resolve_path(
+            config_path,
+            _string_value(
+                section["pull_request_template"],
+                "pull_request_template",
+                config_path,
+            ),
+        )
     sync_workers = _optional_positive_int(section, "sync_workers", config_path)
     policy_workers = _optional_positive_int(section, "policy_workers", config_path)
     return PolicySyncConfig(
@@ -142,6 +154,7 @@ def load_config(path: Path | None = None) -> PolicySyncConfig:
         allow_dirty_pr=allow_dirty_pr,
         quiet=quiet,
         cache_directory=cache_directory,
+        pull_request_template=pull_request_template,
         sync_workers=sync_workers,
         policy_workers=policy_workers,
     )

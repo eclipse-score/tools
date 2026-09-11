@@ -42,12 +42,15 @@ branch-head marker prevents closure and leaves the PR open for human review.
 
 ## Generated content
 
-The runtime template is [pull_request.md](../../templates/pull_request.md). It
-contains the policy identity and description, the non-compliant files that
-triggered the pull request, any satisfied applicability condition, and the
+The packaged runtime template is [pull_request.md](../../templates/pull_request.md),
+and repositories can select a validated custom template through the
+`pull_request_template` configuration setting or `--pull-request-template`.
+Templates render the policy identity and description, the non-compliant files
+that triggered the pull request, any satisfied applicability condition, and the
 concrete changed files. A change can include one operation-level rationale; it
-is rendered as a nested bullet below that change. The template also states that
-the pull request is generated and must be reviewed before merging.
+is rendered as a nested bullet below that change. All supported placeholders,
+including the ownership and branch-head markers, are required so customized
+body text cannot disable PR discovery or safety checks.
 
 Repository Policy Sync applies the `automation` and `repo-policy-sync` labels
 after PR creation. Before creating a PR, it creates either label when it is

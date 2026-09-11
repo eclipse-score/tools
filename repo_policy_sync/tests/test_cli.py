@@ -41,6 +41,21 @@ def _empty_report() -> RunReport:
     )
 
 
+def _valid_template() -> str:
+    return "\n".join(
+        (
+            "custom",
+            "{{ policy_id }}",
+            "{{ policy_description }}",
+            "{{ policy_trigger }}",
+            "{{ changes }}",
+            "{{ failure_section }}",
+            "{{ policy_marker }}",
+            "{{ policy_head_marker }}",
+        )
+    )
+
+
 @pytest.mark.parametrize(
     "argv, message",
     [
@@ -102,6 +117,38 @@ def test_default_output_is_a_table(monkeypatch, capsys) -> None:
     captured = capsys.readouterr()
     assert captured.err == ""
     assert "📋 Policy evaluations" in captured.out
+
+
+def test_cli_template_override_is_loaded_and_passed_to_runner(
+    monkeypatch, tmp_path: Path
+) -> None:
+    template = _valid_template()
+    template_path = tmp_path / "custom-pull-request.md"
+    template_path.write_text(template, encoding="utf-8")
+    observed = {}
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(cli, "load_policies", lambda _: ())
+    monkeypatch.setattr(
+        cli,
+        "run_policies",
+        lambda **kwargs: observed.update(kwargs) or _empty_report(),
+    )
+
+    assert (
+        cli.main(
+            (
+                "plan",
+                "--org",
+                "eclipse-score",
+                "--pull-request-template",
+                template_path.name,
+                "--quiet",
+            )
+        )
+        == 0
+    )
+
+    assert observed["pull_request_template"] == template
 
 
 def test_all_reports_can_be_written_from_one_run(
