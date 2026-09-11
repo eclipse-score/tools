@@ -27,7 +27,7 @@
 
 ## Tool revision
 
-Generated from commit `{{ tool_revision }}` in the checkout where the tool was run.
+Generated from [eclipse-score/tools](https://github.com/eclipse-score/tools) at commit `{{ tool_revision }}`.
 
 {{ failure_section }}
 

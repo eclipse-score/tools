@@ -638,8 +638,8 @@ def test_pull_request_template_explains_policy_trigger_and_changes(monkeypatch) 
     assert "`MODULE.bazel` declares the required direct Bazel dependency" in body
     assert "- `.gitignore`: add '_build'" in body
     assert (
-        "Generated from commit `abc1234-dirty` in the checkout where the tool was run."
-        in body
+        "Generated from [eclipse-score/tools](https://github.com/eclipse-score/tools) "
+        "at commit `abc1234-dirty`." in body
     )
     assert body.index("## Policy") < body.index("<!-- repo-policy-sync-policy:")
     assert body.index("<!-- repo-policy-sync-policy:") < body.index(
