@@ -23,6 +23,7 @@ from repo_policy_sync.src.github import (
     GitHubCli,
     PullRequest,
     _pull_request_body,
+    _tool_revision,
     policy_branches,
 )
 from repo_policy_sync.src.errors import CommandError, redact_sensitive_text
@@ -611,7 +612,10 @@ def test_create_pull_request_can_create_a_draft(monkeypatch) -> None:
     assert commands[1][:4] == ["gh", "pr", "create", "--draft"]
 
 
-def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
+def test_pull_request_template_explains_policy_trigger_and_changes(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "repo_policy_sync.src.github._tool_revision", lambda: "abc1234-dirty"
+    )
     policy = Policy(
         "score-docs-as-code.cleanup",
         "Update docs files",
@@ -633,10 +637,60 @@ def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
     )
     assert "`MODULE.bazel` declares the required direct Bazel dependency" in body
     assert "- `.gitignore`: add '_build'" in body
+    assert (
+        "Generated from commit `abc1234-dirty` in the checkout where the tool was run."
+        in body
+    )
     assert body.index("## Policy") < body.index("<!-- repo-policy-sync-policy:")
     assert body.index("<!-- repo-policy-sync-policy:") < body.index(
         "<!-- repo-policy-sync-head:"
     )
+
+
+def test_tool_revision_reports_a_clean_short_commit_hash(monkeypatch) -> None:
+    def run(command, **kwargs):
+        assert kwargs["capture_output"] is True
+        assert kwargs["text"] is True
+        if command == ["git", "rev-parse", "--short", "HEAD"]:
+            return subprocess.CompletedProcess(
+                command, 0, stdout="abc1234\n", stderr=""
+            )
+        if command == ["git", "diff-index", "--quiet", "HEAD", "--"]:
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        raise AssertionError(command)
+
+    monkeypatch.setattr("repo_policy_sync.src.github.subprocess.run", run)
+
+    assert _tool_revision() == "abc1234"
+
+
+def test_tool_revision_marks_a_dirty_checkout(monkeypatch) -> None:
+    def run(command, **kwargs):
+        if command == ["git", "rev-parse", "--short", "HEAD"]:
+            return subprocess.CompletedProcess(
+                command, 0, stdout="abc1234\n", stderr=""
+            )
+        if command == ["git", "diff-index", "--quiet", "HEAD", "--"]:
+            return subprocess.CompletedProcess(command, 1, stdout="", stderr="")
+        raise AssertionError(command)
+
+    monkeypatch.setattr("repo_policy_sync.src.github.subprocess.run", run)
+
+    assert _tool_revision() == "abc1234-dirty"
+
+
+def test_tool_revision_rejects_missing_git_metadata(monkeypatch) -> None:
+    def run(*_: object, **__: object) -> None:
+        raise subprocess.CalledProcessError(
+            128,
+            ["git", "rev-parse", "--short", "HEAD"],
+            stderr="fatal: not a git repository\n",
+        )
+
+    monkeypatch.setattr("repo_policy_sync.src.github.subprocess.run", run)
+
+    with pytest.raises(CommandError, match="not a git repository"):
+        _tool_revision()
 
 
 def test_module_policy_pull_request_includes_the_matching_rationale() -> None:

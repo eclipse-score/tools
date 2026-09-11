@@ -785,6 +785,46 @@ def _pull_request_number(url: str) -> int:
     return int(match.group(1))
 
 
+def _tool_revision() -> str:
+    """Return the current checkout's short commit hash and dirty marker."""
+
+    try:
+        revision_result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise CommandError("required command is unavailable: git") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.strip() or exc.stdout.strip() or "command failed"
+        raise CommandError(f"git rev-parse --short HEAD: {detail}") from exc
+
+    revision = revision_result.stdout.strip()
+    if not revision:
+        raise CommandError("git rev-parse --short HEAD returned no commit hash")
+
+    try:
+        dirty_result = subprocess.run(
+            ["git", "diff-index", "--quiet", "HEAD", "--"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:  # pragma: no cover - guarded by rev-parse
+        raise CommandError("required command is unavailable: git") from exc
+
+    if dirty_result.returncode not in (0, 1):
+        detail = (
+            dirty_result.stderr.strip()
+            or dirty_result.stdout.strip()
+            or "command failed"
+        )
+        raise CommandError(f"git diff-index --quiet HEAD --: {detail}")
+    return f"{revision}-dirty" if dirty_result.returncode == 1 else revision
+
+
 def _pull_request_body(
     policy: Policy,
     changes: tuple[Change, ...],
@@ -815,6 +855,7 @@ def _pull_request_body(
         "policy_description": description,
         "policy_trigger": _policy_trigger(policy, changes),
         "changes": change_lines,
+        "tool_revision": _tool_revision(),
         "failure_section": _failure_section(failure),
     }
     for key, value in values.items():

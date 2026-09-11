@@ -25,6 +25,10 @@
 
 {{ changes }}
 
+## Tool revision
+
+Generated from commit `{{ tool_revision }}` in the checkout where the tool was run.
+
 {{ failure_section }}
 
 ---
