@@ -49,6 +49,7 @@ def _valid_template() -> str:
             "{{ policy_description }}",
             "{{ policy_trigger }}",
             "{{ changes }}",
+            "{{ tool_revision }}",
             "{{ failure_section }}",
             "{{ policy_marker }}",
             "{{ policy_head_marker }}",

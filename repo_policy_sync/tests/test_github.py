@@ -733,6 +733,7 @@ def test_custom_pull_request_template_is_loaded_and_rendered(tmp_path: Path) -> 
         policy,
         (Change(Path(".gitignore"), "add '_build'"),),
         head_oid="a" * 40,
+        tool_revision="test-revision",
         pull_request_template=template,
     )
 
