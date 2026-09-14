@@ -850,7 +850,12 @@ class GitHubCli:
 
 @dataclass(frozen=True)
 class GitHubTag:
-    """A release tag and the commit GitHub resolves it to."""
+    """A release tag and the commit GitHub resolves it to.
+
+    Repository identity is intentionally kept by the resolver that returned
+    the tag. A tag result is always scoped to one repository, so this value
+    object can describe the release without duplicating that context.
+    """
 
     name: str
     sha: str
@@ -873,7 +878,13 @@ class GitHubResolver:
         self._lock = RLock()
 
     def tags(self, repository: str) -> tuple[GitHubTag, ...]:
-        """Return all published tags for one ``owner/repository``."""
+        """Return all published tags for one ``owner/repository``.
+
+        The result is scoped to the requested repository. Keeping that scope at
+        the resolver boundary ensures callers cannot accidentally select a tag
+        from a different repository while keeping ``GitHubTag`` repository
+        agnostic.
+        """
 
         with self._lock:
             cached = self._tags.get(repository)

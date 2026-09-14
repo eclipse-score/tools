@@ -218,7 +218,13 @@ def _parse_target(raw: dict[str, Any], source: Path) -> str:
 
 
 def _repository_for(target: str) -> str:
-    """Return the GitHub repository that owns a target or reusable workflow."""
+    """Extract the API repository from an action or reusable-workflow target.
+
+    Workflow targets may append an action directory or workflow file to the
+    repository name, but GitHub's tag and comparison endpoints are scoped to
+    ``owner/repository``. The remaining path is used only for workflow text
+    matching and must not be sent to those endpoints.
+    """
 
     return "/".join(target.split("/", 2)[:2])
 
