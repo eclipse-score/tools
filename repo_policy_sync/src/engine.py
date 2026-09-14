@@ -30,6 +30,7 @@ from .bazel import (
     starlark_call_ranges,
 )
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
+from .github import GitHubResolver
 from .models import Change, EnsureOperation, Evaluation, Policy
 from .operations import apply as apply_operation
 from .operations import describe_changes, resolve_operation
@@ -52,18 +53,29 @@ _REDUCED_ENVIRONMENT_KEYS = {
 
 
 def evaluate_policy(
-    root: Path, policy: Policy, *, organization: str | None = None
+    root: Path,
+    policy: Policy,
+    *,
+    organization: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> Evaluation:
     """Evaluate a policy against a checked-out repository without changing it."""
 
     evaluation, _ = _evaluate_policy_with_operations(
-        root, policy, organization=organization
+        root,
+        policy,
+        organization=organization,
+        github_resolver=github_resolver,
     )
     return evaluation
 
 
 def _evaluate_policy_with_operations(
-    root: Path, policy: Policy, *, organization: str | None = None
+    root: Path,
+    policy: Policy,
+    *,
+    organization: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> tuple[Evaluation, tuple[EnsureOperation, ...]]:
     """Evaluate a policy and retain the materialized operations for applying it."""
 
@@ -75,9 +87,17 @@ def _evaluate_policy_with_operations(
     operations = tuple(
         resolve_operation(operation, values) for operation in policy.ensure
     )
+    github_resolver = github_resolver or GitHubResolver()
     changes: list[Change] = []
     for operation in operations:
-        changes.extend(describe_changes(root, operation, organization=organization))
+        changes.extend(
+            describe_changes(
+                root,
+                operation,
+                organization=organization,
+                github_resolver=github_resolver,
+            )
+        )
     if changes:
         changes.extend(
             Change(command.when_file_exists, command.description)
@@ -95,16 +115,26 @@ def apply_policy(
     *,
     force_after_apply: bool = False,
     organization: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> Evaluation:
     """Apply a matching policy and return the changes that were made."""
 
+    github_resolver = github_resolver or GitHubResolver()
     evaluation, operations = _evaluate_policy_with_operations(
-        root, policy, organization=organization
+        root,
+        policy,
+        organization=organization,
+        github_resolver=github_resolver,
     )
     if not evaluation.applies:
         return evaluation
     for operation in operations:
-        apply_operation(root, operation, organization=organization)
+        apply_operation(
+            root,
+            operation,
+            organization=organization,
+            github_resolver=github_resolver,
+        )
     if evaluation.changes or force_after_apply:
         changed_paths = {change.path for change in evaluation.changes}
         for command in policy.after_apply:

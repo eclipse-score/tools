@@ -64,6 +64,7 @@ class EnsureLineOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureLine)
         path = root / operation.path
@@ -95,6 +96,7 @@ class EnsureLineOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> None:
         assert isinstance(operation, EnsureLine)
         path = root / operation.path

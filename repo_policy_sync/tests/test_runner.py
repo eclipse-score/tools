@@ -1281,6 +1281,15 @@ def test_existing_compliant_conflicted_pull_request_is_recreated(
         (EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
     )
     client = ImplicitRecreateClient(mergeable="CONFLICTING", body="stale body")
+    github_resolver = object()
+    observed_resolvers: list[object] = []
+    original_apply_policy = runner.apply_policy
+
+    def track_resolver(*args: object, **kwargs: object) -> Evaluation:
+        observed_resolvers.append(kwargs["github_resolver"])
+        return original_apply_policy(*args, **kwargs)
+
+    monkeypatch.setattr(runner, "apply_policy", track_resolver)
     monkeypatch.setattr(
         runner,
         "restore_synced_default_branch",
@@ -1295,12 +1304,14 @@ def test_existing_compliant_conflicted_pull_request_is_recreated(
         policy=policy,
         checkout=checkout,
         apply=True,
+        github_resolver=github_resolver,
     )
 
     assert outcome.status == "pull-request-recreated"
     assert client.recreated_branch
     assert client.force_pushed
     assert client.updated
+    assert observed_resolvers == [github_resolver, github_resolver]
 
 
 def test_existing_compliant_pull_request_is_left_alone_with_current_body(

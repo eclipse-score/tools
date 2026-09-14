@@ -53,6 +53,7 @@ class EnsureMinimumVersionOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureMinimumVersion)
         path = root / operation.path
@@ -74,6 +75,7 @@ class EnsureMinimumVersionOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> None:
         assert isinstance(operation, EnsureMinimumVersion)
         path = root / operation.path

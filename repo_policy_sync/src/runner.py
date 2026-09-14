@@ -33,6 +33,7 @@ from .engine import apply_policy, evaluate_policy
 from .errors import RepoPolicySyncError, redact_sensitive_text
 from .github import (
     CommitResult,
+    GitHubResolver,
     PolicyPullRequestStatus,
     TOOL_SLUG,
     _pull_request_body,
@@ -247,6 +248,10 @@ def run_policies(
         pull_requests_recreated
     ) = pull_requests_closed = 0
     outcomes: list[RepositoryOutcome] = []
+    # Share immutable GitHub target metadata across policy and repository
+    # workers. The resolver owns synchronization and is scoped to this run so
+    # a later run can observe newly published target tags.
+    github_resolver = GitHubResolver()
     for policy in policies:
         policy_outcomes = _run_policy_across_repositories(
             client=client,
@@ -264,6 +269,7 @@ def run_policies(
             progress=report_progress,
             include_pull_request_status=include_pull_request_status,
             tool_revision=tool_revision,
+            github_resolver=github_resolver,
         )
         outcomes.extend(policy_outcomes)
         for outcome in policy_outcomes:
@@ -339,9 +345,11 @@ def _run_policy_across_repositories(
     progress: Callable[[str], None],
     include_pull_request_status: bool,
     tool_revision: str | None,
+    github_resolver: GitHubResolver | None = None,
 ) -> tuple[RepositoryOutcome, ...]:
     """Evaluate or apply one policy in independent repository checkouts concurrently."""
 
+    github_resolver = github_resolver or GitHubResolver()
     progress(
         f"{policy.id}: processing {len(repositories)} repositories with {workers} worker(s)..."
     )
@@ -375,6 +383,7 @@ def _run_policy_across_repositories(
                     pull_request_template=pull_request_template,
                     include_pull_request_status=include_pull_request_status,
                     tool_revision=tool_revision,
+                    github_resolver=github_resolver,
                 )
             ] = (index, repository)
         for completed, future in enumerate(as_completed(futures), start=1):
@@ -409,7 +418,9 @@ def _run_policy_in_repository(
     pull_request_template: str | None,
     include_pull_request_status: bool,
     tool_revision: str | None,
+    github_resolver: GitHubResolver | None = None,
 ) -> RepositoryOutcome:
+    github_resolver = github_resolver or GitHubResolver()
     restore_synced_default_branch(checkout=checkout)
     if (
         repository.default_branch is None
@@ -428,6 +439,7 @@ def _run_policy_in_repository(
         pull_request_template=pull_request_template,
         include_pull_request_status=include_pull_request_status,
         tool_revision=tool_revision,
+        github_resolver=github_resolver,
     )
 
 
@@ -445,7 +457,9 @@ def _run_repository(
     pull_request_template: str | None = None,
     include_pull_request_status: bool = False,
     tool_revision: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> RepositoryOutcome:
+    github_resolver = github_resolver or GitHubResolver()
     if apply and tool_revision is None:
         # Keep direct private callers safe as well as the organization-level
         # entry point: provenance must be known before branch mutation.
@@ -461,7 +475,12 @@ def _run_repository(
         else None
     )
     try:
-        evaluation = evaluate_policy(checkout, policy, organization=org)
+        evaluation = evaluate_policy(
+            checkout,
+            policy,
+            organization=org,
+            github_resolver=github_resolver,
+        )
     except RepoPolicySyncError as exc:
         if apply:
             existing_pr = client.find_open_pull_request(
@@ -532,6 +551,7 @@ def _run_repository(
         return _recreate_repository(
             client=client,
             organization=org,
+            github_resolver=github_resolver,
             repository=repository,
             full_name=full_name,
             policy=policy,
@@ -616,7 +636,12 @@ def _run_repository(
         client.switch_to_policy_branch(
             checkout=checkout, branch=branch, exists_remotely=existing_pr is not None
         )
-        applied = apply_policy(checkout, policy, organization=org)
+        applied = apply_policy(
+            checkout,
+            policy,
+            organization=org,
+            github_resolver=github_resolver,
+        )
         head_oid = existing_pr.expected_head_oid if existing_pr is not None else ""
         pre_commit_failure = None
         if applied.changes:
@@ -672,6 +697,7 @@ def _run_repository(
                     allow_dirty_pr=allow_dirty_pr,
                     tool_revision=tool_revision,
                     pull_request_template=pull_request_template,
+                    github_resolver=github_resolver,
                 )
             if _pull_request_body_changed(
                 existing_pr,
@@ -886,6 +912,7 @@ def _recreate_repository(
     allow_dirty_pr: bool = False,
     tool_revision: str | None = None,
     pull_request_template: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> RepositoryOutcome:
     """Rebuild an existing policy branch from the freshly synced default branch."""
 
@@ -911,6 +938,7 @@ def _recreate_repository(
         allow_dirty_pr=allow_dirty_pr,
         tool_revision=tool_revision,
         pull_request_template=pull_request_template,
+        github_resolver=github_resolver,
     )
 
 
@@ -927,6 +955,7 @@ def _recreate_existing_pull_request(
     allow_dirty_pr: bool = False,
     tool_revision: str | None = None,
     pull_request_template: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> RepositoryOutcome:
     """Rebuild one known policy PR from the freshly synchronized default branch."""
 
@@ -944,7 +973,11 @@ def _recreate_existing_pull_request(
     )
     client.recreate_policy_branch(checkout=checkout, branch=branch)
     applied = apply_policy(
-        checkout, policy, force_after_apply=True, organization=organization
+        checkout,
+        policy,
+        force_after_apply=True,
+        organization=organization,
+        github_resolver=github_resolver,
     )
     if not client.has_changes(checkout=checkout, changes=applied.changes):
         body_changes = applied.changes if changes is None else changes

@@ -102,6 +102,24 @@ class EnsureMinimumVersion:
 
 
 @dataclass(frozen=True)
+class EnsureExactGitHubRef:
+    """Ensure every use of one external GitHub target points at one ref."""
+
+    target: str
+    ref: str
+    rationale: str | None = None
+
+
+@dataclass(frozen=True)
+class EnsureMinimalGitHubRef:
+    """Ensure GitHub target tags and commit pins meet a minimum release."""
+
+    target: str
+    minimum_version: str
+    rationale: str | None = None
+
+
+@dataclass(frozen=True)
 class ValueReference:
     """A reference to a named value derived by the containing policy."""
 
@@ -155,6 +173,8 @@ EnsureOperation = (
     | RemoveFile
     | ReplaceRegex
     | EnsureMinimumVersion
+    | EnsureExactGitHubRef
+    | EnsureMinimalGitHubRef
     | EnsureBazelDependency
     | EnsureBazelDependencyDevDependency
 )

@@ -23,6 +23,7 @@ import tempfile
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
+from threading import RLock
 
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .models import Change, Policy, policy_branch_slug
@@ -845,6 +846,144 @@ class GitHubCli:
             detail = exc.stderr.strip() or exc.stdout.strip() or "command failed"
             raise CommandError(f"{' '.join(command[:3])}: {detail}") from exc
         return result.stdout
+
+
+@dataclass(frozen=True)
+class GitHubTag:
+    """A release tag and the commit GitHub resolves it to."""
+
+    name: str
+    sha: str
+
+
+class GitHubResolver:
+    """Resolve GitHub repository releases through authenticated ``gh api`` calls.
+
+    Repository metadata is immutable for the duration of a policy run. Keeping
+    the cache on this object avoids repeated requests when a policy has several
+    matching workflow entries or several targets from the same repository. The
+    lock also prevents concurrent repository workers from fetching the same
+    metadata twice.
+    """
+
+    def __init__(self, client: GitHubCli | None = None) -> None:
+        self._client = client or GitHubCli()
+        self._tags: dict[str, tuple[GitHubTag, ...]] = {}
+        self._comparisons: dict[tuple[str, str, str], str] = {}
+        self._lock = RLock()
+
+    def tags(self, repository: str) -> tuple[GitHubTag, ...]:
+        """Return all published tags for one ``owner/repository``."""
+
+        with self._lock:
+            cached = self._tags.get(repository)
+            if cached is not None:
+                return cached
+            output = self._client._run(
+                [
+                    "gh",
+                    "api",
+                    "--paginate",
+                    "--slurp",
+                    f"/repos/{repository}/tags?per_page=100",
+                ]
+            )
+            tags = _parse_repository_tags(output, repository)
+            self._tags[repository] = tags
+            return tags
+
+    def compare_commits(self, repository: str, base: str, head: str) -> str:
+        """Return GitHub's ancestry relationship for ``base`` and ``head``.
+
+        GitHub reports ``behind`` when ``head`` is an ancestor of ``base``,
+        which is exactly the state in which a target pin needs updating.
+        ``diverged`` is intentionally retained as an error by the operation:
+        commit timestamps cannot safely turn unrelated histories into a
+        minimum-version decision.
+        """
+
+        key = (repository, base, head)
+        with self._lock:
+            cached = self._comparisons.get(key)
+            if cached is not None:
+                return cached
+            output = self._client._run(
+                [
+                    "gh",
+                    "api",
+                    f"/repos/{repository}/compare/{base}...{head}",
+                ]
+            )
+            try:
+                response = json.loads(output)
+            except json.JSONDecodeError as exc:
+                raise CommandError(
+                    f"gh returned invalid commit comparison JSON for {repository}"
+                ) from exc
+            if not isinstance(response, dict) or not isinstance(
+                response.get("status"), str
+            ):
+                raise CommandError(
+                    f"gh returned invalid commit comparison JSON for {repository}"
+                )
+            status = response["status"]
+            if status not in {"ahead", "behind", "identical", "diverged"}:
+                raise CommandError(
+                    f"gh returned an unknown commit comparison status for {repository}: {status!r}"
+                )
+            self._comparisons[key] = status
+            return status
+
+
+def _parse_repository_tags(output: str, repository: str) -> tuple[GitHubTag, ...]:
+    """Validate the paginated shape returned by GitHub's tags endpoint."""
+
+    try:
+        pages = json.loads(output)
+    except json.JSONDecodeError as exc:
+        raise CommandError(
+            f"gh returned invalid repository tag JSON for {repository}"
+        ) from exc
+    if not isinstance(pages, list):
+        raise CommandError(f"gh returned invalid repository tag JSON for {repository}")
+    # `--slurp` returns a list of pages. Accepting a flat list as well keeps the
+    # parser compatible with small test doubles and with future gh output
+    # changes that may omit the wrapper for a single page.
+    entries = (
+        [entry for page in pages for entry in page]
+        if all(isinstance(page, list) for page in pages)
+        else pages
+    )
+    tags: list[GitHubTag] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            raise CommandError(
+                f"gh returned invalid repository tag JSON for {repository}"
+            )
+        name = entry.get("name")
+        commit = entry.get("commit")
+        if name is None:
+            reference = entry.get("ref")
+            object_value = entry.get("object")
+            if (
+                isinstance(reference, str)
+                and reference.startswith("refs/tags/")
+                and isinstance(object_value, dict)
+            ):
+                name = reference.removeprefix("refs/tags/")
+                commit = object_value
+        sha = commit.get("sha") if isinstance(commit, dict) else None
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(sha, str)
+            or re.fullmatch(r"[0-9a-fA-F]{40}", sha) is None
+        ):
+            raise CommandError(
+                f"gh returned invalid repository tag JSON for {repository}"
+            )
+        tags.append(GitHubTag(name, sha))
+    return tuple(tags)
 
 
 def policy_branch(policy_id: str) -> str:

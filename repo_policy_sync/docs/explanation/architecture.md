@@ -55,6 +55,15 @@ references; operation handlers do not know where those values came from.
 `operations/`. An operation owns its YAML validation, compliance check,
 remediation description, and application.
 
+GitHub target ref operations scan workflow text directly so YAML comments and
+formatting survive updates. `GitHubResolver` is created once for a run, uses
+the authenticated `gh api` boundary for repository tag and commit metadata,
+and shares a synchronized in-memory cache across policy and repository
+workers. Exact refs do not require remote resolution; minimal refs resolve
+tags and use GitHub's commit ancestry comparison for full SHA pins. The
+workflow target can be an action path or an external reusable-workflow path;
+the API repository is derived from its first two path components.
+
 The registry is intentionally built in. It makes supported operations visible
 and testable without runtime discovery, third-party code loading, or an
 extension ABI. Add a new operation by implementing it in `operations/` and

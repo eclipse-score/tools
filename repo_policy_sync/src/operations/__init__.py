@@ -21,12 +21,17 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from ..errors import RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureOperation, ValueReference
 from .ensure_bazel_dependency import EnsureBazelDependencyOperation
 from .ensure_bazel_dependency_dev_dependency import (
     EnsureBazelDependencyDevDependencyOperation,
 )
 from .ensure_line import EnsureLineOperation
+from .ensure_github_ref import (
+    EnsureExactGitHubRefOperation,
+    EnsureMinimalGitHubRefOperation,
+)
 from .ensure_minimum_version import EnsureMinimumVersionOperation
 from .remove_file import RemoveFileOperation
 from .replace_regex import ReplaceRegexOperation
@@ -44,6 +49,7 @@ class OperationHandler(Protocol):
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]: ...
 
     def apply(
@@ -52,6 +58,7 @@ class OperationHandler(Protocol):
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None: ...
 
 
@@ -59,6 +66,8 @@ _HANDLERS: tuple[OperationHandler, ...] = (
     EnsureBazelDependencyOperation(),
     EnsureBazelDependencyDevDependencyOperation(),
     EnsureLineOperation(),
+    EnsureExactGitHubRefOperation(),
+    EnsureMinimalGitHubRefOperation(),
     EnsureMinimumVersionOperation(),
     RemoveFileOperation(),
     ReplaceRegexOperation(),
@@ -86,21 +95,37 @@ def parse_operation(raw: object, source: Path) -> EnsureOperation:
 
 
 def describe_changes(
-    root: Path, operation: EnsureOperation, *, organization: str | None = None
+    root: Path,
+    operation: EnsureOperation,
+    *,
+    organization: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> tuple[Change, ...]:
     """Describe every path an operation would change."""
 
     return _handler_for(operation).describe_changes(
-        root, operation, organization=organization
+        root,
+        operation,
+        organization=organization,
+        github_resolver=github_resolver,
     )
 
 
 def apply(
-    root: Path, operation: EnsureOperation, *, organization: str | None = None
+    root: Path,
+    operation: EnsureOperation,
+    *,
+    organization: str | None = None,
+    github_resolver: GitHubResolver | None = None,
 ) -> None:
     """Apply one operation from a repository root."""
 
-    _handler_for(operation).apply(root, operation, organization=organization)
+    _handler_for(operation).apply(
+        root,
+        operation,
+        organization=organization,
+        github_resolver=github_resolver,
+    )
 
 
 def resolve_operation(

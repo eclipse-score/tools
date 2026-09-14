@@ -181,6 +181,42 @@ existing match; without one, it appends the line. A missing file is created.
 Globs use `*`, `?`, and `[...]` and match complete raw lines; comments and
 whitespace have no special meaning.
 
+### `ensure_exact`
+
+```yaml
+- type: ensure_exact
+  target: actions/checkout
+  ref: 11bd719055c2f7a3f9e0f8c1e4f2a5b6c7d8e9f0
+```
+
+Updates every matching external action or reusable-workflow `uses:` reference
+in workflow files under `.github/workflows/`. `target` uses the complete
+external target before `@`, such as `actions/checkout`,
+`eclipse-score/cicd-actions/setup-bazel-cache`, or
+`eclipse-score/cicd-actions/.github/workflows/build.yml`. `ref` may be a
+branch, tag, or complete 40-character commit SHA. The operation preserves
+surrounding YAML formatting, quotes, and comments. Local actions and local
+reusable workflows are outside this operation.
+
+### `ensure_minimal`
+
+```yaml
+- type: ensure_minimal
+  target: actions/setup-python
+  minimum_version: v5.1
+```
+
+The operation obtains the target repository's tags through the authenticated
+`gh api` client and selects the lowest semantic tag that satisfies
+`minimum_version`. Older semantic tags are replaced with that tag. A complete
+SHA is compared with the resolved tag commit through GitHub's commit comparison
+API; an ancestor is updated to the resolved commit SHA, while an identical or
+newer commit is left alone. Diverged commit histories are rejected because
+their order is not unambiguous. Branches and other non-semantic refs are
+intentionally unchanged. Repository tags and commit comparisons are cached for
+the duration of one policy run. A policy can contain any number of
+`ensure_exact` and `ensure_minimal` entries for actions or reusable workflows.
+
 ### `remove_file`
 
 ```yaml

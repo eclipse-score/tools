@@ -44,6 +44,7 @@ class RemoveFileOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, RemoveFile)
         path = root / operation.path
@@ -62,6 +63,7 @@ class RemoveFileOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> None:
         assert isinstance(operation, RemoveFile)
         path = root / operation.path

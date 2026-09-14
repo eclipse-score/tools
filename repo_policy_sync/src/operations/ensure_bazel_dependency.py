@@ -77,6 +77,7 @@ class EnsureBazelDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependency)
         dependency = _module_dependency(root, operation)
@@ -97,6 +98,7 @@ class EnsureBazelDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> None:
         assert isinstance(operation, EnsureBazelDependency)
         if _module_dependency(root, operation) is not None:

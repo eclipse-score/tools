@@ -57,6 +57,7 @@ class ReplaceRegexOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, ReplaceRegex)
         path = root / operation.path
@@ -77,6 +78,7 @@ class ReplaceRegexOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> None:
         assert isinstance(operation, ReplaceRegex)
         path = root / operation.path

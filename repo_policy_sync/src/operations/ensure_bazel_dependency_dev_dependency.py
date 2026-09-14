@@ -87,6 +87,7 @@ class EnsureBazelDependencyDevDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
         _, dependency = _find_dependency(root, operation)
@@ -108,6 +109,7 @@ class EnsureBazelDependencyDevDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
+        github_resolver=None,
     ) -> None:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
         path = root / _MODULE_FILE
