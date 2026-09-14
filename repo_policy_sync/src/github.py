@@ -944,11 +944,15 @@ def _parse_repository_tags(output: str, repository: str) -> tuple[GitHubTag, ...
         raise CommandError(
             f"gh returned invalid repository tag JSON for {repository}"
         ) from exc
+    # `gh api --paginate --slurp` must produce a list. Treating any other
+    # shape as an error avoids silently interpreting an API error object as a
+    # repository with no usable releases.
     if not isinstance(pages, list):
         raise CommandError(f"gh returned invalid repository tag JSON for {repository}")
-    # `--slurp` returns a list of pages. Accepting a flat list as well keeps the
-    # parser compatible with small test doubles and with future gh output
-    # changes that may omit the wrapper for a single page.
+    # The normal `--slurp` shape is a list of page lists, while lightweight API
+    # doubles and non-paginated callers commonly provide one flat entry list.
+    # Normalize both forms here so release selection never depends on how the
+    # response was paginated.
     entries = (
         [entry for page in pages for entry in page]
         if all(isinstance(page, list) for page in pages)
@@ -956,12 +960,17 @@ def _parse_repository_tags(output: str, repository: str) -> tuple[GitHubTag, ...
     )
     tags: list[GitHubTag] = []
     for entry in entries:
+        # A malformed item must fail the policy rather than being skipped and
+        # potentially making an incomplete release list look authoritative.
         if not isinstance(entry, dict):
             raise CommandError(
                 f"gh returned invalid repository tag JSON for {repository}"
             )
         name = entry.get("name")
         commit = entry.get("commit")
+        # The tags endpoint normally exposes `name` and `commit`, but GitHub's
+        # ref-shaped representation uses `ref` and `object`. Accept both so
+        # endpoint representation details cannot change the resolved release.
         if name is None:
             reference = entry.get("ref")
             object_value = entry.get("object")
@@ -973,6 +982,10 @@ def _parse_repository_tags(output: str, repository: str) -> tuple[GitHubTag, ...
                 name = reference.removeprefix("refs/tags/")
                 commit = object_value
         sha = commit.get("sha") if isinstance(commit, dict) else None
+        # The policy compares semantic tag names and pins to commit SHAs. Both
+        # values therefore need to be validated before they influence either
+        # decision; malformed metadata is safer as an error than as a partial
+        # or incorrect update.
         if (
             not isinstance(name, str)
             or not name
