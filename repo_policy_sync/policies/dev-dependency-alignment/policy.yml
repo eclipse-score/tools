@@ -20,7 +20,6 @@ when:
   bazel:
     any_direct_module_dependencies:
       - score_bazel_cpp_toolchains
-      - aspect_rules_py
       - buildifier_prebuilt
       - aspect_rules_lint
       - toolchains_llvm
@@ -32,10 +31,6 @@ ensure:
     module_name: score_bazel_cpp_toolchains
     dev_dependency: true
     rationale: Toolchain setup is only needed for development and validation.
-  - type: ensure_bazel_dependency_dev_dependency
-    module_name: aspect_rules_py
-    dev_dependency: true
-    rationale: Python build rules are only needed for development and validation.
   - type: ensure_bazel_dependency_dev_dependency
     module_name: buildifier_prebuilt
     dev_dependency: true
