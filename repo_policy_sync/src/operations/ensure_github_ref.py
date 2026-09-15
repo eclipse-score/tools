@@ -272,6 +272,8 @@ def _minimal_replacement_for(
 ) -> Callable[[str], str]:
     required_version = _parse_semantic_version(required_tag.name)
     assert required_version is not None
+    repository = _repository_for(operation.target)
+    tagged_versions = _tagged_release_versions(resolver, repository)
 
     def replacement(current_ref: str) -> str:
         current_version = _parse_semantic_version(current_ref)
@@ -287,9 +289,21 @@ def _minimal_replacement_for(
             return current_ref
         if current_ref.lower() == required_tag.sha.lower():
             return current_ref
-        status = resolver.compare_commits(
-            _repository_for(operation.target), required_tag.sha, current_ref
-        )
+
+        # A release tag is the authoritative semantic-version information for
+        # its commit. This handles newer release lines whose histories do not
+        # descend from the configured minimum tag.
+        tagged_version = tagged_versions.get(current_ref.lower())
+        if tagged_version is not None:
+            if _compare_versions(tagged_version, required_version) >= 0:
+                return current_ref
+            else:
+                return required_tag.sha
+
+        # Without a release tag, ancestry is the only available ordering
+        # signal. Keep rejecting diverged histories because timestamps cannot
+        # safely establish that an untagged commit meets the minimum version.
+        status = resolver.compare_commits(repository, required_tag.sha, current_ref)
         if status == "behind":
             return required_tag.sha
         if status == "diverged":
@@ -305,6 +319,30 @@ def _minimal_replacement_for(
         )
 
     return replacement
+
+
+def _tagged_release_versions(
+    resolver: GitHubResolver, repository: str
+) -> dict[str, _SemanticVersion]:
+    """Index the highest semantic release version associated with each SHA.
+
+    A repository may maintain multiple release branches at the same time, so
+    the commit behind a newer release tag is not required to be an ancestor of
+    the commit behind an older minimum tag. Mapping tags to versions lets the
+    minimum-version policy compare those commits semantically while retaining
+    ancestry comparison for commits that have no release tag.
+    """
+
+    tagged_versions: dict[str, _SemanticVersion] = {}
+    for tag in resolver.tags(repository):
+        version = _parse_semantic_version(tag.name)
+        if version is None:
+            continue
+        normalized_sha = tag.sha.lower()
+        previous_version = tagged_versions.get(normalized_sha)
+        if previous_version is None or _compare_versions(version, previous_version) > 0:
+            tagged_versions[normalized_sha] = version
+    return tagged_versions
 
 
 def _workflow_files(root: Path) -> tuple[Path, ...]:

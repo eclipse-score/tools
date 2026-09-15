@@ -296,6 +296,24 @@ def test_ensure_minimal_compares_full_sha_pins(
     assert sum("/compare/" in command[-1] for command in calls) == 1
 
 
+def test_ensure_minimal_keeps_tagged_newer_sha_without_comparing_histories(
+    fake_repo: Path, monkeypatch
+) -> None:
+    """A newer tagged release remains valid when release histories diverge."""
+
+    workflow = fake_repo / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(f"jobs:\n  build:\n    uses: {SETUP_PYTHON}@{NEW_SHA}\n")
+    calls = _mock_gh_api(monkeypatch, statuses={NEW_SHA: "diverged"})
+    policy = _policy((EnsureMinimalGitHubRef(SETUP_PYTHON, "v5.1"),))
+
+    evaluation = evaluate_policy(fake_repo, policy)
+
+    assert evaluation.changes == ()
+    assert f"uses: {SETUP_PYTHON}@{NEW_SHA}" in workflow.read_text()
+    assert sum("/compare/" in command[-1] for command in calls) == 0
+
+
 def test_ensure_minimal_rejects_diverged_sha_histories(
     fake_repo: Path, monkeypatch
 ) -> None:
