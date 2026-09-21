@@ -52,8 +52,6 @@ def _custom_pull_request_template() -> str:
             "{{ changes }}",
             "{{ tool_revision }}",
             "{{ failure_section }}",
-            "{{ policy_marker }}",
-            "{{ policy_head_marker }}",
         )
     )
 
@@ -755,6 +753,7 @@ def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
     assert body.index("<!-- repo-policy-sync-policy:") < body.index(
         "<!-- repo-policy-sync-head:"
     )
+    assert "<!-- repo-policy-sync-generation: abc1234-dirty -->" in body
 
 
 def test_tool_revision_reports_a_clean_short_commit_hash(monkeypatch) -> None:
@@ -821,6 +820,40 @@ def test_custom_pull_request_template_is_loaded_and_rendered(tmp_path: Path) -> 
     assert "- `.gitignore`: add '_build'" in body
     assert "<!-- repo-policy-sync-policy: example -->" in body
     assert "<!-- repo-policy-sync-head: " + "a" * 40 + " -->" in body
+
+
+def test_custom_pull_request_template_gets_internal_markers_automatically() -> None:
+    template = "\n".join(
+        (
+            "{{ policy_id }}",
+            "{{ policy_description }}",
+            "{{ policy_trigger }}",
+            "{{ changes }}",
+            "{{ tool_revision }}",
+            "{{ failure_section }}",
+        )
+    )
+    policy = Policy("example", "Example", "Description", None, ())
+
+    body = _pull_request_body(
+        policy,
+        (),
+        head_oid="a" * 40,
+        tool_revision="test-revision",
+        pull_request_template=template,
+    )
+
+    assert body.endswith(
+        "\n".join(
+            (
+                "",
+                "<!-- repo-policy-sync-policy: example -->",
+                "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                "<!-- repo-policy-sync-generation: test-revision -->",
+                "",
+            )
+        )
+    )
 
 
 def test_pull_request_template_requires_supported_placeholders(tmp_path: Path) -> None:
@@ -1135,6 +1168,42 @@ def test_policy_pull_request_without_head_marker_is_not_safe_to_reuse(
     assert pull_request is not None
     assert pull_request.expected_head_oid is None
     assert pull_request.mergeable == "CONFLICTING"
+
+
+def test_policy_pull_request_generation_marker_is_parsed(monkeypatch) -> None:
+    policy = Policy("example", "Example", None, None, ())
+    branch = policy_branches(policy)[0]
+
+    def run(command: list[str]) -> str:
+        assert command[command.index("--label") + 1] == "repo-policy-sync"
+        return json.dumps(
+            [
+                {
+                    "number": 1,
+                    "url": "https://github.example/owner/repo/pull/1",
+                    "body": "\n".join(
+                        (
+                            "<!-- repo-policy-sync-policy: example -->",
+                            "<!-- repo-policy-sync-head: " + "a" * 40 + " -->",
+                            "<!-- repo-policy-sync-generation: test-revision -->",
+                        )
+                    ),
+                    "headRefName": branch,
+                    "mergeable": "MERGEABLE",
+                }
+            ]
+        )
+
+    monkeypatch.setattr(GitHubCli, "_run", staticmethod(run))
+
+    pull_request = GitHubCli().find_open_pull_request(
+        repository="owner/repo",
+        branches=policy_branches(policy),
+        policy_id=policy.id,
+    )
+
+    assert pull_request is not None
+    assert pull_request.generation_revision == "test-revision"
 
 
 def test_pre_existing_user_pull_request_is_not_reused(monkeypatch) -> None:

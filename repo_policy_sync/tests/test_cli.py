@@ -51,8 +51,6 @@ def _valid_template() -> str:
             "{{ changes }}",
             "{{ tool_revision }}",
             "{{ failure_section }}",
-            "{{ policy_marker }}",
-            "{{ policy_head_marker }}",
         )
     )
 

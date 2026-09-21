@@ -56,8 +56,6 @@ PULL_REQUEST_TEMPLATE_PLACEHOLDERS = (
     "changes",
     "tool_revision",
     "failure_section",
-    "policy_marker",
-    "policy_head_marker",
 )
 _PULL_REQUEST_TEMPLATE_PLACEHOLDER = re.compile(r"\{\{([^{}]*)\}\}")
 
@@ -148,6 +146,7 @@ class PullRequest:
     closed_at: str | None = None
     body: str | None = None
     mergeable: str | None = None
+    generation_revision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -355,6 +354,7 @@ class GitHubCli:
                     closed_at=closed_at,
                     body=body,
                     mergeable=mergeable,
+                    generation_revision=_policy_generation_marker_from_body(body),
                 )
             )
         if state == "open":
@@ -611,6 +611,7 @@ class GitHubCli:
         head_oid: str,
         draft: bool = False,
         tool_revision: str,
+        generation_revision: str | None = None,
         pull_request_template: str | None = None,
     ) -> PullRequest:
         self._ensure_automation_labels(repository=repository)
@@ -632,6 +633,7 @@ class GitHubCli:
                 changes,
                 head_oid=head_oid,
                 tool_revision=tool_revision,
+                generation_revision=generation_revision,
                 pull_request_template=pull_request_template,
             ),
         ]
@@ -659,7 +661,10 @@ class GitHubCli:
             except CommandError as exc:
                 warnings.append(f"label {label!r} was not applied: {exc}")
         return PullRequest(
-            number=pull_request.number, url=output, warnings=tuple(warnings)
+            number=pull_request.number,
+            url=output,
+            warnings=tuple(warnings),
+            generation_revision=generation_revision or tool_revision,
         )
 
     def _add_pull_request_label(
@@ -748,6 +753,7 @@ class GitHubCli:
         head_oid: str,
         failure: str | None = None,
         tool_revision: str,
+        generation_revision: str | None = None,
         pull_request_template: str | None = None,
     ) -> None:
         """Keep an existing policy-owned pull request's explanation current."""
@@ -772,6 +778,7 @@ class GitHubCli:
                         head_oid=head_oid,
                         failure=failure,
                         tool_revision=tool_revision,
+                        generation_revision=generation_revision,
                         pull_request_template=pull_request_template,
                     )
                 }",
@@ -1056,6 +1063,21 @@ def _policy_head_marker_from_body(body: str) -> str | None:
     return match.group(1) if match else None
 
 
+def _policy_generation_marker(generation_revision: str) -> str:
+    return f"<!-- {TOOL_SLUG}-generation: {generation_revision} -->"
+
+
+def _policy_generation_marker_from_body(body: str) -> str | None:
+    tool_slugs = "|".join(
+        re.escape(tool_slug) for tool_slug in (TOOL_SLUG, LEGACY_TOOL_SLUG)
+    )
+    match = re.search(
+        rf"<!-- (?:{tool_slugs})-generation: ([^\s<>]+) -->",
+        body,
+    )
+    return match.group(1) if match else None
+
+
 def _pull_request_number(url: str) -> int:
     match = re.search(r"/pull/(\d+)/?$", url)
     if match is None:
@@ -1109,6 +1131,7 @@ def _pull_request_body(
     *,
     head_oid: str,
     tool_revision: str,
+    generation_revision: str | None = None,
     failure: str | None = None,
     pull_request_template: str | None = None,
 ) -> str:
@@ -1134,8 +1157,6 @@ def _pull_request_body(
             pull_request_template,
         )
     values = {
-        "policy_marker": _policy_marker(policy.id),
-        "policy_head_marker": _policy_head_marker(head_oid),
         "policy_id": policy.id,
         "policy_description": description,
         "policy_trigger": _policy_trigger(policy, changes),
@@ -1145,7 +1166,16 @@ def _pull_request_body(
     }
     for key, value in values.items():
         template = template.replace(f"{{{{ {key} }}}}", value)
-    return template
+    # These markers are internal metadata rather than template content. Append
+    # them after rendering so custom-template authors cannot accidentally omit
+    # the ownership, branch-safety, or generation information used by the tool.
+    markers = (
+        _policy_marker(policy.id),
+        _policy_head_marker(head_oid),
+        _policy_generation_marker(generation_revision or tool_revision),
+    )
+    marker_text = "\n".join(markers)
+    return f"{template.rstrip()}\n\n{marker_text}\n"
 
 
 def load_pull_request_template(path: Path | None = None) -> str:

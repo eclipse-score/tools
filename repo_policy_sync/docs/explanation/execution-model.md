@@ -38,7 +38,10 @@ owns one deterministic branch and one pull request per repository.
    first pre-commit run applies formatting fixes,
    the changes are staged and pre-commit is run once more before publishing.
    The same pre-commit gate runs before rebuilding an existing policy branch.
-   Existing policy-owned pull requests receive the current title and body. If
+   Existing policy-owned pull requests carry the tool generation revision that
+   produced their branch. A branch from an older or unknown generation is
+   rebuilt from the current default branch; a current, non-conflicting branch
+   is left untouched. If
    pre-commit still fails after the retry, no commit, push, or pull request is
    created. With `--allow-dirty-pr`, the changes are committed and pushed
    anyway, and the resulting pull request is draft with a comment containing

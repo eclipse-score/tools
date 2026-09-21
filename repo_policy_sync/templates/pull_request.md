@@ -39,6 +39,3 @@ Please report any issues to [#score-infrastructure](https://sdvworkinggroup.slac
 > [!NOTE]
 > This pull request is generated automatically. Review the proposed changes
 > before merging.
-
-{{ policy_marker }}
-{{ policy_head_marker }}

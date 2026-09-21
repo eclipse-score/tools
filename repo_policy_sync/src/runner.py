@@ -110,6 +110,7 @@ class RepositoryClient(Protocol):
         head_oid: str,
         draft: bool = False,
         tool_revision: str,
+        generation_revision: str | None = None,
         pull_request_template: str | None = None,
     ) -> object: ...
 
@@ -123,6 +124,7 @@ class RepositoryClient(Protocol):
         head_oid: str,
         failure: str | None = None,
         tool_revision: str,
+        generation_revision: str | None = None,
         pull_request_template: str | None = None,
     ) -> None: ...
 
@@ -508,6 +510,7 @@ def _run_repository(
                         head_oid=existing_pr.expected_head_oid,
                         failure=str(exc),
                         tool_revision=tool_revision,
+                        generation_revision=tool_revision,
                         pull_request_template=pull_request_template,
                     )
                     client.close_pull_request(
@@ -626,6 +629,27 @@ def _run_repository(
             f"refusing to modify policy-owned pull request {existing_pr.url}: "
             "it has no recognized branch-head marker"
         )
+    # Rebuild from the current default branch when the policy branch belongs to
+    # an older generation. Reapplying the current policy to that old branch
+    # cannot reliably remove changes produced by a policy generation that is no
+    # longer part of the current policy definition.
+    if existing_pr is not None and _policy_branch_needs_rebuild(
+        existing_pr, tool_revision=tool_revision
+    ):
+        return _recreate_existing_pull_request(
+            client=client,
+            organization=org,
+            repository=repository,
+            full_name=full_name,
+            policy=policy,
+            checkout=checkout,
+            existing_pr=existing_pr,
+            changes=evaluation.changes,
+            allow_dirty_pr=allow_dirty_pr,
+            tool_revision=tool_revision,
+            pull_request_template=pull_request_template,
+            github_resolver=github_resolver,
+        )
     try:
         if existing_pr is not None:
             client.verify_policy_branch_head(
@@ -672,6 +696,7 @@ def _run_repository(
                     head_oid=existing_pr.expected_head_oid,
                     failure=str(exc),
                     tool_revision=tool_revision,
+                    generation_revision=tool_revision,
                     pull_request_template=pull_request_template,
                 )
                 client.close_pull_request(
@@ -680,51 +705,6 @@ def _run_repository(
         raise
     if not applied.changes:
         if existing_pr is not None:
-            if existing_pr.mergeable == "CONFLICTING":
-                # The checkout currently contains the unchanged PR branch. Reset
-                # it to the freshly synchronized default branch before rebuilding
-                # the conflicted PR with the current policy.
-                restore_synced_default_branch(checkout=checkout)
-                return _recreate_existing_pull_request(
-                    client=client,
-                    organization=org,
-                    repository=repository,
-                    full_name=full_name,
-                    policy=policy,
-                    checkout=checkout,
-                    existing_pr=existing_pr,
-                    changes=evaluation.changes,
-                    allow_dirty_pr=allow_dirty_pr,
-                    tool_revision=tool_revision,
-                    pull_request_template=pull_request_template,
-                    github_resolver=github_resolver,
-                )
-            if _pull_request_body_changed(
-                existing_pr,
-                policy=policy,
-                changes=evaluation.changes,
-                head_oid=existing_pr.expected_head_oid,
-                tool_revision=tool_revision,
-                pull_request_template=pull_request_template,
-            ):
-                client.update_pull_request(
-                    repository=full_name,
-                    pull_request=existing_pr,
-                    policy=policy,
-                    changes=evaluation.changes,
-                    head_oid=existing_pr.expected_head_oid,
-                    tool_revision=tool_revision,
-                    pull_request_template=pull_request_template,
-                )
-                return RepositoryOutcome(
-                    repository,
-                    policy.id,
-                    "yes (live)",
-                    "pull-request-updated",
-                    changes=evaluation.changes,
-                    pull_request_url=existing_pr.url,
-                    policy_pr_status="open",
-                )
             return RepositoryOutcome(
                 repository,
                 policy.id,
@@ -752,6 +732,7 @@ def _run_repository(
             head_oid=head_oid,
             draft=pre_commit_failure is not None,
             tool_revision=tool_revision,
+            generation_revision=tool_revision,
             pull_request_template=pull_request_template,
         )
         if pre_commit_failure is not None:
@@ -778,6 +759,7 @@ def _run_repository(
         changes=applied.changes,
         head_oid=head_oid,
         tool_revision=tool_revision,
+        generation_revision=tool_revision,
         pull_request_template=pull_request_template,
     )
     if pre_commit_failure is not None:
@@ -866,6 +848,7 @@ def _pull_request_body_changed(
     changes: tuple[Change, ...],
     head_oid: str,
     tool_revision: str,
+    generation_revision: str | None = None,
     pull_request_template: str | None = None,
 ) -> bool:
     """Return whether the generated explanation differs from the PR body."""
@@ -876,12 +859,29 @@ def _pull_request_body_changed(
         changes,
         head_oid=head_oid,
         tool_revision=tool_revision,
+        generation_revision=generation_revision,
         pull_request_template=pull_request_template,
     )
 
 
 def _commit_result_parts(result: CommitResult) -> tuple[str, str | None]:
     return result.head_oid, result.pre_commit_failure
+
+
+def _policy_branch_needs_rebuild(pull_request: object, *, tool_revision: str) -> bool:
+    """Return whether an existing policy branch needs current-tool regeneration.
+
+    The generation marker is separate from the branch-head marker: the latter
+    proves ownership of the current remote branch, while this marker records
+    which tool revision produced its contents. Missing markers identify PRs
+    created before generation tracking was introduced and are migrated through
+    the same guarded rebuild path.
+    """
+
+    return (
+        getattr(pull_request, "generation_revision", None) != tool_revision
+        or getattr(pull_request, "mergeable", None) == "CONFLICTING"
+    )
 
 
 def _mark_dirty_pull_request(
@@ -987,6 +987,7 @@ def _recreate_existing_pull_request(
             changes=body_changes,
             head_oid=existing_pr.expected_head_oid,
             tool_revision=tool_revision,
+            generation_revision=tool_revision,
             pull_request_template=pull_request_template,
         ):
             client.update_pull_request(
@@ -996,6 +997,7 @@ def _recreate_existing_pull_request(
                 changes=body_changes,
                 head_oid=existing_pr.expected_head_oid,
                 tool_revision=tool_revision,
+                generation_revision=tool_revision,
                 pull_request_template=pull_request_template,
             )
         return RepositoryOutcome(
@@ -1022,6 +1024,7 @@ def _recreate_existing_pull_request(
         changes=applied.changes,
         head_oid=head_oid,
         tool_revision=tool_revision,
+        generation_revision=tool_revision,
         pull_request_template=pull_request_template,
     )
     if pre_commit_failure is not None:

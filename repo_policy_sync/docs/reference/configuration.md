@@ -83,12 +83,11 @@ inside the braces is allowed:
 | `{{ policy_trigger }}` | Why the repository matches the policy. |
 | `{{ changes }}` | Markdown list of changed files and rationales. |
 | `{{ failure_section }}` | Automation failure details, or empty text. |
-| `{{ policy_marker }}` | Ownership marker used to identify the policy PR. |
-| `{{ policy_head_marker }}` | Branch-head marker used by PR safety checks. |
 
-Missing or unknown placeholders are configuration errors. The ownership and
-head markers are mandatory because policy pull-request discovery and safety
-checks depend on them.
+Missing or unknown placeholders are configuration errors. The ownership,
+branch-head, and generation markers are hidden internal metadata and are
+appended automatically to every generated policy pull request; custom
+templates do not need to know about them.
 
 Values in `repos` use the same repository selection rules as `--repo`: values
 without `*`, `?`, or `[` are exact names, while values containing those

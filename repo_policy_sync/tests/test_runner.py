@@ -195,6 +195,7 @@ class RoundTripClient:
                 tool_revision=tool_revision,
             ),
             mergeable="MERGEABLE",
+            generation_revision=tool_revision,
         )
         return self.pull_request
 
@@ -1236,7 +1237,7 @@ def test_recreate_does_not_push_without_a_diff(tmp_path: Path) -> None:
     assert client.updated
 
 
-def test_existing_compliant_pull_request_updates_only_stale_body(
+def test_existing_compliant_pull_request_does_not_update_stale_body_with_same_generation(
     tmp_path: Path,
 ) -> None:
     checkout = tmp_path / "repository"
@@ -1249,7 +1250,11 @@ def test_existing_compliant_pull_request_updates_only_stale_body(
         None,
         (EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
     )
-    client = ImplicitRecreateClient(mergeable="MERGEABLE", body="stale body")
+    client = ImplicitRecreateClient(
+        mergeable="MERGEABLE",
+        body="stale body",
+        generation_revision="test-revision",
+    )
 
     outcome = _run_repository(
         client=client,
@@ -1259,12 +1264,81 @@ def test_existing_compliant_pull_request_updates_only_stale_body(
         policy=policy,
         checkout=checkout,
         apply=True,
+        tool_revision="test-revision",
     )
 
-    assert outcome.status == "pull-request-updated"
-    assert client.updated
+    assert outcome.status == "pull-request-open"
+    assert not client.updated
     assert not client.recreated_branch
     assert not client.force_pushed
+
+
+def test_existing_pull_request_with_old_generation_is_recreated(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "repository"
+    checkout.mkdir()
+    (checkout / ".bazelversion").write_text("8.5.0\n")
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        None,
+        (EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
+    )
+    client = ImplicitRecreateClient(
+        mergeable="MERGEABLE",
+        body="old generated body",
+        generation_revision="old-revision",
+    )
+
+    outcome = _run_repository(
+        client=client,
+        org="eclipse-score",
+        repository="candidate",
+        default_branch="main",
+        policy=policy,
+        checkout=checkout,
+        apply=True,
+        tool_revision="test-revision",
+    )
+
+    assert outcome.status == "pull-request-recreated"
+    assert client.recreated_branch
+    assert client.force_pushed
+    assert client.updated
+
+
+def test_existing_pull_request_without_generation_marker_is_migrated(
+    tmp_path: Path,
+) -> None:
+    checkout = tmp_path / "repository"
+    checkout.mkdir()
+    (checkout / ".bazelversion").write_text("8.5.0\n")
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        None,
+        (EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
+    )
+    client = ImplicitRecreateClient(mergeable="MERGEABLE", body="legacy body")
+
+    outcome = _run_repository(
+        client=client,
+        org="eclipse-score",
+        repository="candidate",
+        default_branch="main",
+        policy=policy,
+        checkout=checkout,
+        apply=True,
+        tool_revision="test-revision",
+    )
+
+    assert outcome.status == "pull-request-recreated"
+    assert client.recreated_branch
+    assert client.force_pushed
+    assert client.updated
 
 
 def test_existing_compliant_conflicted_pull_request_is_recreated(
@@ -1280,7 +1354,11 @@ def test_existing_compliant_conflicted_pull_request_is_recreated(
         None,
         (EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
     )
-    client = ImplicitRecreateClient(mergeable="CONFLICTING", body="stale body")
+    client = ImplicitRecreateClient(
+        mergeable="CONFLICTING",
+        body="stale body",
+        generation_revision="test-revision",
+    )
     github_resolver = object()
     observed_resolvers: list[object] = []
     original_apply_policy = runner.apply_policy
@@ -1304,6 +1382,7 @@ def test_existing_compliant_conflicted_pull_request_is_recreated(
         policy=policy,
         checkout=checkout,
         apply=True,
+        tool_revision="test-revision",
         github_resolver=github_resolver,
     )
 
@@ -1311,7 +1390,7 @@ def test_existing_compliant_conflicted_pull_request_is_recreated(
     assert client.recreated_branch
     assert client.force_pushed
     assert client.updated
-    assert observed_resolvers == [github_resolver, github_resolver]
+    assert observed_resolvers == [github_resolver]
 
 
 def test_existing_compliant_pull_request_is_left_alone_with_current_body(
@@ -1336,6 +1415,7 @@ def test_existing_compliant_pull_request_is_left_alone_with_current_body(
             head_oid="a" * 40,
             tool_revision="test-revision",
         ),
+        generation_revision="test-revision",
     )
 
     outcome = _run_repository(
@@ -1386,13 +1466,20 @@ class RecreateClient:
 
 
 class ImplicitRecreateClient:
-    def __init__(self, *, mergeable: str, body: str) -> None:
+    def __init__(
+        self,
+        *,
+        mergeable: str,
+        body: str,
+        generation_revision: str | None = None,
+    ) -> None:
         self.pull_request = PullRequest(
             1,
             "https://github.example/eclipse-score/candidate/pull/1",
             "a" * 40,
             body=body,
             mergeable=mergeable,
+            generation_revision=generation_revision,
         )
         self.recreated_branch = False
         self.force_pushed = False
