@@ -67,13 +67,75 @@ def test_apply_policy_replaces_legacy_lines_and_removes_file(fake_repo: Path) ->
 
 def test_policy_does_not_apply_without_direct_dependency(fake_repo: Path) -> None:
     (fake_repo / "MODULE.bazel").write_text(
-        'bazel_dep(name = "other", version = "1.0")\n'
+        'module(name = "other")\nbazel_dep(name = "other", version = "1.0.0")\n'
     )
 
     evaluation = evaluate_policy(fake_repo, _policy())
 
     assert not evaluation.applies
     assert evaluation.changes == ()
+
+
+def test_bazel_condition_accepts_own_module_for_each_required_name(
+    fake_repo: Path,
+) -> None:
+    (fake_repo / "MODULE.bazel").write_text(
+        'module(name = "score_docs_as_code")\n'
+        'bazel_dep(name = "score_platform", version = "1.0.0")\n'
+    )
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        BazelCondition(("score_docs_as_code", "score_platform")),
+        (),
+    )
+
+    assert evaluate_policy(fake_repo, policy).applies is True
+
+
+def test_bazel_any_dependency_condition_accepts_own_module_name(
+    fake_repo: Path,
+) -> None:
+    (fake_repo / "MODULE.bazel").write_text('module(name = "score_docs_as_code")\n')
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        BazelCondition(
+            (), any_direct_module_dependencies=("score_platform", "score_docs_as_code")
+        ),
+        (),
+    )
+
+    assert evaluate_policy(fake_repo, policy).applies is True
+
+
+def test_bazel_version_condition_still_requires_a_direct_dependency(
+    fake_repo: Path,
+) -> None:
+    module_file = fake_repo / "MODULE.bazel"
+    module_file.write_text('module(name = "score_docs_as_code")\n')
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        BazelCondition(
+            (),
+            any_direct_module_conditions=(
+                BazelDependencyCondition("score_docs_as_code", ">=", (1, 0, 0)),
+            ),
+        ),
+        (),
+    )
+
+    assert evaluate_policy(fake_repo, policy).applies is False
+
+    module_file.write_text(
+        'module(name = "score_docs_as_code")\n'
+        'bazel_dep(name = "score_docs_as_code", version = "1.2.3")\n'
+    )
+    assert evaluate_policy(fake_repo, policy).applies is True
 
 
 def test_value_exists_condition_skips_missing_source(fake_repo: Path) -> None:

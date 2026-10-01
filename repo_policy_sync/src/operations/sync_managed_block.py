@@ -115,6 +115,7 @@ class SyncManagedBlockOperation:
             current,
             _read_source(operation),
             operation,
+            target_exists=path.exists(),
         )
         return (
             (
@@ -141,13 +142,24 @@ class SyncManagedBlockOperation:
         validate_repository_path(root, path)
         _validate_target(path, operation)
         current = _read_target(path, operation)
-        updated = _updated_text(current, _read_source(operation), operation)
+        updated = _updated_text(
+            current,
+            _read_source(operation),
+            operation,
+            target_exists=path.exists(),
+        )
         if updated != current:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(updated.encode("utf-8"))
 
 
-def _updated_text(current: str, source_text: str, operation: SyncManagedBlock) -> str:
+def _updated_text(
+    current: str,
+    source_text: str,
+    operation: SyncManagedBlock,
+    *,
+    target_exists: bool,
+) -> str:
     start_marker, end_marker = _marker_lines(operation.marker)
     lines = current.splitlines(keepends=True)
     values = [_line_value(line) for line in lines]
@@ -175,6 +187,11 @@ def _updated_text(current: str, source_text: str, operation: SyncManagedBlock) -
         ),
         None,
     )
+    if target_exists and first_legacy is None:
+        raise RepoPolicySyncError(
+            f"{operation.path} must contain the managed-block markers or at least "
+            "one configured legacy line to migrate"
+        )
     insertion_index = (
         len(lines)
         if first_legacy is None

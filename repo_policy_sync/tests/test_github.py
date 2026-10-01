@@ -725,7 +725,7 @@ def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
         "score-docs-as-code.cleanup",
         "Update docs files",
         "Replace legacy documentation files.",
-        BazelCondition(("score_docs_as_code",)),
+        BazelCondition(("score_docs_as_code", "score_platform")),
         (),
     )
 
@@ -740,10 +740,11 @@ def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
     assert "## Policy" in body
     assert "**`score-docs-as-code.cleanup`**" in body
     assert (
-        "This repository matches this policy because `MODULE.bazel` declares the required direct Bazel"
+        "This repository matches this policy because `MODULE.bazel` matches every required module name"
         in body
     )
-    assert "`MODULE.bazel` declares the required direct Bazel dependency" in body
+    assert "this repository's own module declaration" in body
+    assert "`score_docs_as_code`, `score_platform`" in body
     assert "- `.gitignore`: add '_build'" in body
     assert (
         "Generated from [eclipse-score/tools](https://github.com/eclipse-score/tools) "

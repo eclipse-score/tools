@@ -202,13 +202,15 @@ partial, duplicate, or misordered pair is rejected. When the pair exists, only
 its body is replaced and configured legacy lines are removed outside the
 managed block.
 
-When neither marker exists, configured `replace_lines` and
-`replace_line_globs` are removed from the target, then the marked block is
-inserted at the first removed line or appended when there is no legacy line to
-replace. This supports a one-time migration while keeping later changes
-bounded by the markers. `source` is relative to the policy directory and must
-resolve to a regular UTF-8 file without escaping that directory; `path` is a
-repository-relative destination and may name a missing file.
+When the destination does not exist, the operation creates it with the marked
+block. For an existing destination without markers, at least one configured
+`replace_lines` or `replace_line_globs` entry must match; otherwise the
+operation fails and leaves the repository unmodified. Matching legacy lines
+are removed and the block is inserted at the first match. This supports an
+explicit one-time migration while preventing an unmarked file from opting in
+implicitly. `source` is relative to the policy directory and must resolve to a
+regular UTF-8 file without escaping that directory; `path` is a
+repository-relative destination.
 
 ### `ensure_exact`
 
