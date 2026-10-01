@@ -24,16 +24,16 @@ when:
       - score_docs_as_code
 
 ensure:
-  - type: ensure_line
+  - type: sync_managed_block
     path: .gitignore
-    line: _build
+    source: docs-as-code-build-artifacts.gitignore
+    marker: docs-as-code build artifacts
+    replace_lines:
+      - "# docs build artifacts"
     replace_line_globs:
       - "*_build*"
-  - type: ensure_line
-    path: .gitignore
-    line: ubproject.toml
-    replace_line_globs:
       - "*ubproject.toml*"
+    rationale: Keep documentation build artifacts together in one managed block.
   - type: remove_file
     path: docs/ubproject.toml
   - type: remove_file

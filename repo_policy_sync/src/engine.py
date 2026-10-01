@@ -238,6 +238,12 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
         dependencies[name_match.group(1)] = (
             parse_bazel_version(version_match.group(1)) if version_match else None
         )
+    own_module_names: set[str] = set()
+    for start, end in starlark_call_ranges(text, "module"):
+        body = mask_starlark_comments(text[start:end])
+        name_match = BAZEL_NAME_ARGUMENT.search(body)
+        if name_match is not None:
+            own_module_names.add(name_match.group(1))
     condition_names = {
         dependency_condition.module_name
         for dependency_condition in condition.any_direct_module_conditions
@@ -255,8 +261,9 @@ def _matches_bazel_condition(root: Path, policy: Policy) -> bool:
         raise RepoPolicySyncError(
             f"MODULE.bazel configured bazel_dep versions must be numeric major.minor.patch: {names}"
         )
-    # A policy can require a complete set and also accept one of several names.
-    dependency_names = set(dependencies)
+    # Name-only dependency selectors also accept the repository's own module
+    # declaration. Version comparisons below still require an actual bazel_dep.
+    dependency_names = set(dependencies) | own_module_names
     if not set(condition.direct_module_dependencies).issubset(dependency_names):
         return False
     if (

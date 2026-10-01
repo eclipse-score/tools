@@ -81,6 +81,19 @@ class EnsureLine:
 
 
 @dataclass(frozen=True)
+class SyncManagedBlock:
+    """Synchronize a policy-local text block bounded by exact marker lines."""
+
+    path: Path
+    source_root: Path
+    source_file: Path
+    marker: str
+    replace_lines: tuple[str, ...]
+    replace_line_globs: tuple[str, ...] = ()
+    rationale: str | None = None
+
+
+@dataclass(frozen=True)
 class RemoveFile:
     path: Path
     rationale: str | None = None
@@ -170,6 +183,7 @@ class EnsureBazelDependencyDevDependency:
 
 EnsureOperation = (
     EnsureLine
+    | SyncManagedBlock
     | RemoveFile
     | ReplaceRegex
     | EnsureMinimumVersion

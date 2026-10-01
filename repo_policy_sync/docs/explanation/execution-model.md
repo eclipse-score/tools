@@ -67,8 +67,9 @@ parallel. Repositories remain isolated in separate checkouts; use
   `when.file_exists`, `when.file_contains`, and `when.value_exists` conditions;
 - policy-local derived values, including Dockerfile image-version sources,
   which can be passed explicitly into operations;
-- the explicitly registered `ensure_line`, `ensure_minimum_version`,
-  `remove_file`, `replace_regex`, and `ensure_bazel_dependency` operations;
+- the explicitly registered `ensure_line`, `sync_managed_block`,
+  `ensure_minimum_version`, `remove_file`, `replace_regex`, and
+  `ensure_bazel_dependency` operations;
 - fixed `automation` and `repo-policy-sync` labels, policy titles, descriptions, and
   per-operation rationales;
 - terminal-table output, a compact repository-by-policy Markdown matrix, and a

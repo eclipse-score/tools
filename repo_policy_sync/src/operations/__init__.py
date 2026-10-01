@@ -35,6 +35,7 @@ from .ensure_github_ref import (
 from .ensure_minimum_version import EnsureMinimumVersionOperation
 from .remove_file import RemoveFileOperation
 from .replace_regex import ReplaceRegexOperation
+from .sync_managed_block import SyncManagedBlockOperation
 
 
 class OperationHandler(Protocol):
@@ -71,6 +72,7 @@ _HANDLERS: tuple[OperationHandler, ...] = (
     EnsureMinimumVersionOperation(),
     RemoveFileOperation(),
     ReplaceRegexOperation(),
+    SyncManagedBlockOperation(),
 )
 # Operations that work on a repository root are handled explicitly below;
 # path-based operations can be dispatched directly to one target file.
