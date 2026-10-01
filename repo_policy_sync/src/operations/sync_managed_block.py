@@ -147,15 +147,11 @@ class SyncManagedBlockOperation:
             path.write_bytes(updated.encode("utf-8"))
 
 
-def _updated_text(
-    current: str, source_text: str, operation: SyncManagedBlock
-) -> str:
+def _updated_text(current: str, source_text: str, operation: SyncManagedBlock) -> str:
     start_marker, end_marker = _marker_lines(operation.marker)
     lines = current.splitlines(keepends=True)
     values = [_line_value(line) for line in lines]
-    starts = [
-        index for index, line in enumerate(values) if line == start_marker
-    ]
+    starts = [index for index, line in enumerate(values) if line == start_marker]
     ends = [index for index, line in enumerate(values) if line == end_marker]
 
     if starts or ends:
@@ -183,8 +179,7 @@ def _updated_text(
         len(lines)
         if first_legacy is None
         else sum(
-            not _matches_legacy_line(line, operation)
-            for line in values[:first_legacy]
+            not _matches_legacy_line(line, operation) for line in values[:first_legacy]
         )
     )
     cleaned = _without_legacy_lines(lines, operation)
@@ -226,13 +221,9 @@ def _read_target(path: Path, operation: SyncManagedBlock) -> str:
         ) from exc
 
 
-def _without_legacy_lines(
-    lines: list[str], operation: SyncManagedBlock
-) -> list[str]:
+def _without_legacy_lines(lines: list[str], operation: SyncManagedBlock) -> list[str]:
     return [
-        line
-        for line in lines
-        if not _matches_legacy_line(_line_value(line), operation)
+        line for line in lines if not _matches_legacy_line(_line_value(line), operation)
     ]
 
 
