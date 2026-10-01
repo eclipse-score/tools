@@ -15,16 +15,16 @@
 
 ## Why this repository exists
 
-The utilities in this repository used to live inside
+Some of the utilities in this repository used to live inside
 [tooling](https://github.com/eclipse-score/tooling). That repository serves
 its main purpose well, but it also brings a large and growing dependency graph
 because it bundles many unrelated concerns together.
 
-For consumers who need only one small, self-contained utility, building or
-depending on it meant pulling in the dependency graph of `tooling`, even when
-most of it was irrelevant. This repository gives those utilities a separate
-home so consumers can depend on what they need without taking on unrelated
-dependencies.
+For consumers who needed one of those small, self-contained utilities,
+building or depending on it meant pulling in the dependency graph of
+`tooling`, even when most of it was irrelevant. This repository gives those
+utilities a separate home so consumers can depend on what they need without
+taking on unrelated dependencies.
 
 ## Repository scope
 
