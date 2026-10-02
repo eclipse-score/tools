@@ -36,6 +36,7 @@ from .ensure_minimum_version import EnsureMinimumVersionOperation
 from .remove_file import RemoveFileOperation
 from .replace_regex import ReplaceRegexOperation
 from .sync_managed_block import SyncManagedBlockOperation
+from .synchronize_file import SynchronizeFileOperation
 
 
 class OperationHandler(Protocol):
@@ -73,6 +74,7 @@ _HANDLERS: tuple[OperationHandler, ...] = (
     RemoveFileOperation(),
     ReplaceRegexOperation(),
     SyncManagedBlockOperation(),
+    SynchronizeFileOperation(),
 )
 # Operations that work on a repository root are handled explicitly below;
 # path-based operations can be dispatched directly to one target file.

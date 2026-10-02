@@ -212,6 +212,23 @@ implicitly. `source` is relative to the policy directory and must resolve to a
 regular UTF-8 file without escaping that directory; `path` is a
 repository-relative destination.
 
+### `synchronize_file`
+
+```yaml
+- type: synchronize_file
+  path: .devcontainer/run-tool
+  source: run-tool
+  executable: true
+```
+
+Replaces the complete destination contents with the exact bytes from a
+policy-local source asset. The source must be a file within the policy
+directory; the repository-relative destination may be missing, in which case
+its parent directories are created. When `executable` is `true`, the operation
+ensures at least one execute bit is set on the destination. When omitted or
+`false`, it leaves the destination's execute bits unchanged. Other permission
+bits are not synchronized.
+
 ### `ensure_exact`
 
 ```yaml

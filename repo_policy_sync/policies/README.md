@@ -34,6 +34,7 @@ use the [documentation index](../docs/README.md).
 | `minimum-bazel-version` | Upgrade repositories to at least Bazel `8.6.0` and regenerate the lockfile when required. | Baseline maintenance |
 | `minimum-github-action-versions` | Keep `actions/checkout` at semantic version `v6` or newer in GitHub workflows. | Baseline maintenance |
 | `score-devcontainer-dependency-alignment` | Declare the direct SCORE devcontainer Bazel dependency using the Dockerfile image version. | One-time integration |
+| `score-devcontainer-run-tool` | Keep the executable SCORE devcontainer tool launcher synchronized with its policy-owned asset. | Baseline maintenance |
 
 The policy definitions and their executable before/after cases are the
 authoritative detail. The [policy format reference](../docs/reference/policy-format.md)

@@ -30,6 +30,7 @@ authoritative source for the complete schema, validation rules, and examples.
 | `ensure_bazel_dependency_dev_dependency` | Controlling whether a direct bzlmod dependency is development-only | Adds or changes `dev_dependency = True`, or removes the attribute when configured as false, in the repository-root `MODULE.bazel`. | [`test_ensure_bazel_dependency_dev_dependency.py`](../../tests/operations/test_ensure_bazel_dependency_dev_dependency.py) |
 | `ensure_line` | Keeping one exact line in a text file | Inserts the desired line, removes configured replacements and duplicates, and creates a missing file. | [`test_ensure_line.py`](../../tests/operations/test_ensure_line.py) |
 | `sync_managed_block` | Keeping a policy-owned section in a text file | Replaces a marked section, migrates matching legacy lines, creates a missing target, and rejects unmarked existing files without a migration match. | [`test_sync_managed_block.py`](../../tests/operations/test_sync_managed_block.py) |
+| `synchronize_file` | Distributing a policy-owned file asset | Replaces the complete destination with the asset's exact bytes, creates missing parent directories, and can ensure the executable bit. | [`test_synchronize_file.py`](../../tests/operations/test_synchronize_file.py) |
 | `ensure_exact` | Pinning one external GitHub target to one exact ref | Updates every matching action or reusable-workflow `uses: target@ref` in `.github/workflows/**/*.yml` and `.yaml` to the configured branch, tag, or full commit SHA. | [`test_ensure_github_ref.py`](../../tests/operations/test_ensure_github_ref.py) |
 | `ensure_minimal` | Maintaining a minimum release for one external GitHub target | Resolves the lowest available semantic tag meeting the configured minimum, upgrades older tags and stale commit pins, and leaves branches unchanged. | [`test_ensure_github_ref.py`](../../tests/operations/test_ensure_github_ref.py) |
 | `ensure_minimum_version` | Maintaining a simple version file such as `.bazelversion` | Replaces a lower `major.minor.patch` value; equal or higher versions and missing files are compliant. | [`test_ensure_minimum_version.py`](../../tests/operations/test_ensure_minimum_version.py) |
@@ -45,6 +46,9 @@ rationale is included with the generated change description.
   format explicitly describes a policy-local source asset.
 - A `sync_managed_block` source is relative to its policy directory; its
   destination path remains relative to the consuming repository.
+- A `synchronize_file` source is a policy-local asset and its destination path
+  is relative to the consuming repository. Set `executable: true` when the
+  synchronized asset must remain runnable as a program.
 - Policies are evaluated for applicability first. A policy that does not match
   its `when` conditions makes no change.
 - Operations are deterministic and idempotent: a compliant repository can be
