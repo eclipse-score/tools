@@ -94,6 +94,17 @@ class SyncManagedBlock:
 
 
 @dataclass(frozen=True)
+class SynchronizeFile:
+    """Copy a policy-local file asset to a repository-relative destination."""
+
+    path: Path
+    source_root: Path
+    source_file: Path
+    executable: bool = False
+    rationale: str | None = None
+
+
+@dataclass(frozen=True)
 class RemoveFile:
     path: Path
     rationale: str | None = None
@@ -184,6 +195,7 @@ class EnsureBazelDependencyDevDependency:
 EnsureOperation = (
     EnsureLine
     | SyncManagedBlock
+    | SynchronizeFile
     | RemoveFile
     | ReplaceRegex
     | EnsureMinimumVersion
