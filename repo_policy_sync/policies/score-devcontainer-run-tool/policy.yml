@@ -12,8 +12,8 @@
 # *******************************************************************************
 title: "chore(devcontainer): sync standard SCORE tool launcher"
 description: |
-  Keep the SCORE devcontainer tool launcher in sync with its policy-owned
-  source file.
+  Keep the SCORE devcontainer tool launcher in sync with the version maintained
+  by eclipse-score/devcontainer.
 values:
   devcontainer_version:
     type: dockerfile_image_version
@@ -27,4 +27,4 @@ ensure:
     path: .devcontainer/run-tool
     source: run-tool
     executable: true
-    rationale: Keep the standard SCORE devcontainer tool launcher in sync.
+    rationale: Keep the launcher synchronized with the maintained devcontainer version.
