@@ -1,0 +1,11 @@
+# MODULE.bazel declares score_docs_as_code, so this policy applies here.
+# The existing markers let it replace the block and remove matching legacy lines.
+.repo-ignore-1
+
+# docs-as-code build artifacts
+stale locally edited body
+# end docs-as-code build artifacts
+
+/_build
+/docs/ubproject.toml
+.repo-ignore-2

@@ -16,30 +16,40 @@
 from pathlib import Path
 from shutil import copytree
 
+import pytest
+
 from repo_policy_sync.src.engine import apply_policy
 from repo_policy_sync.src.policy import BUNDLED_POLICY_DIRECTORY, load_policy
 
 
-def test_policy_examples_apply_as_documented(tmp_path: Path) -> None:
-    for policy_directory in sorted(
-        path for path in BUNDLED_POLICY_DIRECTORY.iterdir() if path.is_dir()
-    ):
-        policy = load_policy(policy_directory / "policy.yml")
+def _policy_examples():
+    return [
+        pytest.param(policy_directory, case, id=f"{policy_directory.name}-{case.name}")
+        for policy_directory in sorted(
+            path for path in BUNDLED_POLICY_DIRECTORY.iterdir() if path.is_dir()
+        )
         for case in sorted(
-            path for path in policy_directory.iterdir() if path.is_dir()
-        ):
-            actual = tmp_path / policy_directory.name / case.name
-            copytree(case / "before", actual)
+            candidate for candidate in policy_directory.iterdir() if candidate.is_dir()
+        )
+    ]
 
-            apply_policy(actual, policy, organization="eclipse-score")
 
-            assert _tree(actual) == _tree(case / "after"), case
-            compliant = tmp_path / policy_directory.name / f"{case.name}-compliant"
-            copytree(case / "after", compliant)
-            assert (
-                apply_policy(compliant, policy, organization="eclipse-score").changes
-                == ()
-            ), case
+@pytest.mark.parametrize(("policy_directory", "case"), _policy_examples())
+def test_policy_examples_apply_as_documented(
+    policy_directory: Path, case: Path, tmp_path: Path
+) -> None:
+    policy = load_policy(policy_directory / "policy.yml")
+    actual = tmp_path / policy_directory.name / case.name
+    copytree(case / "before", actual)
+
+    apply_policy(actual, policy, organization="eclipse-score")
+
+    assert _tree(actual) == _tree(case / "after"), case
+    compliant = tmp_path / policy_directory.name / f"{case.name}-compliant"
+    copytree(case / "after", compliant)
+    assert (
+        apply_policy(compliant, policy, organization="eclipse-score").changes == ()
+    ), case
 
 
 def _tree(root: Path) -> dict[Path, str]:

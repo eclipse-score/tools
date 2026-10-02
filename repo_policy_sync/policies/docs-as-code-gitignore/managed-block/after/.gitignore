@@ -1,5 +1,5 @@
-# This file is processed because MODULE.bazel declares score_docs_as_code.
-# These legacy artifact entries let the policy migrate this existing file.
+# MODULE.bazel declares score_docs_as_code, so this policy applies here.
+# The existing markers let it replace the block and remove matching legacy lines.
 .repo-ignore-1
 
 # docs-as-code build artifacts
