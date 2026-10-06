@@ -44,34 +44,22 @@ class SynchronizeFileOperation:
         source_file = source_root / safe_relative_path(
             required_string(raw, "source", source), source
         )
-        try:
-            validate_repository_path(source_root, source_file)
-        except RepoPolicySyncError as exc:
-            raise PolicyError(f"policy {source}: invalid source asset: {exc}") from exc
-        if not source_file.is_file():
-            raise PolicyError(
-                f"policy {source}: synchronize_file source must be a file: "
-                f"{source_file}"
-            )
-        try:
-            source_file.read_bytes()
-        except OSError as exc:
-            raise PolicyError(
-                f"policy {source}: could not read synchronize_file source "
-                f"{source_file}: {exc}"
-            ) from exc
-
         executable = raw.get("executable", False)
         if not isinstance(executable, bool):
             raise PolicyError(f"policy {source}: executable must be a boolean")
 
-        return SynchronizeFile(
+        operation = SynchronizeFile(
             path=safe_relative_path(required_string(raw, "path", source), source),
             source_root=source_root,
             source_file=source_file,
             executable=executable,
             rationale=optional_string(raw, "rationale", source),
         )
+        try:
+            _read_source(operation)
+        except RepoPolicySyncError as exc:
+            raise PolicyError(f"policy {source}: {exc}") from exc
+        return operation
 
     def describe_changes(
         self,
@@ -121,12 +109,24 @@ class SynchronizeFileOperation:
 
 
 def _read_source(operation: SynchronizeFile) -> bytes:
-    validate_repository_path(operation.source_root, operation.source_file)
+    # Revalidate before every read because a source can change after policy loading.
+    # Check symlinks before file checks or reads that would follow them.
+    try:
+        validate_repository_path(operation.source_root, operation.source_file)
+    except RepoPolicySyncError as exc:
+        raise RepoPolicySyncError(
+            f"synchronize_file source {operation.source_file} must be within "
+            f"policy directory {operation.source_root} without symbolic links: {exc}"
+        ) from exc
+    if not operation.source_file.is_file():
+        raise RepoPolicySyncError(
+            f"synchronize_file source must be a regular file: {operation.source_file}"
+        )
     try:
         return operation.source_file.read_bytes()
     except OSError as exc:
         raise RepoPolicySyncError(
-            f"synchronize_file source must be readable: {operation.source_file}"
+            f"could not read synchronize_file source {operation.source_file}: {exc}"
         ) from exc
 
 

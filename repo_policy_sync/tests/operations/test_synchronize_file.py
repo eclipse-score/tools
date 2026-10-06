@@ -17,8 +17,10 @@ import stat
 import pytest
 
 from repo_policy_sync.src.engine import apply_policy, evaluate_policy
-from repo_policy_sync.src.errors import RepoPolicySyncError
+from repo_policy_sync.src.errors import PolicyError, RepoPolicySyncError
 from repo_policy_sync.src.models import Policy, SynchronizeFile
+from repo_policy_sync.src.operations import apply, describe_changes
+from repo_policy_sync.src.policy import load_policy
 
 
 def _policy(
@@ -103,3 +105,99 @@ def test_synchronize_file_rejects_a_directory_destination(fake_repo: Path) -> No
 
     with pytest.raises(RepoPolicySyncError, match="must not be a directory"):
         evaluate_policy(fake_repo, _policy(fake_repo))
+
+
+@pytest.fixture
+def source_policy_path(fake_repo: Path) -> Path:
+    policy_directory = fake_repo.parent / "policy"
+    policy_directory.mkdir()
+    (policy_directory / "run-tool").write_bytes(b"managed launcher\n")
+    policy_path = policy_directory / "policy.yml"
+    policy_path.write_text(
+        "title: Example\n"
+        "ensure:\n"
+        "  - type: synchronize_file\n"
+        "    path: .devcontainer/run-tool\n"
+        "    source: run-tool\n",
+        encoding="utf-8",
+    )
+    return policy_path
+
+
+def _invalidate_source(
+    source_file: Path, problem: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    if problem == "unreadable":
+        source_path_class = type(source_file)
+        original_read_bytes = source_path_class.read_bytes
+
+        def read_bytes(path: Path) -> bytes:
+            if path == source_file:
+                raise PermissionError(13, "Permission denied", str(path))
+            return original_read_bytes(path)
+
+        # Inject the read error so this test also works when running as root.
+        monkeypatch.setattr(source_path_class, "read_bytes", read_bytes)
+        return
+
+    source_file.unlink()
+    if problem == "directory":
+        source_file.mkdir()
+    elif problem == "symlink":
+        outside = source_file.parent.parent / "outside-launcher"
+        outside.write_bytes(b"outside the policy directory\n")
+        source_file.symlink_to(outside)
+
+
+_SOURCE_ERRORS = [
+    pytest.param("missing", "must be a regular file", id="missing"),
+    pytest.param("directory", "must be a regular file", id="directory"),
+    pytest.param("symlink", "without symbolic links", id="symlink"),
+    pytest.param("unreadable", "Permission denied", id="unreadable"),
+]
+
+
+@pytest.mark.parametrize(("problem", "message"), _SOURCE_ERRORS)
+def test_synchronize_file_loading_reports_policy_and_invalid_source(
+    source_policy_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    problem: str,
+    message: str,
+) -> None:
+    source_file = source_policy_path.parent / "run-tool"
+    _invalidate_source(source_file, problem, monkeypatch)
+
+    with pytest.raises(PolicyError, match=message) as error:
+        load_policy(source_policy_path)
+
+    assert f"policy {source_policy_path}:" in str(error.value)
+    assert "synchronize_file source" in str(error.value)
+    assert str(source_file) in str(error.value)
+
+
+@pytest.mark.parametrize(("problem", "message"), _SOURCE_ERRORS)
+@pytest.mark.parametrize(
+    "execute", [describe_changes, apply], ids=["describe", "apply"]
+)
+def test_synchronize_file_revalidates_source_after_loading_before_changing_target(
+    fake_repo: Path,
+    source_policy_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    problem: str,
+    message: str,
+    execute,
+) -> None:
+    policy = load_policy(source_policy_path)
+    target = fake_repo / ".devcontainer/run-tool"
+    target.parent.mkdir()
+    target.write_bytes(b"consumer content\n")
+    source_file = source_policy_path.parent / "run-tool"
+    _invalidate_source(source_file, problem, monkeypatch)
+
+    with pytest.raises(RepoPolicySyncError, match=message) as error:
+        execute(fake_repo, policy.ensure[0])
+
+    assert type(error.value) is RepoPolicySyncError
+    assert "synchronize_file source" in str(error.value)
+    assert str(source_file) in str(error.value)
+    assert target.read_bytes() == b"consumer content\n"
