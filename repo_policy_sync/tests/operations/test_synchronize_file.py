@@ -48,10 +48,6 @@ def _policy(
     )
 
 
-def _is_executable(path: Path) -> bool:
-    return bool(path.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))
-
-
 def test_synchronize_file_creates_byte_exact_executable_and_is_idempotent(
     fake_repo: Path,
 ) -> None:
@@ -65,7 +61,7 @@ def test_synchronize_file_creates_byte_exact_executable_and_is_idempotent(
         Path(".devcontainer/run-tool")
     ]
     assert target.read_bytes() == source
-    assert _is_executable(target)
+    assert target.stat().st_mode & stat.S_IXUSR
     assert apply_policy(fake_repo, policy).changes == ()
 
 
@@ -80,30 +76,49 @@ def test_synchronize_file_replaces_existing_content_and_sets_executable(
     apply_policy(fake_repo, policy)
 
     assert target.read_bytes() == b"new launcher\r\n"
-    assert _is_executable(target)
+    assert target.stat().st_mode & stat.S_IXUSR
 
 
-def test_synchronize_file_repairs_executable_bit_without_changing_content(
+@pytest.mark.parametrize(
+    ("executable", "mode", "expected_mode"),
+    [
+        (True, 0o644, 0o744),
+        (True, 0o641, 0o741),
+        (True, 0o650, 0o750),
+        (True, 0o744, 0o744),
+        (True, 0o755, 0o755),
+        (False, 0o644, 0o644),
+        (False, 0o641, 0o641),
+        (False, 0o755, 0o755),
+    ],
+)
+def test_synchronize_file_ensures_owner_execution_and_preserves_other_permissions(
     fake_repo: Path,
+    executable: bool,
+    mode: int,
+    expected_mode: int,
 ) -> None:
+    """Group/other execute bits cannot substitute for the owner's execute bit."""
     content = b"already current\n"
     target = fake_repo / ".devcontainer/run-tool"
     target.parent.mkdir()
     target.write_bytes(content)
-    policy = _policy(fake_repo, content)
+    target.chmod(mode)
+    policy = _policy(fake_repo, content, executable=executable)
 
     evaluation = evaluate_policy(fake_repo, policy)
     apply_policy(fake_repo, policy)
 
-    assert evaluation.changes[0].description == "make executable"
+    assert bool(evaluation.changes) == (mode != expected_mode)
     assert target.read_bytes() == content
-    assert _is_executable(target)
+    assert stat.S_IMODE(target.stat().st_mode) == expected_mode
+    assert apply_policy(fake_repo, policy).changes == ()
 
 
 def test_synchronize_file_rejects_a_directory_destination(fake_repo: Path) -> None:
     (fake_repo / ".devcontainer/run-tool").mkdir(parents=True)
 
-    with pytest.raises(RepoPolicySyncError, match="must not be a directory"):
+    with pytest.raises(RepoPolicySyncError, match="must be a regular file"):
         evaluate_policy(fake_repo, _policy(fake_repo))
 
 
@@ -152,7 +167,7 @@ def _invalidate_source(
 _SOURCE_ERRORS = [
     pytest.param("missing", "must be a regular file", id="missing"),
     pytest.param("directory", "must be a regular file", id="directory"),
-    pytest.param("symlink", "without symbolic links", id="symlink"),
+    pytest.param("symlink", "must not contain a symbolic link", id="symlink"),
     pytest.param("unreadable", "Permission denied", id="unreadable"),
 ]
 

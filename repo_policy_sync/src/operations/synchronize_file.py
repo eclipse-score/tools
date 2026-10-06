@@ -72,21 +72,13 @@ class SynchronizeFileOperation:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
         validate_repository_path(root, path)
-        _validate_target(path, operation)
+        if path.exists() and not path.is_file():
+            raise RepoPolicySyncError(f"destination must be a regular file: {path}")
         source_content = _read_source(operation)
-        content_changed = not path.is_file() or path.read_bytes() != source_content
-        executable_changed = (
-            operation.executable and path.is_file() and not _is_executable(path)
-        )
-        if content_changed and executable_changed:
-            description = "synchronize contents and make executable"
-        elif content_changed:
-            description = "add file" if not path.exists() else "synchronize contents"
-        elif executable_changed:
-            description = "make executable"
-        else:
-            return ()
-        return (Change(operation.path, description, operation.rationale),)
+        if path.is_file() and path.read_bytes() == source_content:
+            if not operation.executable or path.stat().st_mode & stat.S_IXUSR:
+                return ()
+        return (Change(operation.path, "synchronize file", operation.rationale),)
 
     def apply(
         self,
@@ -99,24 +91,25 @@ class SynchronizeFileOperation:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
         validate_repository_path(root, path)
-        _validate_target(path, operation)
+        if path.exists() and not path.is_file():
+            raise RepoPolicySyncError(f"destination must be a regular file: {path}")
         source_content = _read_source(operation)
         if not path.is_file() or path.read_bytes() != source_content:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(source_content)
-        if operation.executable and not _is_executable(path):
-            path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        if operation.executable:
+            mode = path.stat().st_mode
+            if not mode & stat.S_IXUSR:
+                path.chmod(mode | stat.S_IXUSR)
 
 
 def _read_source(operation: SynchronizeFile) -> bytes:
-    # Revalidate before every read because a source can change after policy loading.
-    # Check symlinks before file checks or reads that would follow them.
+    # Sources can change after loading; reject symlinks before following file checks.
     try:
         validate_repository_path(operation.source_root, operation.source_file)
     except RepoPolicySyncError as exc:
         raise RepoPolicySyncError(
-            f"synchronize_file source {operation.source_file} must be within "
-            f"policy directory {operation.source_root} without symbolic links: {exc}"
+            f"invalid synchronize_file source {operation.source_file}: {exc}"
         ) from exc
     if not operation.source_file.is_file():
         raise RepoPolicySyncError(
@@ -128,12 +121,3 @@ def _read_source(operation: SynchronizeFile) -> bytes:
         raise RepoPolicySyncError(
             f"could not read synchronize_file source {operation.source_file}: {exc}"
         ) from exc
-
-
-def _validate_target(path: Path, operation: SynchronizeFile) -> None:
-    if path.exists() and not path.is_file():
-        raise RepoPolicySyncError(f"{operation.path} must not be a directory")
-
-
-def _is_executable(path: Path) -> bool:
-    return bool(path.stat().st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH))

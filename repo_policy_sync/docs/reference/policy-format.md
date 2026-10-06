@@ -225,9 +225,9 @@ Replaces the complete destination contents with the exact bytes from a
 policy-local source asset. The source must be a file within the policy
 directory; the repository-relative destination may be missing, in which case
 its parent directories are created. When `executable` is `true`, the operation
-ensures at least one execute bit is set on the destination. When omitted or
-`false`, it leaves the destination's execute bits unchanged. Other permission
-bits are not synchronized.
+ensures the owner execute bit is set on the destination. Group, other, and
+non-execute permission bits are preserved. When omitted or `false`, it leaves
+the destination's execute bits unchanged.
 
 ### `ensure_exact`
 
