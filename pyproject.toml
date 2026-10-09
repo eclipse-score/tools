@@ -10,6 +10,7 @@ members = [
     "cr_checker",
     "repo_cache",
     "repo_policy_sync",
+    "rust_dependency_audit",
 ]
 
 [tool.uv]
@@ -22,6 +23,7 @@ dev = [
     "pytest>=9.1.1",
     "repo-cache",
     "repo-policy-sync",
+    "rust-dependency-audit",
     "ruff==0.15.10",
 ]
 
@@ -29,6 +31,7 @@ dev = [
 cr-checker = { workspace = true }
 repo-cache = { workspace = true }
 repo-policy-sync = { workspace = true }
+rust-dependency-audit = { workspace = true }
 
 [tool.pytest.ini_options]
 
