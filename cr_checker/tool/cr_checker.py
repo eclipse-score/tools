@@ -410,6 +410,77 @@ def has_any_copyright(path, use_mmap, encoding, offset):
     )
 
 
+def replace_malformed_copyright(path, copyright_text, encoding, offset):
+    """Replace a recognizable malformed header while preserving file content."""
+    with open(path, "r", encoding=encoding) as handle:
+        content = handle.read()
+
+    header_content = content[offset : offset + BYTES_TO_READ]
+    lines = header_content.splitlines(keepends=True)
+    template_lines = copyright_text.splitlines()
+    if not lines or not template_lines:
+        return False
+
+    def matches_template_line(actual, expected):
+        actual = actual.rstrip("\r\n")
+        if BORDER_FILL_PATTERN.search(expected):
+            return re.fullmatch(line_to_flexible_regex(expected), actual) is not None
+        return actual == expected
+
+    if not matches_template_line(lines[0], template_lines[0]):
+        return False
+
+    spdx_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if "SPDX-License-Identifier" in line
+        ),
+        None,
+    )
+    if spdx_index is None or spdx_index >= len(template_lines):
+        return False
+    if "SPDX-License-Identifier" not in template_lines[spdx_index]:
+        return False
+
+    # A later border could otherwise make source look like the header end.
+    closing_index = len(template_lines) - 1
+    if closing_index >= len(lines) or not matches_template_line(
+        lines[closing_index], template_lines[closing_index]
+    ):
+        return False
+
+    html_comment = "<!--" in template_lines[0]
+    block_comment = "/*" in template_lines[0]
+    for index in range(1, closing_index):
+        actual = lines[index].rstrip("\r\n").lstrip()
+        expected = template_lines[index].lstrip()
+        if block_comment and "*/" in actual:
+            return False
+        if BORDER_FILL_PATTERN.search(template_lines[index]):
+            if not matches_template_line(lines[index], template_lines[index]):
+                return False
+        elif html_comment:
+            if "-->" in actual:
+                return False
+        else:
+            comment_prefix = re.match(r"(?://|/\*|\*|#|'|--|;|%)", expected)
+            if comment_prefix is None or not actual.startswith(comment_prefix.group()):
+                return False
+
+    closing_end = offset + sum(len(line) for line in lines[: closing_index + 1])
+    remainder = content[closing_end:]
+    if remainder.startswith("\r\n"):
+        remainder = remainder[2:]
+    elif remainder.startswith("\n"):
+        remainder = remainder[1:]
+    canonical_header = copyright_text.format(year=datetime.now().year) + "\n"
+    with open(path, "w", encoding=encoding) as handle:
+        handle.write(content[:offset] + canonical_header + remainder)
+    LOGGER.info("Replaced malformed copyright header in: %s", path)
+    return True
+
+
 def has_duplicate_copyright(path, template, use_mmap, encoding, offset):
     """
     Checks if more than one copyright notice is present in the file header.
@@ -648,9 +719,23 @@ def process_files(
             item, templates[key], use_mmap, encoding, shebang_offset
         ):
             if has_any_copyright(item, use_mmap, encoding, shebang_offset):
-                LOGGER.warning(
-                    "Wrong copyright format in: %s, expected format from template", item
-                )
+                results["no_copyright"] += 1
+                if fix:
+                    fix_result = replace_malformed_copyright(
+                        item, templates[key], encoding, shebang_offset
+                    )
+                    if fix_result:
+                        results["fixed"] += 1
+                    else:
+                        LOGGER.error(
+                            "Malformed copyright header in: %s; expected format from template and could not safely replace it",
+                            item,
+                        )
+                else:
+                    LOGGER.error(
+                        "Malformed copyright header in: %s, expected format from template; use --fix to replace it",
+                        item,
+                    )
             elif fix:
                 fix_result = fix_copyright(
                     item, templates[key], encoding, shebang_offset
