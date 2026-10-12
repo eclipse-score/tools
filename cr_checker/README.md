@@ -43,7 +43,7 @@
 - **-e**, **--extensions**: List of file extensions to filter, e.g., `-e py cpp`. This list replaces (rather than extends) the built-in default list.
 - **--encoding**: File encoding (default is utf-8).
 - **--exclusion-file**: Path to a file listing paths (one per line, relative to the repository root) to exclude from the check.
-- **--fix**: Setting script into fix mode where copyright header will be added to the files if it's missing from same.
+- **--fix**: Add a missing copyright header or replace a recognizable malformed header with the configured template. Malformed headers that cannot be safely identified are reported as errors.
 - **inputs**: (Optional) Directories and/or files to check. Neither integration passes these explicitly for a full-repo check: `pre-commit` passes whichever files it decided to run against instead, and the Bazel macro never passes any, which makes the tool fall back to running `git ls-files --cached --other --exclude-standard` (resolved against `BUILD_WORKSPACE_DIRECTORY` if set, otherwise the current working directory) and checking everything that comes back.
 
 
