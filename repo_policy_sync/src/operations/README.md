@@ -35,7 +35,7 @@ authoritative source for the complete schema, validation rules, and examples.
 | `ensure_minimal` | Maintaining a minimum release for one external GitHub target | Resolves the lowest available semantic tag meeting the configured minimum, upgrades older tags and stale commit pins, and leaves branches unchanged. | [`test_ensure_github_ref.py`](../../tests/operations/test_ensure_github_ref.py) |
 | `ensure_minimum_version` | Maintaining a simple version file such as `.bazelversion` | Replaces a lower `major.minor.patch` value; equal or higher versions and missing files are compliant. | [`test_ensure_minimum_version.py`](../../tests/operations/test_ensure_minimum_version.py) |
 | `remove_file` | Removing an obsolete file | Deletes an existing file; a missing file is compliant and directories are rejected. | [`test_remove_file.py`](../../tests/operations/test_remove_file.py) |
-| `replace_regex` | Applying a narrow text substitution | Applies Python `re.sub` to a complete UTF-8 file; missing files and non-matching patterns are compliant. | [`test_replace_regex.py`](../../tests/operations/test_replace_regex.py) |
+| `replace_regex` | Applying a narrow text substitution | Applies Python `re.sub` to a complete UTF-8 file or files matched by filename wildcards under a literal repository-relative parent directory; missing files, unmatched patterns, and non-matching patterns are compliant. | [`test_replace_regex.py`](../../tests/operations/test_replace_regex.py) |
 
 All operations accept an optional `rationale`. When a change is needed, the
 rationale is included with the generated change description.

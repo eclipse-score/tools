@@ -14,6 +14,8 @@
 """The replace_regex operation."""
 
 import re
+from fnmatch import fnmatchcase
+from glob import has_magic
 from pathlib import Path
 from typing import Any
 
@@ -60,17 +62,20 @@ class ReplaceRegexOperation:
         github_resolver=None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, ReplaceRegex)
-        path = root / operation.path
-        validate_repository_path(root, path)
-        _validate_target(path, operation)
-        if not path.is_file():
-            return ()
-        text = path.read_text(encoding="utf-8")
-        return (
-            (Change(operation.path, "replace matching text", operation.rationale),)
-            if re.sub(operation.pattern, operation.replacement, text) != text
-            else ()
-        )
+        changes = []
+        for path in _matching_paths(root, operation):
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            if re.sub(operation.pattern, operation.replacement, text) != text:
+                changes.append(
+                    Change(
+                        path.relative_to(root),
+                        "replace matching text",
+                        operation.rationale,
+                    )
+                )
+        return tuple(changes)
 
     def apply(
         self,
@@ -81,15 +86,38 @@ class ReplaceRegexOperation:
         github_resolver=None,
     ) -> None:
         assert isinstance(operation, ReplaceRegex)
-        path = root / operation.path
+        for path in _matching_paths(root, operation):
+            if not path.is_file():
+                continue
+            text = path.read_text(encoding="utf-8")
+            replaced = re.sub(operation.pattern, operation.replacement, text)
+            if replaced != text:
+                path.write_text(replaced, encoding="utf-8")
+
+
+def _matching_paths(root: Path, operation: ReplaceRegex) -> tuple[Path, ...]:
+    """Resolve one target or filename-glob matches under a literal parent."""
+
+    if has_magic(str(operation.path)):
+        parent = root / operation.path.parent
+        validate_repository_path(root, parent)
+        paths = (
+            tuple(
+                sorted(
+                    path
+                    for path in parent.iterdir()
+                    if fnmatchcase(path.name, operation.path.name)
+                )
+            )
+            if parent.is_dir()
+            else ()
+        )
+    else:
+        paths = (root / operation.path,)
+    for path in paths:
         validate_repository_path(root, path)
         _validate_target(path, operation)
-        if not path.is_file():
-            return
-        text = path.read_text(encoding="utf-8")
-        replaced = re.sub(operation.pattern, operation.replacement, text)
-        if replaced != text:
-            path.write_text(replaced, encoding="utf-8")
+    return paths
 
 
 def _validate_target(path: Path, operation: ReplaceRegex) -> None:
