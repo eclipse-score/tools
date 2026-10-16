@@ -35,6 +35,7 @@ use the [documentation index](../docs/README.md).
 | `minimum-github-action-versions` | Keep `actions/checkout` at semantic version `v6` or newer in GitHub workflows. | Baseline maintenance |
 | `score-devcontainer-dependency-alignment` | Declare the direct SCORE devcontainer Bazel dependency using the Dockerfile image version. | One-time integration |
 | `score-devcontainer-run-tool` | Keep the executable SCORE devcontainer tool launcher synchronized with its policy-owned asset. | Baseline maintenance |
+| `ubuntu-24-runners` | Replace `ubuntu-latest` references in top-level GitHub workflow YAML files with `ubuntu-24.04`. | Baseline maintenance |
 
 The policy definitions and their executable before/after cases are the
 authoritative detail. The [policy format reference](../docs/reference/policy-format.md)

@@ -279,18 +279,20 @@ refuses to delete a directory.
 
 ```yaml
 - type: replace_regex
-  path: MODULE.bazel
-  pattern: 'legacy = "([^"]+)"'
-  replacement: 'current = "\1"'
+  path: .github/workflows/*.yml
+  pattern: ubuntu-latest
+  replacement: ubuntu-24.04
 ```
 
 Applies Python `re.sub` semantics to the complete UTF-8 text file: every
 non-overlapping match is replaced, with no implicit flags. Use inline regex
 flags such as `(?s)` when needed. Capture groups in `replacement` use `\1`
 syntax; invalid replacement backreferences are rejected while the policy is
-loaded. A missing file, no match, or replacement that produces identical text
-is compliant. Prefer narrow patterns and cover every intended layout with an
-executable example.
+loaded. `path` may include repository-relative glob wildcards (`*`, `?`, `[]`,
+and `**`); each matching file is evaluated independently and reported by its
+repository-relative path. A missing file, unmatched glob, no match, or
+replacement that produces identical text is compliant. Prefer narrow patterns
+and cover every intended layout with an executable example.
 
 ### `ensure_minimum_version`
 
