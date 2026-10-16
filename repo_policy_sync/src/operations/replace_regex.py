@@ -14,6 +14,7 @@
 """The replace_regex operation."""
 
 import re
+from fnmatch import fnmatchcase
 from glob import has_magic
 from pathlib import Path
 from typing import Any
@@ -95,10 +96,22 @@ class ReplaceRegexOperation:
 
 
 def _matching_paths(root: Path, operation: ReplaceRegex) -> tuple[Path, ...]:
-    """Resolve one target or a deterministic set of repository-relative glob matches."""
+    """Resolve one target or filename-glob matches under a literal parent."""
 
     if has_magic(str(operation.path)):
-        paths = tuple(sorted(root.glob(str(operation.path))))
+        parent = root / operation.path.parent
+        validate_repository_path(root, parent)
+        paths = (
+            tuple(
+                sorted(
+                    path
+                    for path in parent.iterdir()
+                    if fnmatchcase(path.name, operation.path.name)
+                )
+            )
+            if parent.is_dir()
+            else ()
+        )
     else:
         paths = (root / operation.path,)
     for path in paths:

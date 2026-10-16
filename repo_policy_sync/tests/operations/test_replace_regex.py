@@ -64,6 +64,25 @@ def test_replace_regex_unmatched_glob_does_not_create_target_directories(
     assert not (fake_repo / ".github").exists()
 
 
+def test_replace_regex_rejects_symlink_directories_before_glob_descent(
+    fake_repo: Path,
+) -> None:
+    outside = fake_repo.parent / "outside"
+    (outside / "workflows").mkdir(parents=True)
+    (outside / "workflows" / "README.md").write_text("unmatched\n")
+    (fake_repo / ".github").symlink_to(outside, target_is_directory=True)
+    policy = Policy(
+        "example",
+        "Example",
+        None,
+        None,
+        (ReplaceRegex(Path(".github/workflows/*.yml"), "legacy", "current"),),
+    )
+
+    with pytest.raises(RepoPolicySyncError, match="symbolic link"):
+        evaluate_policy(fake_repo, policy)
+
+
 def test_replace_regex_rejects_a_directory_target(fake_repo: Path) -> None:
     (fake_repo / "target").mkdir()
     policy = Policy(
