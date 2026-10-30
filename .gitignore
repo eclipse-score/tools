@@ -9,3 +9,6 @@ external
 
 __pycache__
 .ruff_cache/
+dist/
+reports/
+site/
