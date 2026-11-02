@@ -129,6 +129,27 @@ synchronization. Policy evaluation and apply work, including policy follow-up
 commands such as Bazel, run across independent repositories with
 `--policy-workers N`.
 
+Follow-up commands and pre-commit hooks use temporary home directories. To
+share Bazel caches in CI, set `REPO_POLICY_SYNC_BAZELRC` to a trusted rc file
+containing cache settings and optionally `BAZELISK_HOME` to the Bazelisk download
+cache. The selected rc is imported into each temporary home's `.bazelrc`,
+including for Bazel 8. Other user configuration and credentials are not
+inherited.
+
+Before apply, a separate job warms one shared Bazel repository download cache
+and the Bazelisk executable cache using `eclipse-score/reference_integration`.
+The seed repository is chosen in the workflow, not in the tool configuration.
+`setup-bazel-cache` uses the seed's lockfile for its automatic cache reset and
+save decisions. The apply job only restores caches, so its additional downloads
+cannot overwrite the seed. Build results and extracted dependencies are not
+persisted. A job-local `output_user_root` lets later policies and hook retries
+reuse each repository's extracted dependencies within the apply job.
+
+A failed cache warm-up does not prevent apply from running; it can restore an
+older cache or download missing dependencies itself. The
+cache job still makes the workflow fail. A failed warm-up with cold caches
+does not save new caches, following the cache action's failure policy.
+
 To rebuild a policy PR from the current default branch, use the guarded
 recreate operation with exactly one repository and policy:
 
