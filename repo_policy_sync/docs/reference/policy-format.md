@@ -300,7 +300,7 @@ layout with an executable example.
 ```yaml
 - type: ensure_minimum_version
   path: .bazelversion
-  minimum_version: 8.6.0
+  minimum_version: 8.8.2
 ```
 
 Ensures an existing `major.minor.patch` version is at least the specified
