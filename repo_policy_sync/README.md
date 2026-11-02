@@ -133,8 +133,11 @@ Follow-up commands and pre-commit hooks use temporary home directories. To
 share Bazel caches in CI, set `REPO_POLICY_SYNC_BAZELRC` to a trusted rc file
 containing cache settings and optionally `BAZELISK_HOME` to the Bazelisk download
 cache. The selected rc is imported into each temporary home's `.bazelrc`,
-including for Bazel 8. Other user configuration and credentials are not
-inherited.
+including for Bazel 8. Personal Bazel settings and token environment variables
+such as `GH_TOKEN` and `GITHUB_TOKEN` are not inherited. Pre-commit hooks do
+receive global Git `url.*.insteadOf` rewrites for authenticated dependency
+downloads. Those URLs can contain credentials, so hooks are not isolated from
+Git credentials.
 
 Before apply, a separate job warms one shared Bazel repository download cache
 and the Bazelisk executable cache using `eclipse-score/reference_integration`.

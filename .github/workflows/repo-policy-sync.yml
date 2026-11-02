@@ -172,8 +172,10 @@ jobs:
           report-test-cache-hits: "false"
       - name: Configure isolated Bazel caches
         run: |
-          # Commands and hooks get fresh homes to keep runner credentials and
-          # personal settings out. Import only cache settings into those homes.
+          # Commands and hooks get fresh homes without personal Bazel settings
+          # or token environment variables. Pre-commit separately receives Git
+          # URL rewrites, which can contain credentials for dependency downloads.
+          # Import the shared Bazel cache settings into each temporary home.
           # Keep unpacked dependencies for this job so later policies reuse them.
           policy_bazelrc="$RUNNER_TEMP/repo-policy-sync.bazelrc"
           {

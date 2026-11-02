@@ -27,7 +27,7 @@ def test_follow_up_commands_and_hooks_share_only_explicit_cache_configuration(
     """Policy commands and hooks find the shared caches from fresh homes.
 
     Both must import the selected cache configuration without copying the
-    runner's personal Bazel configuration or passing its GitHub token.
+    runner's personal Bazel configuration or passing GitHub token variables.
     """
 
     user_home = tmp_path / "user-home"
