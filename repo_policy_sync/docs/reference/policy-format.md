@@ -203,12 +203,11 @@ its body is replaced and configured legacy lines are removed outside the
 managed block.
 
 When the destination does not exist, the operation creates it with the marked
-block. For an existing destination without markers, at least one configured
-`replace_lines` or `replace_line_globs` entry must match; otherwise the
-operation fails and leaves the repository unmodified. Matching legacy lines
-are removed and the block is inserted at the first match. This supports an
-explicit one-time migration while preventing an unmarked file from opting in
-implicitly. `source` is relative to the policy directory and must resolve to a
+block. For an existing destination without markers, matching `replace_lines`
+or `replace_line_globs` entries are removed and the block is inserted at the
+first match. If no legacy lines match, the block is appended while preserving
+the existing content. The policy's `when` conditions determine which repositories
+receive the block. `source` is relative to the policy directory and must resolve to a
 regular UTF-8 file without escaping that directory; `path` is a
 repository-relative destination.
 

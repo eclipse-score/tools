@@ -120,17 +120,35 @@ def test_sync_managed_block_rejects_incomplete_duplicate_or_misordered_markers(
         evaluate_policy(fake_repo, _policy(fake_repo))
 
 
-def test_sync_managed_block_rejects_unmarked_existing_file_without_legacy_match(
-    fake_repo: Path,
+@pytest.mark.parametrize(
+    "content, expected_prefix, newline",
+    [
+        # score-crates has unrelated ignore entries and no final newline.
+        (
+            b"# Bazel build outputs\nbazel-*",
+            b"# Bazel build outputs\nbazel-*\n\n",
+            b"\n",
+        ),
+        (b"unrelated entry\r\n", b"unrelated entry\r\n\r\n", b"\r\n"),
+        (b"", b"", b"\n"),
+    ],
+)
+def test_sync_managed_block_appends_missing_block_without_removing_existing_entries(
+    fake_repo: Path, content: bytes, expected_prefix: bytes, newline: bytes
 ) -> None:
-    (fake_repo / ".gitignore").write_text("unrelated entry\n")
+    target = fake_repo / ".gitignore"
+    target.write_bytes(content)
     policy = _policy(
         fake_repo,
         replace_line_globs=("*_build*", "*ubproject.toml*"),
     )
 
-    with pytest.raises(
-        RepoPolicySyncError, match="at least one configured legacy line"
-    ):
-        apply_policy(fake_repo, policy)
-    assert (fake_repo / ".gitignore").read_text() == "unrelated entry\n"
+    evaluation = evaluate_policy(fake_repo, policy)
+    assert [change.path for change in evaluation.changes] == [Path(".gitignore")]
+    assert target.read_bytes() == content
+
+    assert apply_policy(fake_repo, policy) == evaluation
+    assert target.read_bytes() == expected_prefix + newline.join(
+        [b"# managed section", b"managed line", b"# end managed section", b""]
+    )
+    assert apply_policy(fake_repo, policy).changes == ()
