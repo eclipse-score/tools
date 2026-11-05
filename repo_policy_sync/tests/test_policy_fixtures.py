@@ -13,6 +13,7 @@
 
 """Executable examples colocated with the policies they specify."""
 
+import subprocess
 from pathlib import Path
 from shutil import copytree
 
@@ -41,15 +42,29 @@ def test_policy_examples_apply_as_documented(
     policy = load_policy(policy_directory / "policy.yml")
     actual = tmp_path / policy_directory.name / case.name
     copytree(case / "before", actual)
+    expected = tmp_path / policy_directory.name / f"{case.name}-expected"
+    copytree(case / "before", expected)
+    # Apply the specification independently so comparison includes unchanged
+    # files and catches any extra files created by the policy. --no-index keeps
+    # this independent of a surrounding checkout; --allow-empty supports cases
+    # where the policy must leave the input unchanged.
+    subprocess.run(
+        [
+            "git",
+            "apply",
+            "--no-index",
+            "--allow-empty",
+            str((case / "expected.patch").resolve()),
+        ],
+        cwd=expected,
+        check=True,
+    )
 
     apply_policy(actual, policy, organization="eclipse-score")
 
-    assert _tree(actual) == _tree(case / "after"), case
-    compliant = tmp_path / policy_directory.name / f"{case.name}-compliant"
-    copytree(case / "after", compliant)
-    assert (
-        apply_policy(compliant, policy, organization="eclipse-score").changes == ()
-    ), case
+    assert _tree(actual) == _tree(expected), case
+    evaluation = apply_policy(expected, policy, organization="eclipse-score")
+    assert evaluation.changes == (), case
 
 
 def _tree(root: Path) -> dict[Path, str]:

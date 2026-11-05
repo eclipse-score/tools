@@ -21,13 +21,17 @@ policies/
     policy.yml
     example-case/
       before/
-      after/
+      expected.patch
 ```
 
-`policy.yml` is the policy definition. Each example case is an executable
-before/after repository tree: the fixture test applies the real policy to
-`before/`, compares the result with `after/`, and confirms that `after/` is
-already compliant. Keep cases small and name them for the behavior they show.
+`policy.yml` is the policy definition. Each example case contains an input
+repository tree in `before/` and a Git patch in `expected.patch`, using
+repository-relative paths with `a/` and `b/` prefixes. The patch can modify,
+create, or delete files; an empty patch specifies no changes. The fixture test
+applies the real policy to `before/` and compares the complete result with a
+separate copy of `before/` transformed by `git apply --no-index --allow-empty`.
+It also confirms that the expected tree is already compliant. Running these
+tests requires Git. Keep cases small and name them for the behavior they show.
 
 The policy directory is scanned recursively for `policy.yml` files. Every
 policy must use the directory layout above so its directory name can provide
