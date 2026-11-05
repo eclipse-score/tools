@@ -166,6 +166,95 @@ def test_process_files_inserts_missing_header(prepare_test_no_header):
     assert test_file.read_text(encoding="utf-8").startswith(expected_header)
 
 
+def test_main_fails_for_malformed_build_header(tmp_path):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("BUILD")
+    malformed_header = header_template.replace(
+        "Apache License Version 2.0", "Apache License 2.0"
+    )
+    build_file = tmp_path / "BUILD"
+    build_file.write_text(malformed_header + "some content\n", encoding="utf-8")
+
+    exit_code = cr_checker.main([str(build_file)])
+
+    assert exit_code == 1
+
+
+def test_process_files_replaces_malformed_header_in_fix_mode(tmp_path):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("BUILD")
+    malformed_header = header_template.replace(
+        "Apache License Version 2.0", "Apache License, Version 2.0"
+    )
+    build_file = tmp_path / "BUILD"
+    build_file.write_text(malformed_header + "some content\n", encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[build_file], templates={"BUILD": header_template}, fix=True
+    )
+
+    assert results["fixed"] == 1
+    expected_header = header_template.format(year=datetime.now().year)
+    assert build_file.read_text(encoding="utf-8") == (
+        expected_header + "\nsome content\n"
+    )
+
+
+def test_process_files_leaves_unrecognizable_header_unchanged_in_fix_mode(tmp_path):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("BUILD")
+    malformed_header = "# Custom preamble\n" + header_template.replace(
+        "Apache License Version 2.0", "Apache License 2.0"
+    )
+    build_file = tmp_path / "BUILD"
+    build_file.write_text(malformed_header + "some content\n", encoding="utf-8")
+
+    exit_code = cr_checker.main(["--fix", str(build_file)])
+
+    assert exit_code == 1
+    assert build_file.read_text(encoding="utf-8") == (
+        malformed_header + "some content\n"
+    )
+
+
+def test_process_files_does_not_replace_header_across_source_and_later_border(
+    tmp_path,
+):
+    cr_checker = load_cr_checker_module()
+    header_template = load_template("BUILD")
+    header_lines = header_template.splitlines()
+    original_content = (
+        "\n".join(
+            header_lines[:-1]
+            + ['load("//rules:defs.bzl", "rule")', header_lines[-1], "rule()"]
+        )
+        + "\n"
+    )
+    build_file = tmp_path / "BUILD"
+    build_file.write_text(original_content, encoding="utf-8")
+
+    exit_code = cr_checker.main(["--fix", str(build_file)])
+
+    assert exit_code == 1
+    assert build_file.read_text(encoding="utf-8") == original_content
+
+
+def test_fix_does_not_delete_code_after_early_block_comment_terminator(tmp_path):
+    cr_checker = load_cr_checker_module()
+    template = load_template("cpp")
+    malformed = template.replace(
+        "SPDX-License-Identifier: Apache-2.0",
+        "SPDX-License-Identifier: Apache-2.0 */ execute();",
+    )
+    source_file = tmp_path / "file.cpp"
+    source_file.write_text(malformed + "int main() {}\n", encoding="utf-8")
+
+    exit_code = cr_checker.main(["--fix", str(source_file)])
+
+    assert exit_code == 1
+    assert source_file.read_text(encoding="utf-8") == malformed + "int main() {}\n"
+
+
 def test_process_files_skips_exclusion_with_missing_header(prepare_test_no_header):
     cr_checker = load_cr_checker_module()
     test_file, extension, header_template, tmp_path = prepare_test_no_header
@@ -284,7 +373,7 @@ def test_process_files_accepts_flexible_border(tmp_path):
     # Use '/' fill chars instead of '*' for border lines
     header = (
         "/////////////////////////////////////////////////////////////////////////////////////\n"
-        f" * Copyright (c) {current_year} Author\n"
+        f" * Copyright (c) {current_year} Contributors to the Eclipse Foundation\n"
         " *\n"
         " * See the NOTICE file(s) distributed with this work for additional\n"
         " * information regarding copyright ownership.\n"
