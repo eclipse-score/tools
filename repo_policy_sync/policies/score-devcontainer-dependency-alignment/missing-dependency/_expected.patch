@@ -1,0 +1,13 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+index ed46691..8bb0caf 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -12,3 +12,8 @@
+ # *******************************************************************************
+ 
+ module(name = "example")
++
++bazel_dep(
++    name = "score_devcontainer",
++    version = "1.9.0",
++)

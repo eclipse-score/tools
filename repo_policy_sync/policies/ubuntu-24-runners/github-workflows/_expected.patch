@@ -1,0 +1,26 @@
+diff --git a/.github/workflows/build.yml b/.github/workflows/build.yml
+index 6b450ed..08e2527 100644
+--- a/.github/workflows/build.yml
++++ b/.github/workflows/build.yml
+@@ -15,9 +15,9 @@ name: Build
+ on: push
+ jobs:
+   build:
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-24.04
+     steps:
+       - uses: actions/checkout@v6
+     strategy:
+       matrix:
+-        os: [ubuntu-latest, windows-latest]
++        os: [ubuntu-24.04, windows-latest]
+diff --git a/.github/workflows/test.yaml b/.github/workflows/test.yaml
+index c1aa5d7..673e076 100644
+--- a/.github/workflows/test.yaml
++++ b/.github/workflows/test.yaml
+@@ -13,4 +13,4 @@
+ 
+ jobs:
+   test:
+-    runs-on: ubuntu-latest
++    runs-on: ubuntu-24.04

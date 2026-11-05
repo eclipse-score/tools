@@ -1,0 +1,33 @@
+diff --git a/.gitignore b/.gitignore
+index 65708a5..7f0c8f8 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -1,7 +1,11 @@
+ # This file is processed because MODULE.bazel declares score_docs_as_code.
+ # These legacy artifact entries let the policy migrate this existing file.
+ .repo-ignore-1
+-/_build
+-/docs/ubproject.toml
+-/_build
++
++# docs-as-code build artifacts
++# Please don't edit locally; repo_policy_sync keeps this block in sync from score_tools.
++_build/
++ubproject.toml
++# end docs-as-code build artifacts
++
+ .repo-ignore-2
+diff --git a/docs/ubproject.toml b/docs/ubproject.toml
+deleted file mode 100644
+index 482004c..0000000
+--- a/docs/ubproject.toml
++++ /dev/null
+@@ -1 +0,0 @@
+-legacy configuration
+diff --git a/ubproject.toml b/ubproject.toml
+deleted file mode 100644
+index e4476ff..0000000
+--- a/ubproject.toml
++++ /dev/null
+@@ -1 +0,0 @@
+-legacy root configuration

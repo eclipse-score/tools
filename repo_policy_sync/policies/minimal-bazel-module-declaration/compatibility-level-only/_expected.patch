@@ -1,0 +1,13 @@
+diff --git a/MODULE.bazel b/MODULE.bazel
+index b79351a..91e233d 100644
+--- a/MODULE.bazel
++++ b/MODULE.bazel
+@@ -11,7 +11,4 @@
+ # SPDX-License-Identifier: Apache-2.0
+ # *******************************************************************************
+ 
+-module(
+-    name = "score_sbom",
+-    compatibility_level = 1,
+-)
++module(name = "score_sbom")

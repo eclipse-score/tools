@@ -37,7 +37,8 @@ use the [documentation index](../docs/README.md).
 | `score-devcontainer-run-tool` | Keep the executable SCORE devcontainer tool launcher synchronized with its policy-owned asset. | Baseline maintenance |
 | `ubuntu-24-runners` | Replace `ubuntu-latest` references in top-level GitHub workflow YAML files with `ubuntu-24.04`. | Baseline maintenance |
 
-The policy definitions and their executable before/after cases are the
-authoritative detail. The [policy format reference](../docs/reference/policy-format.md)
+The policy definitions and their executable scenario directories with
+`_expected.patch` are the authoritative detail.
+The [policy format reference](../docs/reference/policy-format.md)
 covers the schema and operation semantics; the [run-a-policy how-to](../docs/how-to/run-a-policy.md)
 covers execution.

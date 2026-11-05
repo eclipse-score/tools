@@ -26,8 +26,8 @@ policies/
   ensure-build-directory-ignored/
     policy.yml
     missing-ignore-rule/
-      before/
-      after/
+      .gitignore
+      _expected.patch
 ```
 
 Start with a minimal definition:
@@ -54,10 +54,14 @@ The policy directory name (`ensure-build-directory-ignored`) is its permanent
 ID and determines the policy-owned branch and pull-request marker. Keep it
 stable after rollout; renaming a policy is a first-version breaking change.
 
-Add the smallest representative input tree under `before/`, then the exact
-expected tree under `after/`. The fixture test applies every bundled policy,
-compares its output with `after/`, and confirms a second application makes no
-changes:
+Place the smallest representative input tree directly in the case directory,
+then describe the expected changes in `_expected.patch`, a Git patch with
+repository-relative paths (`a/` and `b/` prefixes). Use an empty patch when the
+input must remain unchanged.
+The root-level `_expected.patch` is reserved for test metadata and is excluded
+from the input tree. The fixture test applies the patch to a separate input
+copy, compares the policy output with that complete expected tree, and confirms
+the expected tree is already compliant:
 
 ```bash
 uv run pytest -q repo_policy_sync/tests/test_policy_fixtures.py

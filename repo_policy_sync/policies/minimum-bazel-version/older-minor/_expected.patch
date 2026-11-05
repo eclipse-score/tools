@@ -1,0 +1,7 @@
+diff --git a/.bazelversion b/.bazelversion
+index df5119e..11f1d47 100644
+--- a/.bazelversion
++++ b/.bazelversion
+@@ -1 +1 @@
+-8.7.0
++8.8.2
