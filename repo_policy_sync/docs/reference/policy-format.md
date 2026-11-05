@@ -20,16 +20,17 @@ policies/
   example-policy/
     policy.yml
     example-case/
-      before/
-      expected.patch
+      MODULE.bazel
+      _expected.patch
 ```
 
 `policy.yml` is the policy definition. Each example case contains an input
-repository tree in `before/` and a Git patch in `expected.patch`, using
-repository-relative paths with `a/` and `b/` prefixes. The patch can modify,
+repository tree directly in its directory and a Git patch in `_expected.patch`,
+using repository-relative paths with `a/` and `b/` prefixes. The patch can modify,
 create, or delete files; an empty patch specifies no changes. The fixture test
-applies the real policy to `before/` and compares the complete result with a
-separate copy of `before/` transformed by `git apply --no-index --allow-empty`.
+excludes the root-level `_expected.patch` from the input, applies the real policy,
+and compares the complete result with a separate input copy transformed by
+`git apply --no-index --allow-empty`.
 It also confirms that the expected tree is already compliant. Running these
 tests requires Git. Keep cases small and name them for the behavior they show.
 

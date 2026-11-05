@@ -41,9 +41,11 @@ def test_policy_examples_apply_as_documented(
 ) -> None:
     policy = load_policy(policy_directory / "policy.yml")
     actual = tmp_path / policy_directory.name / case.name
-    copytree(case / "before", actual)
+    copytree(case, actual)
+    # The root-level patch specifies the outcome and is not repository input.
+    (actual / "_expected.patch").unlink()
     expected = tmp_path / policy_directory.name / f"{case.name}-expected"
-    copytree(case / "before", expected)
+    copytree(actual, expected)
     # Apply the specification independently so comparison includes unchanged
     # files and catches any extra files created by the policy. --no-index keeps
     # this independent of a surrounding checkout; --allow-empty supports cases
@@ -54,7 +56,7 @@ def test_policy_examples_apply_as_documented(
             "apply",
             "--no-index",
             "--allow-empty",
-            str((case / "expected.patch").resolve()),
+            str((case / "_expected.patch").resolve()),
         ],
         cwd=expected,
         check=True,

@@ -20,7 +20,7 @@ repos:
       - id: trailing-whitespace
         # Context lines in fixture patches include a required leading space,
         # including on empty lines; stripping it would corrupt the patch.
-        exclude: ^repo_policy_sync/policies/[^/]+/[^/]+/expected\.patch$
+        exclude: ^repo_policy_sync/policies/[^/]+/[^/]+/_expected\.patch$
       - id: check-shebang-scripts-are-executable
       - id: check-executables-have-shebangs
       - id: check-added-large-files
