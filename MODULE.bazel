@@ -58,3 +58,35 @@ pip.parse(
     requirements_lock = "//score_pytest:requirements_py314.txt",
 )
 use_repo(pip, "score_pytest_pip")
+
+# CodeQL static analysis (//codeql). Keep these pins in sync with
+# codeql/versions.bzl, codeql/config/packs.toml and codeql/README.md.
+# The repositories are fetched lazily, only when //codeql targets are built.
+bazel_dep(name = "platforms", version = "1.0.0")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
+
+# CodeQL bundle v2.27.4, C/C++ only (contains cpp-queries 1.10.0, cpp-all 12.4.0).
+http_archive(
+    name = "codeql_bundle",
+    build_file = "//codeql/third_party:codeql_bundle.BUILD",
+    sha256 = "eea5a76ed6778892278a387c4362fef8d03e5a9c3795f5d5022d496fccfd5388",
+    urls = ["https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.4/codeql-bundle-cpp-linux64.tar.zst"],
+)
+
+# bazel-compile-commands for hosts with glibc >= 2.38.
+http_archive(
+    name = "bazel_compile_commands",
+    build_file = "//codeql/third_party:bazel_compile_commands.BUILD",
+    sha256 = "bb162adaefb282a9e4f0f399fe6223d1d2fe3740518148c1ca8f6f81db4003f6",
+    urls = ["https://github.com/kiron1/bazel-compile-commands/releases/download/bazel-compile-commands-v0.22.4/bazel-compile-commands_0.22.4-linux_amd64.zip"],
+)
+
+# bazel-compile-commands for hosts with glibc < 2.38 (Ubuntu 22.04); unpacked at runtime.
+http_file(
+    name = "bazel_compile_commands_jammy_deb",
+    sha256 = "e57cc545ea9ab6dfc494eb2c5913210099e8e31e947517fd0545844d06949b47",
+    urls = ["https://github.com/kiron1/bazel-compile-commands/releases/download/v0.21.0/bazel-compile-commands_0.21.0-jammy_amd64.deb"],
+)
