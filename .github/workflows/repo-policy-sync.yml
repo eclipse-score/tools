@@ -65,10 +65,69 @@ jobs:
             exit 1
           fi
 
-  apply:
+  cache:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '30 0 * * *') ||
       (github.event_name == 'workflow_dispatch' && inputs.mode == 'apply')
+    runs-on: ubuntu-24.04
+    # A broken upstream download should not hold the apply job for hours.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # The cache action deletes old archives after uploading a replacement.
+      actions: write
+    env:
+      # This workflow chooses its cache seed. Other organizations can use their
+      # own reference integration without changing the policy-sync tool.
+      REFERENCE_REPOSITORY: eclipse-score/reference_integration
+      GH_TOKEN: ${{ secrets.SCORE_BOT_CLASSIC_PAT }}
+    steps:
+      - name: Checkout cache seed
+        uses: actions/checkout@v7.0.0
+        with:
+          repository: ${{ env.REFERENCE_REPOSITORY }}
+          token: ${{ secrets.SCORE_BOT_CLASSIC_PAT }}
+          # The cache action compares the reference integration's lockfile with
+          # its previous commit to decide whether to rebuild the download cache.
+          fetch-depth: 2
+      - name: Checkout tools version
+        uses: actions/checkout@v7.0.0
+        with:
+          path: _policy-sync-tools
+      - name: Select Bazel version and Git authentication
+        run: |
+          # Warm dependencies with the Bazel version used by tools, including
+          # its security updates, rather than the seed's possibly older version.
+          cp _policy-sync-tools/.bazelversion .bazelversion
+          gh auth setup-git --hostname github.com
+      - name: Setup shared download caches
+        uses: eclipse-score/cicd-actions/setup-bazel-cache@setup-bazel-cache/v0.1.0
+        with:
+          disk-cache-key: repo-policy-sync
+          # Keep the action's automatic repository-cache restore/save decisions:
+          # this checkout and its lockfile describe exactly the cache we build.
+          repository-cache-restore: auto
+          repository-cache-save: auto
+          # Persist dependency downloads and Bazel executables. Build results
+          # and unpacked dependencies stay on the runner for this job only.
+          disk-cache-restore: "false"
+          disk-cache-save: "false"
+          external-cache-restore: "false"
+          external-cache-save: "false"
+          enable-profiling: "false"
+          report-cache-hits: "false"
+          report-test-cache-hits: "false"
+      - name: Populate dependency downloads
+        run: bazel mod deps
+
+  apply:
+    needs: cache
+    # Keep applying policies if cache warm-up fails; an older cache or direct
+    # downloads can still be used. The cache job's failure remains visible.
+    if: >-
+      !cancelled() && (
+      (github.event_name == 'schedule' && github.event.schedule == '30 0 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'apply'))
     runs-on: ubuntu-24.04
     env:
       MODE: apply
@@ -92,6 +151,42 @@ jobs:
           fi
       - name: Configure Git authentication for apply mode
         run: gh auth setup-git --hostname github.com
+      - name: Restore shared download caches
+        uses: eclipse-score/cicd-actions/setup-bazel-cache@setup-bazel-cache/v0.1.0
+        with:
+          disk-cache-key: repo-policy-sync
+          # Apply starts from the reference integration's downloads. Only the
+          # cache job saves them, so additions from other repositories do not
+          # accumulate in the persisted cache.
+          repository-cache-restore: "true"
+          repository-cache-save: "false"
+          bazelisk-cache-save: "false"
+          disk-cache-restore: "false"
+          disk-cache-save: "false"
+          external-cache-restore: "false"
+          external-cache-save: "false"
+          # Commands run with a restricted environment, without the extra state
+          # needed by profiling and cache-hit reporting.
+          enable-profiling: "false"
+          report-cache-hits: "false"
+          report-test-cache-hits: "false"
+      - name: Configure isolated Bazel caches
+        run: |
+          # Commands and hooks get fresh homes without personal Bazel settings
+          # or token environment variables. Pre-commit separately receives Git
+          # URL rewrites, which can contain credentials for dependency downloads.
+          # Import the shared Bazel cache settings into each temporary home.
+          # Keep unpacked dependencies for this job so later policies reuse them.
+          policy_bazelrc="$RUNNER_TEMP/repo-policy-sync.bazelrc"
+          {
+            printf 'startup --output_user_root="%s"\n' "$RUNNER_TEMP/repo-policy-sync-bazel"
+            printf 'import "%s"\n' "$RUNNER_TEMP/setup-bazel-cache.bazelrc"
+          } > "$policy_bazelrc"
+          {
+            printf 'REPO_POLICY_SYNC_BAZELRC=%s\n' "$policy_bazelrc"
+            # Bazelisk downloads Bazel itself; the seed job saves this directory.
+            printf 'BAZELISK_HOME=%s\n' "$HOME/.cache/bazelisk"
+          } >> "$GITHUB_ENV"
       - name: Run policy sync in apply mode
         id: sync
         run: >-

@@ -25,6 +25,7 @@ from importlib.resources import files
 from pathlib import Path
 from threading import RLock
 
+from .cache import configure_bazel_cache
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .models import Change, Policy, policy_branch_slug
 
@@ -498,6 +499,7 @@ class GitHubCli:
             if key in _PRE_COMMIT_ENVIRONMENT_KEYS or key.startswith("LC_")
         }
         with tempfile.TemporaryDirectory(prefix=f"{TOOL_SLUG}-pre-commit-") as home:
+            configure_bazel_cache(Path(home), environment)
             # The normal apply workflow authenticates nested Git fetches by
             # installing a narrowly scoped `url.*.insteadOf` rewrite in the
             # runner's global Git configuration. Keep that mechanism

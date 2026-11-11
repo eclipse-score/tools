@@ -29,6 +29,7 @@ from .bazel import (
     parse_bazel_version,
     starlark_call_ranges,
 )
+from .cache import configure_bazel_cache
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .github import GitHubResolver
 from .models import Change, EnsureOperation, Evaluation, Policy
@@ -168,6 +169,7 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
         with tempfile.TemporaryDirectory(
             prefix="repo-policy-sync-after-apply-"
         ) as home:
+            configure_bazel_cache(Path(home), environment)
             environment.update(
                 {
                     "HOME": home,
