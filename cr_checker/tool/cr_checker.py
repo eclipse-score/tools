@@ -509,6 +509,117 @@ def collect_inputs(inputs: list[str], exts=None):
     return all_files
 
 
+SPDX_PATTERN = re.compile(r"SPDX-License-Identifier", re.IGNORECASE)
+HEADER_START_PATTERN = re.compile(r"^\s*(#|//|/\*|\*|'|<!--|\.\.)")
+BORDER_LINE_PATTERN = re.compile(r"^\s*(<!--)?[\s/*#'\-=+]*(-->)?\s*$")
+
+
+def find_existing_header(path, encoding, offset, max_lines):
+    """
+    Locates an existing (possibly malformed) copyright header at the top of a file.
+
+    The header spans from the first line after `offset` through the line holding
+    ``SPDX-License-Identifier``, plus the following line if it is a pure border
+    line (e.g. ``****``, `` ****/``, ``---- -->``).
+
+    Args:
+        path (Path): A `pathlib.Path` object pointing to the file.
+        encoding (str): Encoding type to use when reading the file.
+        offset (int): Number of characters to skip (e.g. shebang line).
+        max_lines (int): Maximum number of lines to search for the SPDX line.
+                         Prevents treating real code as part of the header.
+
+    Returns:
+        tuple[int, str] | None: ``(num_chars, header_text)`` where `num_chars` is the
+        length of the header in characters (counted from `offset`), or None if the
+        file does not start with a comment block containing ``Copyright`` and
+        ``SPDX-License-Identifier`` within `max_lines`.
+    """
+    with open(path, "r", encoding=encoding) as handle:
+        handle.read(offset)
+        lines = []
+        for _ in range(max_lines + 1):  # +1 for a possible closing border line
+            line = handle.readline()
+            if not line:
+                break
+            lines.append(line)
+
+    if not lines or not HEADER_START_PATTERN.match(lines[0]):
+        LOGGER.debug("File does not start with a comment in: %s", path)
+        return None
+
+    spdx_index = next(
+        (i for i, line in enumerate(lines[:max_lines]) if SPDX_PATTERN.search(line)),
+        None,
+    )
+    if spdx_index is None:
+        LOGGER.debug("No SPDX line within %d lines in: %s", max_lines, path)
+        return None
+
+    end = spdx_index + 1
+    if (
+        end < len(lines)
+        and BORDER_FILL_PATTERN.search(lines[end])
+        and BORDER_LINE_PATTERN.match(lines[end])
+    ):
+        end += 1
+
+    header_text = "".join(lines[:end])
+    if not re.search(r"Copyright", header_text, re.IGNORECASE):
+        LOGGER.debug("SPDX line without Copyright line in: %s", path)
+        return None
+
+    return len(header_text), header_text
+
+
+SPDX_ID_PATTERN = re.compile(r"SPDX-License-Identifier:\s*(\S+)", re.IGNORECASE)
+COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4}(?:\s*-\s*\d{4})?)")
+
+
+def fix_wrong_copyright(path, template, encoding, offset) -> bool:
+    """
+    Replaces an existing header that does not match the template with the
+    template, if both use the same license.
+
+    The license is compared via the ``SPDX-License-Identifier``. Headers with a
+    different license (e.g. third-party code) are never touched. The year (or
+    year range) of the old header is kept; if none is found, the current year
+    is used.
+
+    Args:
+        path (Path): A `pathlib.Path` object pointing to the file.
+        template (str): The copyright template with a ``{year}`` placeholder.
+        encoding (str): Encoding type to use when reading and writing the file.
+        offset (int): Number of characters to keep before the header (e.g. shebang).
+
+    Returns:
+        bool: True if the header was replaced, False if it was left unchanged.
+    """
+    found = find_existing_header(path, encoding, offset, len(template.splitlines()) + 5)
+    if found is None:
+        LOGGER.debug("No replaceable header found in: %s", path)
+        return False
+    num_chars, header_text = found
+
+    old_spdx = SPDX_ID_PATTERN.search(header_text)
+    template_spdx = SPDX_ID_PATTERN.search(template)
+    if not old_spdx or not template_spdx or old_spdx[1] != template_spdx[1]:
+        LOGGER.debug("License of existing header differs from template in: %s", path)
+        return False
+
+    year_match = COPYRIGHT_YEAR_PATTERN.search(header_text)
+    year = year_match[1] if year_match else str(datetime.now().year)
+
+    with open(path, "r", encoding=encoding) as handle:
+        content = handle.read()
+    new_content = (
+        content[:offset] + template.format(year=year) + content[offset + num_chars :]
+    )
+    with open(path, "w", encoding=encoding) as handle:
+        handle.write(new_content)
+    return True
+
+
 def create_temp_file(path, encoding):
     """
     Creates a temporary file with the provided content.
@@ -618,7 +729,12 @@ def process_files(
     """
     if exclusion is None:
         exclusion = set()
-    results = {"no_copyright": 0, "fixed": 0, "duplicate_copyright": 0}
+    results = {
+        "no_copyright": 0,
+        "fixed": 0,
+        "duplicate_copyright": 0,
+        "wrong_copyright": 0,
+    }
     for item in files:
         name = Path(item).name
         key = name if name == "BUILD" else Path(item).suffix[1:]
@@ -648,9 +764,24 @@ def process_files(
             item, templates[key], use_mmap, encoding, shebang_offset
         ):
             if has_any_copyright(item, use_mmap, encoding, shebang_offset):
-                LOGGER.warning(
-                    "Wrong copyright format in: %s, expected format from template", item
-                )
+                results["wrong_copyright"] += 1
+                if not fix:
+                    LOGGER.error(
+                        "Wrong copyright format in: %s, expected format from template. Use `copyright-fix` to fix them",
+                        item,
+                    )
+                elif fix_wrong_copyright(
+                    item, templates[key], encoding, shebang_offset
+                ):
+                    results["fixed"] += 1
+                    LOGGER.info("Replaced wrong copyright header in: %s", item)
+                else:
+                    LOGGER.error(
+                        "Wrong copyright format in: %s, not replaced because its "
+                        "license differs from the template or the header could not "
+                        "be located. Fix it by hand or add it to the exclusion file.",
+                        item,
+                    )
             elif fix:
                 fix_result = fix_copyright(
                     item, templates[key], encoding, shebang_offset
@@ -743,7 +874,8 @@ def parse_arguments(argv):
         "-f",
         "--fix",
         action="store_true",
-        help="Fix missing copyright headers by inserting them",
+        help="Insert missing copyright headers and replace wrong-format headers "
+        "that use the same license as the template",
     )
 
     parser.add_argument(
@@ -811,8 +943,18 @@ def main(argv=None):
     )
     total_no = results["no_copyright"]
     total_duplicates = results["duplicate_copyright"]
+    total_wrong = results["wrong_copyright"]
 
-    return 0 if (total_no == 0 and total_duplicates == 0 and exclusion_valid) else 1
+    return (
+        0
+        if (
+            total_no == 0
+            and total_duplicates == 0
+            and total_wrong == 0
+            and exclusion_valid
+        )
+        else 1
+    )
 
 
 if __name__ == "__main__":

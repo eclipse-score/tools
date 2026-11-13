@@ -620,3 +620,271 @@ def test_exclusion_file_respected_under_bazel_run_cwd(tmp_path, monkeypatch):
     assert results["no_copyright"] == 0
     assert results["fixed"] == 0
     assert test_file.read_text(encoding="utf-8") == original_content
+
+
+def find_header(tmp_path, name, content, template_ext=None):
+    cr_checker = load_cr_checker_module()
+    path = tmp_path / name
+    path.write_text(content, encoding="utf-8")
+    ext = template_ext or path.suffix[1:]
+    max_lines = len(load_template(ext).splitlines()) + 5
+    offset = cr_checker.detect_shebang_offset(path, "utf-8")
+    return cr_checker.find_existing_header(path, "utf-8", offset, max_lines)
+
+
+# wrong wording ("Apache License 2.0") in every template style is found in full,
+# including the closing border line, and the code after it is not included
+@pytest.mark.parametrize("ext", ["py", "cpp", "rs", "md", "rst", "puml", "BUILD"])
+def test_find_existing_header_finds_full_malformed_header(tmp_path, ext):
+    header = (
+        load_template(ext)
+        .format(year=2023)
+        .replace("Apache License Version 2.0", "Apache License 2.0")
+    )
+    name = "BUILD" if ext == "BUILD" else f"file.{ext}"
+    result = find_header(tmp_path, name, header + "some content\n", ext)
+    assert result == (len(header), header)
+
+
+def test_find_existing_header_skips_shebang(tmp_path):
+    header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
+    result = find_header(
+        tmp_path, "s.py", "#!/usr/bin/env python3\n" + header + "x = 1\n"
+    )
+    assert result == (len(header), header)
+
+
+def test_find_existing_header_short_header_without_border(tmp_path):
+    header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
+    assert find_header(tmp_path, "a.py", header + "x = 1\n") == (len(header), header)
+
+
+def test_find_existing_header_code_line_with_fill_chars_after_spdx_is_not_eaten(
+    tmp_path,
+):
+    header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
+    result = find_header(tmp_path, "a.py", header + "print('=====')\n")
+    assert result == (len(header), header)
+
+
+def test_find_existing_header_code_before_header_returns_none(tmp_path):
+    content = "x = 1\n# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
+    assert find_header(tmp_path, "a.py", content) is None
+
+
+def test_find_existing_header_spdx_beyond_max_lines_returns_none(tmp_path):
+    content = (
+        "# Copyright (c) 2023 X\n" + "#\n" * 30 + "# SPDX-License-Identifier: MIT\n"
+    )
+    assert find_header(tmp_path, "a.py", content) is None
+
+
+def test_find_existing_header_spdx_without_copyright_returns_none(tmp_path):
+    assert (
+        find_header(tmp_path, "a.py", "# SPDX-License-Identifier: MIT\nx = 1\n") is None
+    )
+
+
+def test_find_existing_header_no_header_returns_none(tmp_path):
+    assert find_header(tmp_path, "a.py", "x = 1\n") is None
+
+
+def test_find_existing_header_header_only_file(tmp_path):
+    header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT"
+    assert find_header(tmp_path, "a.py", header) == (len(header), header)
+
+
+MIT_HEADER = "# Copyright (c) 2023 Example\n# SPDX-License-Identifier: MIT\n"
+
+
+def wrong_wording_header(extension: str) -> str:
+    return (
+        load_template(extension)
+        .format(year=2023)
+        .replace("Apache License Version 2.0", "Apache License 2.0")
+    )
+
+
+def run_main(cr_checker, monkeypatch, *args):
+    # main() calls configure_logging, which clears all root logger handlers
+    # (including pytest's caplog handler), so it is disabled here
+    monkeypatch.setattr(cr_checker, "configure_logging", lambda *a, **k: None)
+    return cr_checker.main([*args])
+
+
+# a header with different wording is counted as wrong, not as missing or ok
+@pytest.mark.parametrize("extension", ["py", "cpp", "rs", "rst", "BUILD"])
+def test_process_files_counts_wrong_copyright(tmp_path, extension):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / ("BUILD" if extension == "BUILD" else f"file.{extension}")
+    content = wrong_wording_header(extension) + "some content\n"
+    test_file.write_text(content, encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={extension: load_template(extension)},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["wrong_copyright"] == 1
+    assert results["no_copyright"] == 0
+    assert results["fixed"] == 0
+    assert test_file.read_text(encoding="utf-8") == content
+
+
+def test_process_files_logs_wrong_copyright_as_error(tmp_path, caplog):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    test_file.write_text(MIT_HEADER + "x = 1\n", encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING):
+        cr_checker.process_files(
+            files=[test_file],
+            templates={"py": load_template("py")},
+            fix=False,
+            use_mmap=False,
+            encoding="utf-8",
+        )
+
+    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(errors) == 1
+    assert "Wrong copyright format" in errors[0].getMessage()
+    assert str(test_file) in errors[0].getMessage()
+
+
+def test_process_files_correct_header_is_not_wrong(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    test_file.write_text(
+        load_template("py").format(year=2023) + "x = 1\n", encoding="utf-8"
+    )
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"py": load_template("py")},
+        fix=False,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["wrong_copyright"] == 0
+
+
+# a header with a different license (e.g. third-party MIT code) is never
+# replaced, also not with --fix
+def test_process_files_fix_keeps_different_license(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    content = MIT_HEADER + "x = 1\n"
+    test_file.write_text(content, encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={"py": load_template("py")},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["wrong_copyright"] == 1
+    assert results["fixed"] == 0
+    assert test_file.read_text(encoding="utf-8") == content
+
+
+# regression test for #25 / #70: wrong header used to exit 0
+@pytest.mark.parametrize("fix_args", [[], ["--fix"]])
+def test_main_returns_1_for_wrong_copyright(tmp_path, monkeypatch, fix_args):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    content = MIT_HEADER + "x = 1\n"
+    test_file.write_text(content, encoding="utf-8")
+
+    assert run_main(cr_checker, monkeypatch, *fix_args, str(test_file)) == 1
+    assert test_file.read_text(encoding="utf-8") == content
+
+
+def test_main_returns_0_for_correct_copyright(tmp_path, monkeypatch):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    test_file.write_text(
+        load_template("py").format(year=2023) + "x = 1\n", encoding="utf-8"
+    )
+
+    assert run_main(cr_checker, monkeypatch, str(test_file)) == 0
+
+
+# --fix replaces a wrong-format header with the same license by the template,
+# keeps the old year and leaves the rest of the file untouched
+@pytest.mark.parametrize("ext", ["py", "cpp", "rs", "md", "rst", "puml", "BUILD"])
+def test_process_files_fix_replaces_wrong_copyright(tmp_path, ext):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / ("BUILD" if ext == "BUILD" else f"file.{ext}")
+    rest = "\nsome content\n"
+    test_file.write_text(wrong_wording_header(ext) + rest, encoding="utf-8")
+
+    results = cr_checker.process_files(
+        files=[test_file],
+        templates={ext: load_template(ext)},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert results["wrong_copyright"] == 1
+    assert results["fixed"] == 1
+    assert test_file.read_text(encoding="utf-8") == (
+        load_template(ext).format(year=2023) + rest
+    )
+
+
+def test_process_files_fix_replaces_wrong_copyright_after_shebang(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "script.py"
+    shebang = "#!/usr/bin/env python3\n"
+    test_file.write_text(
+        shebang + wrong_wording_header("py") + "x = 1\n", encoding="utf-8"
+    )
+
+    cr_checker.process_files(
+        files=[test_file],
+        templates={"py": load_template("py")},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert test_file.read_text(encoding="utf-8") == (
+        shebang + load_template("py").format(year=2023) + "x = 1\n"
+    )
+
+
+def test_process_files_fix_keeps_year_range(tmp_path):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    header = wrong_wording_header("py").replace("2023", "2021-2023")
+    test_file.write_text(header + "x = 1\n", encoding="utf-8")
+
+    cr_checker.process_files(
+        files=[test_file],
+        templates={"py": load_template("py")},
+        fix=True,
+        use_mmap=False,
+        encoding="utf-8",
+    )
+
+    assert test_file.read_text(encoding="utf-8").startswith(
+        load_template("py").format(year="2021-2023")
+    )
+
+
+def test_main_fix_wrong_copyright_then_passes(tmp_path, monkeypatch):
+    cr_checker = load_cr_checker_module()
+    test_file = tmp_path / "file.py"
+    test_file.write_text(wrong_wording_header("py") + "x = 1\n", encoding="utf-8")
+
+    # first run fixes the file and reports it (pre-commit convention)
+    assert run_main(cr_checker, monkeypatch, "--fix", str(test_file)) == 1
+    # second run sees a correct header
+    assert run_main(cr_checker, monkeypatch, str(test_file)) == 0
