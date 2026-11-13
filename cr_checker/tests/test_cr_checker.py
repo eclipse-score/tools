@@ -1253,3 +1253,102 @@ def test_block_comment_repair_preserves_text_between_spdx_and_closing_delimiter(
 
     assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
     assert source.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize(
+    ("extension", "opening", "closing"),
+    [("cpp", "/*", "*/"), ("md", "<!--", "-->"), ("puml", "/'", "'/")],
+)
+@pytest.mark.parametrize("same_line", [False, True])
+@pytest.mark.parametrize(
+    "extra", [" user content", " AND MIT", " SPDX-License-Identifier: MIT"]
+)
+def test_block_comment_repair_refuses_extra_text_on_spdx_line(
+    tmp_path, extension, opening, closing, same_line, extra
+):
+    """The SPDX identifier must end the header text, regardless of delimiter placement."""
+    cr_checker = load_cr_checker_module()
+    header = (
+        f"{opening}\nCopyright (c) 2024 Example\n"
+        f"SPDX-License-Identifier: Apache-2.0{extra}"
+        + (" " if same_line else "\n")
+        + closing
+        + "\n"
+    )
+    original = header + "Following content\n"
+    source = tmp_path / f"example.{extension}"
+    source.write_text(original, encoding="utf-8")
+
+    assert cr_checker.find_existing_header(source, "utf-8", 0, 3) is None
+    assert not cr_checker.fix_wrong_copyright(
+        source, load_template(extension), "utf-8", 0, max_header_lines=3
+    )
+    assert source.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize(
+    ("extension", "opening", "closing"),
+    [("cpp", "/*", "*/"), ("md", "<!--", "-->"), ("puml", "/'", "'/")],
+)
+@pytest.mark.parametrize("ending", ["inline", "separate", "border"])
+@pytest.mark.parametrize("max_lines", [2, 3])
+@pytest.mark.parametrize("final_newline", ["", "\n"])
+def test_block_comment_search_limit_applies_to_spdx_not_closing_lines(
+    tmp_path, extension, opening, closing, ending, max_lines, final_newline
+):
+    """SPDX at the search limit can still be followed by a border and closing line."""
+    cr_checker = load_cr_checker_module()
+    suffix = {
+        "inline": f" {closing}",
+        "separate": f"\n  *** {closing}",
+        "border": f"\n****************\n  {closing}",
+    }[ending]
+    header = (
+        f"{opening}\nCopyright (c) 2021-2024 Example\n"
+        f"SPDX-License-Identifier: Apache-2.0{suffix}{final_newline}"
+    )
+    source = tmp_path / f"example.{extension}"
+    source.write_text(header, encoding="utf-8")
+    found = cr_checker.find_existing_header(source, "utf-8", 0, max_lines)
+    expected = (len(header), header) if max_lines == 3 else None
+    assert found == expected
+    assert cr_checker.fix_wrong_copyright(
+        source, load_template(extension), "utf-8", 0, max_header_lines=max_lines
+    ) == (max_lines == 3)
+    expected_content = (
+        load_template(extension).format(year="2021-2024") if max_lines == 3 else header
+    )
+    assert source.read_text(encoding="utf-8") == expected_content
+
+
+@pytest.mark.parametrize(
+    ("extension", "opening", "closing"),
+    [("cpp", "/*", "*/"), ("md", "<!--", "-->"), ("puml", "/'", "'/")],
+)
+@pytest.mark.parametrize(
+    "unsafe_case",
+    ["two-borders", "blank-line", "missing-identifier", "early-close", "unclosed"],
+)
+def test_block_comment_repair_requires_a_complete_header_and_only_one_border(
+    tmp_path, extension, opening, closing, unsafe_case
+):
+    """A larger read window must not broaden the permitted header contents."""
+    cr_checker = load_cr_checker_module()
+    header_start = f"{opening}\nCopyright (c) 2024 Example\n"
+    spdx = "SPDX-License-Identifier: Apache-2.0\n"
+    endings = {
+        "two-borders": f"{spdx}********\n********\n{closing}\n",
+        "blank-line": f"{spdx}\n{closing}\n",
+        "missing-identifier": f"SPDX-License-Identifier:   \n{closing}\n",
+        "early-close": f"{closing}\n{spdx}",
+        "unclosed": spdx,
+    }
+    original = header_start + endings[unsafe_case] + "Following content\n"
+    source = tmp_path / f"example.{extension}"
+    source.write_text(original, encoding="utf-8")
+
+    assert cr_checker.find_existing_header(source, "utf-8", 0, 10) is None
+    assert not cr_checker.fix_wrong_copyright(
+        source, load_template(extension), "utf-8", 0
+    )
+    assert source.read_text(encoding="utf-8") == original
