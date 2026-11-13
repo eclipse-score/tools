@@ -1112,3 +1112,110 @@ def test_complete_short_comments_can_still_be_repaired(
         == load_template(extension).format(year="2021-2024") + document
     )
     assert run_main(cr_checker, monkeypatch, str(source)) == 0
+
+
+@pytest.fixture(params=["md", "puml"])
+def block_comment_header(request):
+    """Documentation headers whose closing delimiter is separate from the SPDX line."""
+    extension = request.param
+    if extension == "md":
+        header = dedent("""\
+            <!--
+            Copyright (c) {year} Contributors to the Eclipse Foundation
+
+            See the NOTICE file(s) distributed with this work for additional
+            information regarding copyright ownership.
+
+            This program and the accompanying materials are made available under the
+            terms of the Apache License Version 2.0 which is available at
+            https://www.apache.org/licenses/LICENSE-2.0
+
+            SPDX-License-Identifier: Apache-2.0
+            -->
+            """)
+        closing = "-->"
+        document = "# Document content\n\nText with an umlaut: ä.\n"
+    else:
+        header = dedent("""\
+            /'
+               # *******************************************************************************
+               # Copyright (c) {year} Contributors to the Eclipse Foundation
+               #
+               # See the NOTICE file(s) distributed with this work for additional
+               # information regarding copyright ownership.
+               #
+               # This program and the accompanying materials are made available under the
+               # terms of the Apache License Version 2.0 which is available at
+               # https://www.apache.org/licenses/LICENSE-2.0
+               #
+               # SPDX-License-Identifier: Apache-2.0
+               # *******************************************************************************
+            '/
+            """)
+        closing = "'/"
+        document = "@startuml\nAlice -> Bob: Authentication Request\n@enduml\n"
+    return extension, header, closing, document
+
+
+@pytest.mark.parametrize("year", ["2024", "2021-2024"])
+@pytest.mark.parametrize("separator", ["", "\n"])
+def test_block_comment_repair_preserves_year_and_following_content(
+    tmp_path, monkeypatch, block_comment_header, year, separator
+):
+    """Repair consumes the whole comment, preserving years and all following text."""
+    extension, header_template, _, document = block_comment_header
+    header = header_template.format(year=year)
+    following_content = separator + document
+    source = tmp_path / f"example.{extension}"
+    original = header + following_content
+    source.write_text(original, encoding="utf-8")
+    cr_checker = load_cr_checker_module()
+
+    assert find_header(tmp_path, source.name, original) == (len(header), header)
+    # These formats require normalization rather than being accepted as templates.
+    assert run_main(cr_checker, monkeypatch, str(source)) == 1
+    assert source.read_text(encoding="utf-8") == original
+    assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
+    expected = load_template(extension).format(year=year) + following_content
+    assert source.read_text(encoding="utf-8") == expected
+    assert run_main(cr_checker, monkeypatch, str(source)) == 0
+    assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 0
+    assert source.read_text(encoding="utf-8") == expected
+
+
+@pytest.mark.parametrize(
+    "unsafe_case",
+    [
+        "different-license",
+        "unterminated",
+        "early-close",
+        "trailing-content",
+        "late-close",
+    ],
+)
+def test_block_comment_repair_refuses_unsafe_headers(
+    tmp_path, monkeypatch, block_comment_header, unsafe_case
+):
+    """An incompatible license or ambiguous comment boundary must leave the file intact."""
+    extension, header_template, closing, document = block_comment_header
+    header = header_template.format(year=2024)
+    if unsafe_case == "different-license":
+        header = header.replace(
+            "SPDX-License-Identifier: Apache-2.0", "SPDX-License-Identifier: MIT"
+        )
+    elif unsafe_case == "unterminated":
+        header = header.removesuffix(closing + "\n")
+    elif unsafe_case == "early-close":
+        header = header.replace("\n", f" {closing}\n", 1)
+    elif unsafe_case == "trailing-content":
+        header = header.replace(closing + "\n", closing + " content must survive\n")
+    else:
+        # A distant terminator must not allow an unbounded scan into the document.
+        header = header.replace(closing + "\n", "\n" * 30 + closing + "\n")
+    source = tmp_path / f"example.{extension}"
+    original = header + document
+    source.write_text(original, encoding="utf-8")
+    cr_checker = load_cr_checker_module()
+
+    assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
+    assert source.read_text(encoding="utf-8") == original

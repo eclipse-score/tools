@@ -511,7 +511,7 @@ def collect_inputs(inputs: list[str], exts=None):
 
 
 SPDX_PATTERN = re.compile(r"SPDX-License-Identifier", re.IGNORECASE)
-HEADER_START_PATTERN = re.compile(r"^\s*(#|//|/\*|\*|'|<!--|\.\.)")
+HEADER_START_PATTERN = re.compile(r"^\s*(#|//|/\*|/'|\*|'|<!--|\.\.)")
 BORDER_LINE_PATTERN = re.compile(r"^\s*(<!--)?[\s/*#'\-=+]*(-->)?\s*$")
 
 
@@ -520,14 +520,15 @@ def find_existing_header(path, encoding, offset, max_lines):
     Locates an existing (possibly malformed) copyright header at the top of a file.
 
     The header spans from the first line after `offset` through the line holding
-    ``SPDX-License-Identifier``, plus the following line if it is a pure border
-    line (e.g. ``****``, `` ****/``, ``---- -->``).
+    ``SPDX-License-Identifier`` and the closing delimiter for block comments,
+    or the following pure border line for line comments.
 
     Args:
         path (Path): A `pathlib.Path` object pointing to the file.
         encoding (str): Encoding type to use when reading the file.
         offset (int): Number of characters to skip (e.g. shebang line).
         max_lines (int): Maximum number of lines to search for the SPDX line.
+                         A block comment must close within one additional line.
                          Prevents treating real code as part of the header.
 
     Returns:
@@ -568,12 +569,22 @@ def find_existing_header(path, encoding, offset, max_lines):
     # Only replace a contiguous comment. A nearby SPDX line must never
     # cause intervening source or code after a comment terminator to be deleted.
     first_line = lines[0].lstrip()
-    if first_line.startswith(("/*", "<!--")):
-        terminator = "*/" if first_line.startswith("/*") else "-->"
-        for index, line in enumerate(lines[:end]):
+    terminator = next(
+        (
+            closing
+            for opening, closing in (("/*", "*/"), ("<!--", "-->"), ("/'", "'/"))
+            if first_line.startswith(opening)
+        ),
+        None,
+    )
+    if terminator is not None:
+        # A block can contain unprefixed text and decorative borders. Its first
+        # closing delimiter defines the boundary, independently of that styling.
+        for index, line in enumerate(lines):
             if terminator in line:
-                if index != end - 1 or line.split(terminator, 1)[1].strip():
+                if index < spdx_index or line.split(terminator, 1)[1].strip():
                     return None
+                end = index + 1
                 break
         else:
             # Without a terminator the end of a block comment is ambiguous.
