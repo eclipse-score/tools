@@ -43,7 +43,7 @@
 - **-e**, **--extensions**: List of file extensions to filter, e.g., `-e py cpp`. This list replaces (rather than extends) the built-in default list.
 - **--encoding**: File encoding (default is utf-8).
 - **--exclusion-file**: Path to a file listing paths (one per line, relative to the repository root) to exclude from the check.
-- **--fix**: Setting script into fix mode where copyright header will be added to the files if it's missing from same.
+- **--fix**: Add missing headers and repair invalid headers using the preferred template. Existing years and year ranges are preserved. Headers with a different license or that cannot be safely repaired are left unchanged and reported as errors.
 - **inputs**: (Optional) Directories and/or files to check. Neither integration passes these explicitly for a full-repo check: `pre-commit` passes whichever files it decided to run against instead, and the Bazel macro never passes any, which makes the tool fall back to running `git ls-files --cached --other --exclude-standard` (resolved against `BUILD_WORKSPACE_DIRECTORY` if set, otherwise the current working directory) and checking everything that comes back.
 
 
@@ -51,6 +51,12 @@
 
 The template file should be in INI format, with each section representing a file extension and a section specifying the copyright text.
 The copyright text can use format expressions to match the year and the author.
+
+An extension may occur in multiple sections. Its first template is the preferred
+format, used by `--fix` when adding a missing header or repairing a malformed one.
+Later templates for that extension are also accepted: checking succeeds and
+`--fix` leaves matching headers unchanged. This lets you introduce a new preferred
+format without requiring changes to files that use an accepted older format.
 
 Example templates.ini:
 
@@ -60,6 +66,9 @@ Example templates.ini:
 
 [cpp,c,hpp, h]
 // Copyright (c) {year} {author}
+
+[py]
+# Legacy copyright (c) {year} {author}
 ```
 
 ## Exit Codes
