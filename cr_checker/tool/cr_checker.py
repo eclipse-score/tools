@@ -123,19 +123,20 @@ def load_templates(path: Path):
         path (str): Path to the template file.
 
     Returns:
-        dict: A dictionary where each key is a file extension (e.g., ".cpp")
-              and the value is the template string from the config.
+        dict: A dictionary where each key is a file extension (e.g., "cpp")
+              and the value is a list of accepted templates in configuration order.
+              The first template is preferred when inserting or repairing headers.
     """
 
     def add_template_for_extensions(
-        templates: dict[str, str], extensions: list[str], template: str
+        templates: dict[str, list[str]], extensions: list[str], template: str
     ):
         # Remove trailing lines from template and ensure line end
         template = template.rstrip() + "\n"
         for extension in extensions:
-            templates[extension] = template
+            templates.setdefault(extension, []).append(template)
 
-    templates: dict[str, str] = {}
+    templates: dict[str, list[str]] = {}
     current_extensions = []
 
     with open(path, "r", encoding="utf-8") as file:
@@ -564,6 +565,31 @@ def find_existing_header(path, encoding, offset, max_lines):
     ):
         end += 1
 
+    # Only replace a contiguous comment. A nearby SPDX line must never
+    # cause intervening source or code after a comment terminator to be deleted.
+    first_line = lines[0].lstrip()
+    if first_line.startswith(("/*", "<!--")):
+        terminator = "*/" if first_line.startswith("/*") else "-->"
+        for index, line in enumerate(lines[:end]):
+            if terminator in line:
+                if index != end - 1 or line.split(terminator, 1)[1].strip():
+                    return None
+                break
+        else:
+            # Without a terminator the end of a block comment is ambiguous.
+            return None
+    elif first_line.rstrip() == "..":
+        # An RST comment ends when its body is no longer indented.
+        if any(line.strip() and not line.startswith("   ") for line in lines[1:end]):
+            return None
+    else:
+        prefix = re.match(r"(?:\#|//|')", first_line)
+        if prefix is None or any(
+            line.strip() and not line.lstrip().startswith(prefix.group())
+            for line in lines[:end]
+        ):
+            return None
+
     header_text = "".join(lines[:end])
     if not re.search(r"Copyright", header_text, re.IGNORECASE):
         LOGGER.debug("SPDX line without Copyright line in: %s", path)
@@ -576,7 +602,9 @@ SPDX_ID_PATTERN = re.compile(r"SPDX-License-Identifier:\s*(\S+)", re.IGNORECASE)
 COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4}(?:\s*-\s*\d{4})?)")
 
 
-def fix_wrong_copyright(path, template, encoding, offset) -> bool:
+def fix_wrong_copyright(
+    path, template, encoding, offset, *, max_header_lines=None
+) -> bool:
     """
     Replaces an existing header that does not match the template with the
     template, if both use the same license.
@@ -591,11 +619,15 @@ def fix_wrong_copyright(path, template, encoding, offset) -> bool:
         template (str): The copyright template with a ``{year}`` placeholder.
         encoding (str): Encoding type to use when reading and writing the file.
         offset (int): Number of characters to keep before the header (e.g. shebang).
+        max_header_lines (int | None): Search limit covering all accepted formats;
+                                      defaults to the preferred template plus five lines.
 
     Returns:
         bool: True if the header was replaced, False if it was left unchanged.
     """
-    found = find_existing_header(path, encoding, offset, len(template.splitlines()) + 5)
+    found = find_existing_header(
+        path, encoding, offset, max_header_lines or len(template.splitlines()) + 5
+    )
     if found is None:
         LOGGER.debug("No replaceable header found in: %s", path)
         return False
@@ -716,8 +748,8 @@ def process_files(
     Args:
         files (list): A list of file paths to check.
         templates (dict): A dictionary where keys are file extensions
-                          (e.g., '.py', '.txt') and values are strings or patterns
-                          representing the required copyright text.
+                          (e.g., 'py', 'txt') and values are lists of accepted templates
+                          (or single template strings). The first is preferred.
         exclusion (set): A set of paths (as str) to files to be excluded from the
                          copyright check.
         use_mmap (bool): Flag for using mmap function for reading files
@@ -755,13 +787,22 @@ def process_files(
         # Automatically detect shebang and use its offset if no manual offset provided
         shebang_offset = detect_shebang_offset(item, encoding)
 
+        # Direct callers can still supply a single template string.
+        accepted_templates = templates[key]
+        if isinstance(accepted_templates, str):
+            accepted_templates = [accepted_templates]
+        preferred_template = accepted_templates[0]
+        # Legacy headers can be longer than the preferred format.
+        longest_template = max(accepted_templates, key=len)
+
         if has_duplicate_copyright(
-            item, templates[key], use_mmap, encoding, shebang_offset
+            item, longest_template, use_mmap, encoding, shebang_offset
         ):
             LOGGER.error("Duplicate copyright header in: %s", item)
             results["duplicate_copyright"] += 1
-        elif not has_copyright(
-            item, templates[key], use_mmap, encoding, shebang_offset
+        elif not any(
+            has_copyright(item, template, use_mmap, encoding, shebang_offset)
+            for template in accepted_templates
         ):
             if has_any_copyright(item, use_mmap, encoding, shebang_offset):
                 results["wrong_copyright"] += 1
@@ -771,7 +812,14 @@ def process_files(
                         item,
                     )
                 elif fix_wrong_copyright(
-                    item, templates[key], encoding, shebang_offset
+                    item,
+                    preferred_template,
+                    encoding,
+                    shebang_offset,
+                    max_header_lines=max(
+                        len(template.splitlines()) for template in accepted_templates
+                    )
+                    + 5,
                 ):
                     results["fixed"] += 1
                     LOGGER.info("Replaced wrong copyright header in: %s", item)
@@ -784,7 +832,7 @@ def process_files(
                     )
             elif fix:
                 fix_result = fix_copyright(
-                    item, templates[key], encoding, shebang_offset
+                    item, preferred_template, encoding, shebang_offset
                 )
                 results["no_copyright"] += 1
                 if fix_result:
