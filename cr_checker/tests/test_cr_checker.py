@@ -1219,3 +1219,29 @@ def test_block_comment_repair_refuses_unsafe_headers(
 
     assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
     assert source.read_text(encoding="utf-8") == original
+
+
+@pytest.mark.parametrize(
+    ("extension", "opening", "closing"),
+    [("cpp", "/*", "*/"), ("md", "<!--", "-->"), ("puml", "/'", "'/")],
+)
+@pytest.mark.parametrize("border", ["", "************************\n"])
+def test_block_comment_repair_preserves_text_between_spdx_and_closing_delimiter(
+    tmp_path, monkeypatch, extension, opening, closing, border
+):
+    """Text after SPDX is not header decoration, even within the bounded search window."""
+    original = (
+        f"{opening}\n"
+        "Copyright (c) 2024 Contributors to the Eclipse Foundation\n"
+        "SPDX-License-Identifier: Apache-2.0\n"
+        f"{border}"
+        "Content that must survive\n"
+        f"{closing}\n"
+        "Following content\n"
+    )
+    source = tmp_path / f"example.{extension}"
+    source.write_text(original, encoding="utf-8")
+    cr_checker = load_cr_checker_module()
+
+    assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
+    assert source.read_text(encoding="utf-8") == original

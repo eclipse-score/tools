@@ -521,7 +521,9 @@ def find_existing_header(path, encoding, offset, max_lines):
 
     The header spans from the first line after `offset` through the line holding
     ``SPDX-License-Identifier`` and the closing delimiter for block comments,
-    or the following pure border line for line comments.
+    or the following pure border line for line comments. A block comment must
+    close on the SPDX line or immediately after it, allowing one border line
+    before the closing delimiter.
 
     Args:
         path (Path): A `pathlib.Path` object pointing to the file.
@@ -578,9 +580,9 @@ def find_existing_header(path, encoding, offset, max_lines):
         None,
     )
     if terminator is not None:
-        # A block can contain unprefixed text and decorative borders. Its first
-        # closing delimiter defines the boundary, independently of that styling.
-        for index, line in enumerate(lines):
+        # Only a closing delimiter may follow the SPDX line and optional border.
+        # Searching farther could consume unrelated text inside the comment.
+        for index, line in enumerate(lines[: end + 1]):
             if terminator in line:
                 if index < spdx_index or line.split(terminator, 1)[1].strip():
                     return None
