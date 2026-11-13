@@ -7,6 +7,7 @@ members = [
     "cr-checker",
     "repo-cache",
     "repo-policy-sync",
+    "rust-dependency-audit",
     "tools",
 ]
 
@@ -261,6 +262,11 @@ wheels = [
 ]
 
 [[package]]
+name = "rust-dependency-audit"
+version = "0.1.0"
+source = { editable = "rust_dependency_audit" }
+
+[[package]]
 name = "tools"
 version = "0.1.0"
 source = { virtual = "." }
@@ -273,6 +279,7 @@ dev = [
     { name = "repo-cache" },
     { name = "repo-policy-sync" },
     { name = "ruff" },
+    { name = "rust-dependency-audit" },
 ]
 
 [package.metadata]
@@ -285,6 +292,7 @@ dev = [
     { name = "repo-cache", editable = "repo_cache" },
     { name = "repo-policy-sync", editable = "repo_policy_sync" },
     { name = "ruff", specifier = "==0.15.10" },
+    { name = "rust-dependency-audit", editable = "rust_dependency_audit" },
 ]
 
 [[package]]
