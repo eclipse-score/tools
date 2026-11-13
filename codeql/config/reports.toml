@@ -1,0 +1,42 @@
+# Report definitions and presets for the `sca` tool.
+#
+# Each report is a list of pack references of the form
+# `<pack>@<version>:<path inside the pack>`. The version is mandatory and must
+# match config/packs.toml. A report is selected with `--report <name>`; a preset
+# (`--safety-level`) selects a set of reports.
+#
+# The `QM` and `ASIL` presets share the query packs but use different complexity
+# thresholds: QM 200 lines per function, 4000 per file, complexity 20, 7
+# parameters; ASIL 100 / 2000 / 10 / 5. Both presets include
+# `codeql/cpp-queries:AlertSuppression.ql` so `// codeql[<rule>]` comments are
+# processed as suppressions.
+
+[reports.codeql-report]
+packs = [
+  "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+  "codeql/cert-cpp-coding-standards@2.62.0:codeql-suites/cert-cpp-l1.qls",
+  "codeql/cert-c-coding-standards@2.62.0:codeql-suites/cert-c-l1.qls",
+  "codeql/cpp-queries@1.10.0:AlertSuppression.ql",
+]
+
+[reports.codeql-report-safety]
+packs = [
+  "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+  "codeql/cert-cpp-coding-standards@2.62.0:codeql-suites/cert-cpp-l1.qls",
+  "codeql/cert-c-coding-standards@2.62.0:codeql-suites/cert-c-l1.qls",
+  "codeql/cpp-queries@1.10.0:AlertSuppression.ql",
+  "codeql/misra-cpp-coding-standards@2.62.0:codeql-suites/misra-cpp-mandatory.qls",
+  "codeql/misra-cpp-coding-standards@2.62.0:codeql-suites/misra-cpp-required.qls",
+]
+
+# File/function size and complexity thresholds of the QM profile.
+[reports.codeql-report-complexity-qm]
+packs = ["score/code-complexity-queries@1.0.0:suites/thresholds-qm.qls"]
+
+# File/function size and complexity thresholds of the ASIL profile.
+[reports.codeql-report-complexity-asil]
+packs = ["score/code-complexity-queries@1.0.0:suites/thresholds-asil.qls"]
+
+[presets]
+QM = ["codeql-report", "codeql-report-complexity-qm"]
+ASIL = ["codeql-report-safety", "codeql-report-complexity-asil"]
