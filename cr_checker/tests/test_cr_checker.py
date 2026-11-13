@@ -1226,17 +1226,25 @@ def test_block_comment_repair_refuses_unsafe_headers(
     [("cpp", "/*", "*/"), ("md", "<!--", "-->"), ("puml", "/'", "'/")],
 )
 @pytest.mark.parametrize("border", ["", "************************\n"])
+@pytest.mark.parametrize(
+    "placement", ["separate-line", "before-delimiter", "after-delimiter"]
+)
 def test_block_comment_repair_preserves_text_between_spdx_and_closing_delimiter(
-    tmp_path, monkeypatch, extension, opening, closing, border
+    tmp_path, monkeypatch, extension, opening, closing, border, placement
 ):
     """Text after SPDX is not header decoration, even within the bounded search window."""
+    if placement == "before-delimiter":
+        ending = f"Content that must survive {closing}\n"
+    elif placement == "after-delimiter":
+        ending = f"{closing} Content that must survive\n"
+    else:
+        ending = f"Content that must survive\n{closing}\n"
     original = (
         f"{opening}\n"
         "Copyright (c) 2024 Contributors to the Eclipse Foundation\n"
         "SPDX-License-Identifier: Apache-2.0\n"
         f"{border}"
-        "Content that must survive\n"
-        f"{closing}\n"
+        f"{ending}"
         "Following content\n"
     )
     source = tmp_path / f"example.{extension}"

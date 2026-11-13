@@ -584,7 +584,12 @@ def find_existing_header(path, encoding, offset, max_lines):
         # Searching farther could consume unrelated text inside the comment.
         for index, line in enumerate(lines[: end + 1]):
             if terminator in line:
-                if index < spdx_index or line.split(terminator, 1)[1].strip():
+                before, after = line.split(terminator, 1)
+                if index < spdx_index or after.strip():
+                    return None
+                # A separate closing line may contain border decoration, but
+                # other text belongs to the document and must not be replaced.
+                if index > spdx_index and not re.fullmatch(r"[\s/*#'\-=+]*", before):
                     return None
                 end = index + 1
                 break
