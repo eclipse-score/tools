@@ -190,7 +190,12 @@ def pipeline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
                 "directory": str(settings.workspace),
                 "arguments": [str(state["compiler"]), "-c", "a.cpp"],
                 "file": "a.cpp",
-            }
+            },
+            {
+                "directory": str(settings.workspace),
+                "arguments": [str(state["compiler"]), "-c", "score/mock/m.cpp"],
+                "file": "score/mock/m.cpp",
+            },
         ]
         settings.compile_commands.write_text(json.dumps(entries))
 
@@ -225,6 +230,8 @@ def test_run_extraction_success_builds_wrapper_and_records_compilers(
     target = tmp_path / "results" / "compilers.json"
     outcome = extraction.run_extraction(settings, target)
     assert outcome.replayed_commands == 1 and outcome.execroot == pipeline["execroot"]
+    assert (outcome.analysed_commands, outcome.excluded_commands) == (1, 1)
+    assert outcome.generated_commands == 2
     assert pipeline["wrapper"] == settings.bin_dir / replay.WRAPPER_NAME
     (info,) = outcome.gate.compilers
     assert info.static is True and info.via_wrapper is True and info.version == "12.2.0"

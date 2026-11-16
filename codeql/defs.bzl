@@ -53,6 +53,7 @@ _PACK_DATA = [
 _THRESHOLD_FLAGS = {
     "max_commands_with_issues_pct": "--max-commands-with-issues-pct",
     "max_failed_command_pct": "--max-failed-command-pct",
+    "max_missing_commands_pct": "--max-missing-commands-pct",
     "max_unique_parse_errors": "--max-unique-parse-errors",
 }
 
@@ -192,10 +193,12 @@ def codeql_sca(
             (`test`, `tests`, `utests`, `mock`, `mocks`); `[]` disables it.
         extraction_thresholds: Dict overriding the extraction quality gates.
             Supported keys: `max_failed_command_pct`,
-            `max_commands_with_issues_pct`, `max_unique_parse_errors`.
+            `max_commands_with_issues_pct`, `max_missing_commands_pct`,
+            `max_unique_parse_errors`.
         expected_compilers: Regular expressions matched against the basename of
             every extracted compiler. `None` (or empty) keeps the platform
-            default (GCC on Linux, `qcc`/`q++` on QNX); `[""]` disables the check.
+            default (GCC on Linux, `qcc`/`q++` on QNX); `[""]` disables the check
+            (translated to the explicit `--no-compiler-gate`).
         visibility: Visibility of the target.
     """
     if not targets:
@@ -230,7 +233,13 @@ def codeql_sca(
             args += [_flag("auto-exclude-dir", d) for d in auto_exclude_dirs]
         else:
             args.append("--no-auto-exclude")
-    args += [_flag("expect-compiler", c) for c in _as_list(expected_compilers)]
+    compilers = _as_list(expected_compilers)
+    if "" in compilers:
+        # Keep the documented `expected_compilers = [""]` working, but spell the
+        # disabled gate out explicitly instead of an empty regex.
+        args.append("--no-compiler-gate")
+        compilers = [c for c in compilers if c]
+    args += [_flag("expect-compiler", c) for c in compilers]
     for key in sorted(extraction_thresholds):
         args.append(_flag(_THRESHOLD_FLAGS[key][2:], extraction_thresholds[key]))
     args += [_flag("default-target", t) for t in targets]

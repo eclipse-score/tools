@@ -25,10 +25,12 @@ import argparse
 import json
 import logging
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
+from score_codeql.errors import ScaError
 from score_codeql.logging_utils import setup_logging
 
 # Mirrors CodeQL's own detection (\bcodeql\s*\[...\]); accepts // and /* */ comments.
@@ -44,6 +46,24 @@ _COMMENT_RE = re.compile(
     r"(?:\*/)?\s*$"
 )
 _RULE_ID_RE = re.compile(r"codeql\s*\[([^\]]*)\]")
+
+
+@dataclass
+class SuppressionReport:
+    """In-source suppressions of one SARIF file and how well they are justified."""
+
+    suppressed: int = 0
+    annotated: int = 0
+    unresolved: int = 0
+
+    @property
+    def unjustified(self) -> int:
+        """Suppressions without a justification comment."""
+        return self.suppressed - self.annotated
+
+    @property
+    def ok(self) -> bool:
+        return self.unjustified == 0
 
 
 def _uri_to_path(uri: str, source_root: Path) -> Path:
@@ -120,20 +140,20 @@ def extract_justification(
     return justification or None
 
 
-def annotate_sarif(sarif_path: Path, source_root: Path) -> int:
-    """Annotate suppressed results in place; return a process exit code."""
+def annotate_sarif_report(sarif_path: Path, source_root: Path) -> SuppressionReport:
+    """Annotate suppressed results in place and describe the suppressions.
+
+    Raises ``ScaError`` if the SARIF cannot be read or written.
+    """
     try:
         with sarif_path.open("r", encoding="utf-8") as fh:
             sarif = json.load(fh)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-        logging.error("Failed to read SARIF file %s: %s", sarif_path, exc)
-        return 1
+        raise ScaError(f"failed to read SARIF file {sarif_path}: {exc}") from exc
     if not isinstance(sarif, dict):
-        logging.error("Expected a JSON object at the root of %s", sarif_path)
-        return 1
+        raise ScaError(f"expected a JSON object at the root of {sarif_path}")
 
-    annotated = 0
-    suppressed = 0
+    report = SuppressionReport()
     for run in sarif.get("runs", []):
         artifact_paths = _build_artifact_map(run.get("artifacts", []), source_root)
         for result in run.get("results", []):
@@ -144,13 +164,14 @@ def annotate_sarif(sarif_path: Path, source_root: Path) -> int:
             ]
             if not in_source:
                 continue
-            suppressed += 1
+            report.suppressed += 1
             location = _primary_location(result)
             if location is None:
                 logging.warning(
                     "Suppressed result for rule %r has no valid location",
                     result.get("ruleId"),
                 )
+                report.unresolved += 1
                 continue
             source_file = _resolve_source_file(location, artifact_paths, source_root)
             if source_file is None or not source_file.is_file():
@@ -159,6 +180,7 @@ def annotate_sarif(sarif_path: Path, source_root: Path) -> int:
                     result.get("ruleId"),
                     location.get("artifactLocation", {}).get("uri", "<unknown>"),
                 )
+                report.unresolved += 1
                 continue
             start_line = location.get("region", {}).get("startLine")
             if start_line is None:
@@ -166,6 +188,7 @@ def annotate_sarif(sarif_path: Path, source_root: Path) -> int:
                     "Suppressed result for rule %r has no startLine",
                     result.get("ruleId"),
                 )
+                report.unresolved += 1
                 continue
             justification = extract_justification(
                 source_file, start_line, result.get("ruleId", "")
@@ -173,19 +196,34 @@ def annotate_sarif(sarif_path: Path, source_root: Path) -> int:
             if justification:
                 for suppression in in_source:
                     suppression["justification"] = justification
-                annotated += 1
+                report.annotated += 1
 
     try:
         with sarif_path.open("w", encoding="utf-8") as fh:
             json.dump(sarif, fh, indent=2)
     except OSError as exc:
-        logging.error("Failed to write SARIF file %s: %s", sarif_path, exc)
+        raise ScaError(f"failed to write SARIF file {sarif_path}: {exc}") from exc
+    return report
+
+
+def annotate_sarif(sarif_path: Path, source_root: Path) -> int:
+    """Annotate suppressed results in place; return a process exit code."""
+    try:
+        report = annotate_sarif_report(sarif_path, source_root)
+    except ScaError as exc:
+        logging.error("%s", exc)
         return 1
     logging.info(
         "Annotated %d of %d suppressed result(s) with justification text.",
-        annotated,
-        suppressed,
+        report.annotated,
+        report.suppressed,
     )
+    if report.unresolved:
+        logging.warning(
+            "%d suppressed result(s) could not be mapped to their source line; "
+            "their justification cannot be verified",
+            report.unresolved,
+        )
     return 0
 
 
@@ -203,12 +241,42 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Root for relative URIs (default: directory of the SARIF file)",
     )
+    parser.add_argument(
+        "--require-justification",
+        action="store_true",
+        help="Fail if any in-source suppression has no justification text",
+    )
     args = parser.parse_args(argv)
     setup_logging()
     if not args.sarif_file.exists():
         logging.error("SARIF file not found: %s", args.sarif_file)
         return 1
-    return annotate_sarif(args.sarif_file, args.source_root or args.sarif_file.parent)
+    try:
+        report = annotate_sarif_report(
+            args.sarif_file, args.source_root or args.sarif_file.parent
+        )
+    except ScaError as exc:
+        logging.error("%s", exc)
+        return 1
+    logging.info(
+        "Annotated %d of %d suppressed result(s) with justification text.",
+        report.annotated,
+        report.suppressed,
+    )
+    if report.unresolved:
+        logging.warning(
+            "%d suppressed result(s) could not be mapped to their source line",
+            report.unresolved,
+        )
+    if args.require_justification and not report.ok:
+        logging.error(
+            "%d of %d in-source suppression(s) have no justification; add "
+            "`// codeql[rule-id] <reason>` above the suppressed line",
+            report.unjustified,
+            report.suppressed,
+        )
+        return 1
+    return 0
 
 
 if __name__ == "__main__":

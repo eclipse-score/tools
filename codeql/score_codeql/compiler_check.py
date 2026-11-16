@@ -88,6 +88,7 @@ class CompilerInfo:
     version: str | None = None
     gcc_major: int | None = None
     clang: bool = False
+    probe_skipped: bool = False
     via_wrapper: bool | None = None
     rewritten: int = 0
     extracted: int | None = None
@@ -99,6 +100,7 @@ class CompilerInfo:
             "version": self.version,
             "gcc_major": self.gcc_major,
             "clang": self.clang,
+            "identity": "skipped" if self.probe_skipped else "ok",
             "linkage": {True: "static", False: "dynamic", None: "unknown"}[self.static],
             "via_wrapper": self.via_wrapper,
             "commands": self.commands,
@@ -116,9 +118,27 @@ class GateResult:
     compilers: list[CompilerInfo] = field(default_factory=list)
     mimicked: list[tuple[str, int]] = field(default_factory=list)
     replayed_commands: int = 0
+    extracted_commands: int | None = None
+    mimic_source: str | None = None
     wrapper: str | None = None
     status: str = "pending"
     errors: list[str] = field(default_factory=list)
+
+    @property
+    def unverified(self) -> bool:
+        """Some compiler identity could not be queried (e.g. QNX without qcc)."""
+        return any(c.probe_skipped for c in self.compilers)
+
+    @property
+    def disabled(self) -> bool:
+        """The identity gate is disabled (``--no-compiler-gate``)."""
+        return not self.patterns
+
+    def final_status(self) -> str:
+        """Status after a successful post-extraction check."""
+        if self.disabled:
+            return "disabled"
+        return "unverified" if self.unverified else "ok"
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -127,8 +147,11 @@ class GateResult:
             "expected_compilers": self.patterns,
             "require_compiler_root": self.require_root,
             "replayed_commands": self.replayed_commands,
+            "extracted_commands": self.extracted_commands,
+            "mimic_source": self.mimic_source,
             "wrapper": self.wrapper,
             "compilers": [c.to_json() for c in self.compilers],
+            "unverified": self.unverified,
             "extracted_compilers": [
                 {"compiler": name, "count": count} for name, count in self.mimicked
             ],
@@ -144,9 +167,17 @@ def compile_patterns(patterns: Iterable[str]) -> list[re.Pattern[str]]:
 
 
 def resolve_expected(platform: str, given: Sequence[str]) -> list[str]:
-    """Effective regexes: ``[]`` (disabled) if any given value is empty."""
-    if any(not g for g in given):
-        return []
+    """Effective regexes for the compiler gate; raises ``ConfigError`` if empty.
+
+    An empty pattern used to disable the gate implicitly, which made a
+    ``--expect-compiler=""`` look like a passing gate. Disabling is now an
+    explicit decision (``--no-compiler-gate``).
+    """
+    if any(not g.strip() for g in given):
+        raise ConfigError(
+            "--expect-compiler must not be empty; pass --no-compiler-gate to "
+            "disable the compiler identity gate"
+        )
     return list(given) or list(DEFAULT_EXPECTED_COMPILERS.get(platform, []))
 
 
@@ -225,7 +256,7 @@ def check_pre_replay(
 ) -> list[CompilerInfo]:
     """Validate the compilers of *entries* before replay; return their descriptions.
 
-    With ``enforce=False`` (checks disabled by an empty ``--expect-compiler``) the
+    With ``enforce=False`` (gate disabled via ``--no-compiler-gate``) the
     compilers are only described and problems are logged as warnings.
     """
     compiled = compile_patterns(patterns)
@@ -269,9 +300,10 @@ def check_pre_replay(
         info.static = static_fn(resolved)
         result = probe_fn(resolved, Path(directory))
         if not result.ok:
+            info.probe_skipped = True
             message = f"could not query the identity of compiler {info.path}"
             if platform == "qnx" or not enforce:
-                logging.warning("%s; skipping its identity probe", message)
+                logging.warning("%s; its identity is unverified", message)
             else:
                 errors.append(message)
             continue
@@ -497,12 +529,15 @@ def run_post_gate(
             rows = run_compiler_query(
                 codeql, database, diagnostics_dir, work_dir, threads
             )
+            gate.mimic_source = "ExtractedCompilers.ql"
         except ScaError as exc:
             logging.warning(
                 "Compiler query failed (%s); falling back to the extractor logs", exc
             )
             rows = mimic_rows_from_logs(database)
+            gate.mimic_source = "extractor logs (fallback)"
         gate.mimicked = rows
+        gate.extracted_commands = sum(count for _name, count in rows)
         require_root = Path(gate.require_root) if gate.require_root else None
         check_post_extraction(
             gate.compilers,
@@ -519,5 +554,5 @@ def run_post_gate(
         gate.errors.append(str(exc))
         write_compilers_json(compilers_json, gate)
         raise
-    gate.status = "ok"
+    gate.status = gate.final_status()
     write_compilers_json(compilers_json, gate)

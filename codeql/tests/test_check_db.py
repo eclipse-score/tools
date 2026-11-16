@@ -125,10 +125,11 @@ def test_command_fallback_for_source_name(tmp_path: Path) -> None:
         f"{PREFIX}Command: /x/extractor --mimic cc1plus -c main.cpp -o x\n"
         f"{PREFIX}Extractor exiting with code 1\n"
     )
-    source, errors, _internal, failed, recovered = check_db.analyze_log(
-        directory / "1.log"
-    )
-    assert source == "main.cpp" and failed and errors == [] and recovered == []
+    analysis = check_db.analyze_log(directory / "1.log")
+    assert analysis.source == "main.cpp"
+    assert analysis.failed and not analysis.succeeded
+    assert analysis.errors == [] and analysis.recovered == []
+    assert not analysis.verdict_missing and analysis.readable
 
 
 def test_failed_extraction_diagnostics_are_not_recovered(tmp_path: Path) -> None:
@@ -174,3 +175,56 @@ def test_report_to_dict_for_summary(tmp_path: Path) -> None:
     _log(tmp_path, "1")
     data = check_db.analyze_database(tmp_path).to_dict()
     assert data["total_logs"] == 1 and data["passed"] is True
+    assert data["evaluated_logs"] == 1
+    assert data["unreadable_logs"] == 0 and data["logs_without_verdict"] == 0
+    assert data["unchecked"] == ["failed commands", "commands with issues"]
+
+
+def test_unreadable_log_fails_instead_of_counting_as_clean(tmp_path: Path) -> None:
+    _log(tmp_path, "1")
+    # A directory named like a log cannot be read by read_text().
+    (tmp_path / "log" / "extractor" / "00" / "broken.log").mkdir()
+    report = check_db.analyze_database(tmp_path)
+    assert report.unreadable_logs == 1 and report.logs_without_evidence == 1
+    assert not report.passed
+    assert "have no usable verdict" in report.failures[0]
+    text = check_db.format_report(report)
+    assert "Logs without verdict  : 1" in text and "1 unreadable" in text
+    assert "FAIL" in text
+
+
+def test_log_without_exit_marker_fails_instead_of_counting_as_clean(
+    tmp_path: Path,
+) -> None:
+    _log(tmp_path, "1")
+    directory = tmp_path / "log" / "extractor" / "00"
+    (directory / "truncated.log").write_text(
+        f"{PREFIX}Processed command line: x -- b.cpp\n"
+    )
+    report = check_db.analyze_database(
+        tmp_path, max_failed_command_pct=5.0, max_commands_with_issues_pct=5.0
+    )
+    assert report.logs_without_verdict == 1
+    assert not report.passed
+    assert "without an extractor exit marker" in report.failures[0]
+    # The thresholds themselves are still evaluated on the readable logs.
+    assert report.failed_pct == 0.0 and report.evaluated_logs == 2
+
+
+def test_standalone_defaults_report_unchecked_thresholds(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    _log(tmp_path, "1")
+    report = check_db.analyze_database(tmp_path)
+    assert report.unchecked == ["failed commands", "commands with issues"]
+    assert "Not evaluated         : failed commands, commands with issues" in (
+        check_db.format_report(report)
+    )
+    assert check_db.main([str(tmp_path)]) == 0
+    captured = capsys.readouterr()
+    assert "not evaluated" in captured.err
+    checked = check_db.analyze_database(
+        tmp_path, max_failed_command_pct=0.0, max_commands_with_issues_pct=0.0
+    )
+    assert checked.unchecked == []
+    assert "Not evaluated" not in check_db.format_report(checked)

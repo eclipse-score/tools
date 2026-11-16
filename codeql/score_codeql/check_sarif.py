@@ -20,19 +20,24 @@ metrics. Three kinds of checks produce a failing exit status:
   ``..`` escapes, ``bazel-*`` output trees and ``external/`` paths are dropped or
   misplaced by GitHub Code Scanning, so they are rejected here.
 * **An empty ruleset** means no query produced results, so nothing was analysed.
-  This always fails, also with ``--no-fail``.
+  This always fails, also with ``--no-fail``. ``cpp/telemetry/*`` rules are
+  excluded from that count: they only exist to carry metrics and would make a
+  metric-only run look like an analysed one.
 * **Quality metrics** fail unless ``--no-fail`` is given. The gated metrics are
   the telemetry percentages that quantify how much of the database was extracted
   without errors (compilations, source/header files, ``#include`` directives,
   functions, expressions, lines of code) plus the number of syntax and compiler
   errors. Percentages that are legitimately below 100 % (calls with an explicit
   target, expressions and variables with a known type) are reported as ``INFO``
-  in verbose mode only.
+  in verbose mode only. In a multi-run SARIF the worst run decides for a
+  percentage (``min``) and counts are summed, so a healthy run can never mask a
+  broken one.
 
 If the SARIF carries no ``cpp/telemetry`` metrics at all (for example because the
 selected report contains no ``@kind metric`` queries), the quality checks cannot
 be evaluated. That is reported with a visible ``WARN`` line so a run never looks
-green because telemetry is missing.
+green because telemetry is missing. A single run without telemetry next to runs
+that have it is reported the same way.
 
 Missing or invalid SARIF input always fails.
 """
@@ -89,6 +94,14 @@ _GATED_COUNTS = (
 )
 
 
+def format_percentage(value: float) -> str:
+    """Format a percentage with up to four decimals (never hides a deficit)."""
+    text = f"{value:.4f}".rstrip("0")
+    if text.endswith("."):
+        text += "0"
+    return f"{text}%"
+
+
 @dataclass
 class QualityResult:
     """Outcome of the SARIF telemetry quality checks."""
@@ -97,6 +110,7 @@ class QualityResult:
     failed: bool = False
     empty_ruleset: bool = False
     unchecked: list[str] = field(default_factory=list)
+    unevaluated_runs: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -107,12 +121,13 @@ class SarifReport:
     quality_failed: bool = False
     empty_ruleset: bool = False
     unchecked: list[str] = field(default_factory=list)
+    unevaluated_runs: list[int] = field(default_factory=list)
     uri_violations: list[str] = field(default_factory=list)
 
     @property
     def telemetry_missing(self) -> bool:
         """Some gated quality checks could not be evaluated (metric absent)."""
-        return bool(self.unchecked)
+        return bool(self.unchecked or self.unevaluated_runs)
 
     @property
     def text(self) -> str:
@@ -197,17 +212,29 @@ def _metric_results(run: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def get_metric(
-    runs: list[dict[str, Any]], rule_id: str, metric_name: str
+    runs: list[dict[str, Any]],
+    rule_id: str,
+    metric_name: str,
+    *,
+    combine: str = "min",
 ) -> float | None:
-    """Value of a named metric from ``properties.metricResults``, or ``None``."""
-    for run in runs:
-        for metric in _metric_results(run):
-            if (
-                metric.get("ruleId") == rule_id
-                and metric.get("message", {}).get("text", "") == metric_name
-            ):
-                return metric.get("value")
-    return None
+    """Aggregate a named metric over *runs*, or return ``None`` if absent.
+
+    A multi-run SARIF must not be judged by the first run that happens to carry
+    the metric. Percentages use ``combine="min"`` (the worst run decides), counts
+    use ``combine="sum"`` (they add up).
+    """
+    values = [
+        float(metric["value"])
+        for run in runs
+        for metric in _metric_results(run)
+        if metric.get("ruleId") == rule_id
+        and metric.get("message", {}).get("text", "") == metric_name
+        and metric.get("value") is not None
+    ]
+    if not values:
+        return None
+    return min(values) if combine == "min" else sum(values)
 
 
 def has_telemetry(runs: list[dict[str, Any]]) -> bool:
@@ -216,6 +243,17 @@ def has_telemetry(runs: list[dict[str, Any]]) -> bool:
         str(metric.get("ruleId", "")).startswith(_TELEMETRY_PREFIX)
         for run in runs
         for metric in _metric_results(run)
+    )
+
+
+def non_telemetry_rule_count(runs: list[dict[str, Any]]) -> int:
+    """Number of rules that can produce findings (``cpp/telemetry/*`` excluded)."""
+    return sum(
+        1
+        for run in runs
+        for source in _rule_sources(run)
+        for rule in source.get("rules", [])
+        if not str(rule.get("id", "")).startswith(_TELEMETRY_PREFIX)
     )
 
 
@@ -262,9 +300,7 @@ def _quality_lines(runs: list[dict[str, Any]], verbose: bool) -> QualityResult:
             result.failed = True
             result.lines.append(f"[quality check] FAIL: {label}{suffix}")
 
-    rule_count = sum(
-        len(source.get("rules", [])) for run in runs for source in _rule_sources(run)
-    )
+    rule_count = non_telemetry_rule_count(runs)
     label = "Expect number of rules > 0, actual:"
     if rule_count > 0:
         check(label, True, f"{rule_count} rules")
@@ -273,22 +309,26 @@ def _quality_lines(runs: list[dict[str, Any]], verbose: bool) -> QualityResult:
         result.empty_ruleset = True
         result.lines.append(
             f"[quality check] FAIL: {label} (0 rules; no query produced results, "
-            "check the selected reports and the resolved packs)"
+            "check the selected reports and the resolved packs; cpp/telemetry/* "
+            "metric rules do not count)"
         )
 
     telemetry = has_telemetry(runs)
+    runs_without_telemetry = [
+        index for index, run in enumerate(runs) if not has_telemetry([run])
+    ]
 
     for rule_id, metric_name in _GATED_PERCENTAGES:
         pct = get_metric(runs, rule_id, metric_name)
         check(
             f"Expect: {metric_name.lower()} == 100%, actual:",
             None if pct is None else pct >= 100.0,
-            "metric not found" if pct is None else f"{pct:.1f}%",
+            "metric not found" if pct is None else format_percentage(pct),
         )
 
     counts: dict[str, float | None] = {}
     for rule_id, metric_name in _GATED_COUNTS:
-        counts[metric_name] = get_metric(runs, rule_id, metric_name)
+        counts[metric_name] = get_metric(runs, rule_id, metric_name, combine="sum")
         count = counts[metric_name]
         check(
             f"Expect: {metric_name} == 0, actual:",
@@ -307,12 +347,19 @@ def _quality_lines(runs: list[dict[str, Any]], verbose: bool) -> QualityResult:
     if verbose:
         for rule_id, metric_name in _INFORMATIONAL_PERCENTAGES:
             pct = get_metric(runs, rule_id, metric_name)
-            shown = "metric not found" if pct is None else f"{pct:.1f}%"
+            shown = "metric not found" if pct is None else format_percentage(pct)
             result.lines.append(
                 f"[quality check] INFO: {metric_name.lower()}, actual: ({shown})"
             )
 
     if telemetry:
+        if runs_without_telemetry:
+            result.unevaluated_runs = runs_without_telemetry
+            labels = ", ".join(f"run {i}" for i in runs_without_telemetry)
+            result.lines.append(
+                f"[quality check] WARN: {labels} carry no cpp/telemetry metrics; "
+                "their database quality was not evaluated"
+            )
         if result.unchecked:
             result.lines.append(
                 "[quality check] WARN: metric missing, not evaluated: "
@@ -372,6 +419,7 @@ def analyze(runs: list[dict[str, Any]], verbose: bool = False) -> SarifReport:
     report.quality_failed = quality.failed
     report.empty_ruleset = quality.empty_ruleset
     report.unchecked = list(quality.unchecked)
+    report.unevaluated_runs = list(quality.unevaluated_runs)
     report.lines.extend(quality.lines)
     if verbose:
         report.lines.extend(rules_table(runs))

@@ -167,13 +167,34 @@ def test_disabled_gate_only_describes(toolchain: dict[str, Path]) -> None:
         probe=_probe(major=None, clang=True), enforce=False,
     )  # fmt: skip
     assert infos[0].clang is True
+    gate = cc.GateResult("linux", [], None, compilers=infos)
+    assert gate.disabled and not gate.unverified
+    assert gate.final_status() == "disabled"
+    assert gate.to_json()["compilers"][0]["identity"] == "ok"
 
 
-def test_resolve_expected_defaults_and_disable() -> None:
+def test_unqueryable_identity_is_reported_as_unverified(
+    toolchain: dict[str, Path],
+) -> None:
+    entries = _entries(toolchain[GPP], toolchain["execroot"])
+    failing = lambda _p, _c: cc.Probe()  # noqa: E731
+    (info,) = _pre(entries, toolchain, platform="qnx", probe=failing)
+    assert info.probe_skipped and info.version is None
+    assert info.to_json()["identity"] == "skipped"
+    gate = cc.GateResult("qnx", cc.DEFAULT_EXPECTED_COMPILERS["qnx"], None)
+    gate.compilers = [info]
+    assert gate.unverified and not gate.disabled
+    assert gate.final_status() == "unverified"
+
+
+def test_resolve_expected_defaults_and_rejects_empty() -> None:
     assert cc.resolve_expected("linux", []) == LINUX
     assert cc.resolve_expected("qnx", []) == [r"^(qcc|q\+\+)$"]
     assert cc.resolve_expected("linux", ["^custom$"]) == ["^custom$"]
-    assert cc.resolve_expected("linux", ["^custom$", ""]) == []
+    with pytest.raises(ConfigError, match="--no-compiler-gate"):
+        cc.resolve_expected("linux", [""])
+    with pytest.raises(ConfigError, match="--no-compiler-gate"):
+        cc.resolve_expected("linux", ["^custom$", ""])
     with pytest.raises(ConfigError):
         cc.compile_patterns(["("])
 
@@ -349,6 +370,9 @@ def test_run_post_gate_uses_query_result_and_writes_json(
     )  # fmt: skip
     data = json.loads(target.read_text())
     assert data["status"] == "ok"
+    assert data["mimic_source"] == "ExtractedCompilers.ql"
+    assert data["extracted_commands"] == 3
+    assert data["unverified"] is False
     assert data["extracted_compilers"] == [
         {"compiler": str(toolchain[GPP]), "count": 3}
     ]
@@ -400,6 +424,28 @@ def test_run_post_gate_falls_back_to_extractor_logs(
         compilers_json=tmp_path / "compilers.json",
     )  # fmt: skip
     assert gate.status == "ok" and gate.mimicked == [(str(toolchain[GPP]), 3)]
+    assert gate.mimic_source == "extractor logs (fallback)"
+    assert gate.extracted_commands == 3
+
+
+def test_run_post_gate_marks_a_disabled_gate_as_disabled(
+    toolchain: dict[str, Path],
+    fake_codeql: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = {"#select": {"tuples": [[str(toolchain["g++"]), 3]]}}
+    monkeypatch.setenv("FAKE_CODEQL_BQRS", json.dumps(rows))
+    gate = cc.GateResult("linux", [], None, replayed_commands=3)
+    gate.compilers = [_info(toolchain, static=False)]
+    target = tmp_path / "compilers.json"
+    cc.run_post_gate(
+        gate, codeql=fake_codeql, database=tmp_path / "db", diagnostics_dir=tmp_path,
+        work_dir=tmp_path, execroot=None, tolerance_pct=0.0, threads=1,
+        compilers_json=target,
+    )  # fmt: skip
+    assert gate.status == "disabled"
+    assert json.loads(target.read_text())["status"] == "disabled"
 
 
 def test_compilers_json_schema(toolchain: dict[str, Path]) -> None:

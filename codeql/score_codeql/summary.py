@@ -37,6 +37,7 @@ class SarifCounts:
 
     by_severity: Counter[str] = field(default_factory=Counter)
     suppressed: int = 0
+    unjustified: int = 0
     by_rule: Counter[str] = field(default_factory=Counter)
     by_file: Counter[str] = field(default_factory=Counter)
 
@@ -57,13 +58,22 @@ def _rule_levels(run: Mapping[str, Any]) -> dict[str, str]:
 
 
 def count_results(sarif: Mapping[str, Any]) -> SarifCounts:
-    """Count results per severity, rule and file; suppressed results are separate."""
+    """Count results per severity, rule and file; suppressed results are separate.
+
+    A suppressed result counts as *unjustified* if its in-source suppressions
+    carry no justification text; that is what hides a finding from Code Scanning
+    and from the severity counts above.
+    """
     counts = SarifCounts()
     for run in sarif.get("runs", []):
         levels = _rule_levels(run)
         for result in run.get("results", []):
-            if result.get("suppressions"):
+            suppressions = result.get("suppressions") or []
+            if suppressions:
                 counts.suppressed += 1
+                in_source = [s for s in suppressions if s.get("kind") == "inSource"]
+                if in_source and not all(s.get("justification") for s in in_source):
+                    counts.unjustified += 1
                 continue
             rule_id = (
                 result.get("ruleId") or result.get("rule", {}).get("id") or "<unknown>"
@@ -115,10 +125,13 @@ def compiler_section(compilers: Mapping[str, Any] | None) -> list[str]:
             item.get("via_wrapper")
         ]
         extracted = item.get("extracted")
+        version = item.get("version") or (
+            "not queried" if item.get("identity") == "skipped" else "unknown"
+        )
         rows.append(
             (
                 item.get("basename", "?"),
-                item.get("version") or "unknown",
+                version,
                 item.get("linkage", "unknown"),
                 wrapper,
                 f"{item.get('commands', 0)} commands",
@@ -131,6 +144,22 @@ def compiler_section(compilers: Mapping[str, Any] | None) -> list[str]:
     lines.append("")
     status = compilers.get("status", "unknown")
     lines.append(f"Compiler gate: **{status}**")
+    if status == "disabled":
+        lines.append(
+            "- The compiler identity gate is disabled (`--no-compiler-gate`): the "
+            "database is not verified to come from the production compiler."
+        )
+    elif status == "unverified":
+        skipped = [
+            item.get("basename", "?")
+            for item in compilers.get("compilers", [])
+            if item.get("identity") == "skipped"
+        ]
+        names = ", ".join(f"`{name}`" for name in skipped) or "the compiler"
+        lines.append(
+            f"- The identity of {names} could not be queried; the compilers and "
+            "their versions above are not verified."
+        )
     for error in compilers.get("errors", []):
         lines.append(f"- {_esc(error)}")
     lines.append("")
@@ -141,29 +170,44 @@ def extraction_section(stats: Mapping[str, Any] | None) -> list[str]:
     lines = ["## Extraction", ""]
     if not stats:
         return [*lines, "_No extraction statistics available._", ""]
-    lines += _table(
-        ["Metric", "Value"],
-        [
-            ("Command logs analyzed", stats.get("total_logs", 0)),
-            (
-                "Commands failed",
-                f"{stats.get('failed_logs', 0)} ({stats.get('failed_pct', 0.0):.1f}%)",
-            ),
-            (
-                "Commands with issues",
-                f"{stats.get('logs_with_errors', 0)} ({stats.get('issues_pct', 0.0):.1f}%)",
-            ),
-            (
-                "Commands with recovered diagnostics",
-                f"{stats.get('logs_with_recovered', 0)} "
-                f"({stats.get('recovered_pct', 0.0):.1f}%)",
-            ),
-            ("Unique parse errors", stats.get("unique_parse", 0)),
-            ("Unique recovered diagnostics", stats.get("unique_recovered", 0)),
-            ("Status", "PASS" if stats.get("passed", True) else "FAIL"),
-        ],
-    )
+    rows: list[tuple[str, object]] = [
+        ("Command logs analyzed", stats.get("total_logs", 0)),
+        (
+            "Commands failed",
+            f"{stats.get('failed_logs', 0)} ({stats.get('failed_pct', 0.0):.1f}%)",
+        ),
+        (
+            "Commands with issues",
+            f"{stats.get('logs_with_errors', 0)} ({stats.get('issues_pct', 0.0):.1f}%)",
+        ),
+        (
+            "Commands with recovered diagnostics",
+            f"{stats.get('logs_with_recovered', 0)} "
+            f"({stats.get('recovered_pct', 0.0):.1f}%)",
+        ),
+        ("Unique parse errors", stats.get("unique_parse", 0)),
+        ("Unique recovered diagnostics", stats.get("unique_recovered", 0)),
+    ]
+    # Coverage of the extraction pipeline (absent in older result files).
+    for label, key in (
+        ("Translation units analysed", "analysed_commands"),
+        ("Translation units excluded", "excluded_commands"),
+        ("Commands replayed", "replayed_commands"),
+        ("Compilations in database", "extracted_commands"),
+        ("Unreadable extractor logs", "unreadable_logs"),
+        ("Logs without a verdict", "logs_without_verdict"),
+    ):
+        if stats.get(key) is not None:
+            rows.append((label, stats[key]))
+    rows.append(("Status", "PASS" if stats.get("passed", True) else "FAIL"))
+    lines += _table(["Metric", "Value"], rows)
     lines.append("")
+    unchecked = stats.get("unchecked") or []
+    if unchecked:
+        lines.append(
+            "_Not evaluated (no threshold given): " + ", ".join(unchecked) + "._"
+        )
+        lines.append("")
     if stats.get("logs_with_recovered", 0):
         lines.append(
             "_Recovered diagnostics are informational: the extractor completed those "
@@ -181,20 +225,36 @@ def findings_section(
 ) -> list[str]:
     lines = ["## Findings", ""]
     rows = [
-        (name, *(c.by_severity[s] for s in SEVERITIES), c.suppressed, c.total)
+        (name, *(c.by_severity[s] for s in SEVERITIES), c.suppressed, c.unjustified,
+         c.total)
         for name, c in per_report.items()
-    ]
+    ]  # fmt: skip
     if combined is not None:
         rows.append(
             (
                 "**combined (Code Scanning)**",
                 *(combined.by_severity[s] for s in SEVERITIES),
                 combined.suppressed,
+                combined.unjustified,
                 combined.total,
             )
         )
-    lines += _table(["Report", "Error", "Warning", "Note", "Suppressed", "Total"], rows)
+    lines += _table(
+        ["Report", "Error", "Warning", "Note", "Suppressed", "Unjustified", "Total"],
+        rows,
+    )
     lines.append("")
+    unjustified = (
+        combined.unjustified
+        if combined is not None
+        else sum(c.unjustified for c in per_report.values())
+    )
+    if unjustified:
+        lines += [
+            f"`{unjustified}` in-source suppression(s) have no justification text; "
+            "add `// codeql[<rule-id>] <reason>` above the suppressed line.",
+            "",
+        ]
     if dropped_external:
         lines += [
             f"`{dropped_external}` result(s) in code outside the workspace (Bazel "

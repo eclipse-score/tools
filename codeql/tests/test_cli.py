@@ -76,8 +76,10 @@ def test_only_negative_user_targets_extend_default_targets() -> None:
     assert cli.effective_targets(args) == ["//score/...", "-//score/legacy/..."]
 
 
-def test_expect_compiler_empty_string_is_preserved() -> None:
+def test_expect_compiler_empty_string_is_parsed_for_rejection() -> None:
     assert cli.parse_args(["--expect-compiler="]).expect_compiler == [""]
+    assert cli.parse_args(["--no-compiler-gate"]).no_compiler_gate is True
+    assert cli.parse_args([]).max_missing_commands_pct == 0.0
 
 
 def test_print_pins(
@@ -200,8 +202,12 @@ def pipeline(
         monkeypatch.setenv(f"SCORE_CODEQL_{name}", str(script))
     monkeypatch.setattr(bz, "find_bazel", lambda explicit=None: "bazel")
     monkeypatch.setattr(bz, "get_output_base", lambda *_: tmp_path / "output_base")
-    calls: dict[str, list] = {"settings": [], "reports": [], "queries": []}
-
+    calls: dict[str, list] = {
+        "settings": [],
+        "reports": [],
+        "queries": [],
+        "post_gate": [],
+    }
     monkeypatch.setattr(extraction, "init_database", lambda s: None)
 
     def fake_extraction(settings, compilers_json):
@@ -210,7 +216,7 @@ def pipeline(
             "linux", settings.expect_patterns, None, replayed_commands=1
         )
         gate.compilers = [compiler_check.CompilerInfo("g++", "g++", 1, static=False)]
-        return extraction.ExtractionOutcome(tmp_path, 1, gate)
+        return extraction.ExtractionOutcome(tmp_path, 1, gate, analysed_commands=1)
 
     monkeypatch.setattr(extraction, "run_extraction", fake_extraction)
     monkeypatch.setattr(
@@ -219,7 +225,14 @@ def pipeline(
         lambda *_a, **_k: check_db.DbReport(total_logs=1),
     )
     monkeypatch.setattr(analysis, "finalize_database", lambda *a, **k: None)
-    monkeypatch.setattr(compiler_check, "run_post_gate", lambda gate, **k: None)
+
+    def fake_run_post_gate(gate, **kwargs):
+        calls["post_gate"].append(kwargs)
+        gate.extracted_commands = gate.replayed_commands
+        gate.mimic_source = "ExtractedCompilers.ql"
+        gate.status = gate.final_status()
+
+    monkeypatch.setattr(compiler_check, "run_post_gate", fake_run_post_gate)
     monkeypatch.setattr(
         analysis, "run_queries", lambda *a, **k: calls["queries"].append(a)
     )
@@ -287,7 +300,7 @@ def test_pipeline_cli_targets_and_overrides_reach_extraction(
             "--platform=qnx",
             "--safety-level=ASIL",
             "//other/...",
-            "--expect-compiler=",
+            "--no-compiler-gate",
             "--pack-cache-dir",
             str(tmp_path / "cache"),
             "--sarif-category=custom/cat",
@@ -300,6 +313,48 @@ def test_pipeline_cli_targets_and_overrides_reach_extraction(
     assert settings.expect_gcc_major is None and settings.require_root is None
     assert pipeline["category"] == "custom/cat"
     assert pipeline["reports"] == ["safety", "complexity"]
+
+
+def test_pipeline_rejects_empty_expect_compiler(
+    pipeline: dict[str, list], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    args = ["//a/...", "--pack-cache-dir", str(tmp_path / "c")]
+    assert cli.main([*args, "--expect-compiler="]) == 1
+    assert "--no-compiler-gate" in capsys.readouterr().err
+    assert not pipeline["settings"]
+    assert cli.main([*args, "--no-compiler-gate", "--expect-compiler=^g\\+\\+$"]) == 1
+    assert "cannot be combined" in capsys.readouterr().err
+
+
+def test_pipeline_gate_status_is_reported(
+    pipeline: dict[str, list],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    args = [
+        "//a/...",
+        "--no-compiler-gate",
+        "--pack-cache-dir",
+        str(tmp_path / "c"),
+    ]
+    assert cli.main(args) == 0
+    err = capsys.readouterr().err
+    assert "compiler identity gate disabled" in err
+    summary = (tmp_path / "ws" / "_codeql_sca" / "results" / "summary.md").read_text()
+    assert "Compiler gate: **disabled**" in summary
+    assert "not verified to come from the production compiler" in summary
+
+
+def test_pipeline_missing_commands_tolerance_is_separate_from_replay(
+    pipeline: dict[str, list], tmp_path: Path
+) -> None:
+    base = ["//a/...", "--pack-cache-dir", str(tmp_path / "c")]
+    assert cli.main(base) == 0
+    assert pipeline["settings"][0].max_failed_command_pct == 5.0
+    assert pipeline["post_gate"][0]["tolerance_pct"] == 0.0
+    assert cli.main([*base, "--max-missing-commands-pct=2.5"]) == 0
+    assert pipeline["post_gate"][1]["tolerance_pct"] == 2.5
+    assert pipeline["settings"][1].max_failed_command_pct == 5.0
 
 
 def test_pipeline_fail_on_findings_exit_code(
@@ -407,6 +462,38 @@ def test_pipeline_missing_telemetry_is_logged(
 ) -> None:
     assert cli.main(["//a/...", "--pack-cache-dir", str(tmp_path / "c")]) == 0
     assert "SARIF telemetry metrics are missing" in capsys.readouterr().err
+
+
+def _suppressed_sarif() -> dict:
+    sarif = json.loads(json.dumps(SARIF))
+    sarif["runs"][0]["results"].append(
+        {
+            "ruleId": "r/1",
+            "level": "error",
+            "locations": [
+                {"physicalLocation": {"artifactLocation": {"uri": "src/a.cpp"}}}
+            ],
+            "suppressions": [{"kind": "inSource"}],
+        }
+    )
+    return sarif
+
+
+def test_pipeline_unjustified_suppression_is_fatal_unless_disabled(
+    pipeline: dict[str, list],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _combined_writer(monkeypatch, _suppressed_sarif())
+    args = ["//a/...", "--pack-cache-dir", str(tmp_path / "c")]
+    assert cli.main(args) == 1
+    err = capsys.readouterr().err
+    assert "in-source suppression(s) have no justification" in err
+    summary = (tmp_path / "ws" / "_codeql_sca" / "results" / "summary.md").read_text()
+    assert "| **combined (Code Scanning)** | 1 | 0 | 0 | 1 | 1 | 1 |" in summary
+    assert cli.main([*args, "--no-fail-suppressions"]) == 0
+    assert "continuing because of --no-fail-suppressions" in capsys.readouterr().err
 
 
 def test_pipeline_cli_version_mismatch_is_fatal(

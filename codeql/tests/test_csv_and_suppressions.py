@@ -135,3 +135,83 @@ def test_invalid_sarif_fails(tmp_path: Path) -> None:
     bad.write_text("not json")
     assert sarif_suppressions.annotate_sarif(bad, tmp_path) == 1
     assert sarif_suppressions.main([str(tmp_path / "missing.sarif")]) == 1
+
+
+def _two_suppressions(tmp_path: Path) -> tuple[Path, Path]:
+    root = tmp_path / "src"
+    root.mkdir()
+    (root / "a.cpp").write_text("int x;\n// codeql[cpp/goto] intentional\ngoto L;\n")
+    results = [
+        {
+            "ruleId": "cpp/goto",
+            "locations": [
+                {
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": "a.cpp", "index": 0},
+                        "region": {"startLine": line},
+                    }
+                }
+            ],
+            "suppressions": [{"kind": "inSource"}],
+        }
+        for line in (3, 1)
+    ]
+    sarif = tmp_path / "r.sarif"
+    sarif.write_text(
+        json.dumps(
+            {
+                "runs": [
+                    {
+                        "artifacts": [{"location": {"uri": "a.cpp"}}],
+                        "results": results,
+                    }
+                ]
+            }
+        )
+    )
+    return sarif, root
+
+
+def test_report_counts_justified_and_unjustified_suppressions(tmp_path: Path) -> None:
+    sarif, root = _two_suppressions(tmp_path)
+    report = sarif_suppressions.annotate_sarif_report(sarif, root)
+    assert (report.suppressed, report.annotated, report.unresolved) == (2, 1, 0)
+    assert report.unjustified == 1 and not report.ok
+    assert sarif_suppressions.main([str(sarif), "--source-root", str(root)]) == 0
+    assert (
+        sarif_suppressions.main(
+            [str(sarif), "--source-root", str(root), "--require-justification"]
+        )
+        == 1
+    )
+
+
+def test_unresolvable_suppression_is_counted(tmp_path: Path) -> None:
+    sarif = tmp_path / "r.sarif"
+    sarif.write_text(
+        json.dumps(
+            {
+                "runs": [
+                    {
+                        "results": [
+                            {
+                                "ruleId": "cpp/goto",
+                                "locations": [
+                                    {
+                                        "physicalLocation": {
+                                            "artifactLocation": {"uri": "gone.cpp"},
+                                            "region": {"startLine": 2},
+                                        }
+                                    }
+                                ],
+                                "suppressions": [{"kind": "inSource"}],
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+    )
+    report = sarif_suppressions.annotate_sarif_report(sarif, tmp_path)
+    assert report.unresolved == 1 and report.annotated == 0
+    assert sarif_suppressions.main([str(sarif), "--require-justification"]) == 1

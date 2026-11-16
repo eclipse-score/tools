@@ -42,7 +42,7 @@ from score_codeql import bazel as bz
 from score_codeql import config as cfg
 from score_codeql import packs as pk
 from score_codeql import runfiles as rf
-from score_codeql.errors import ScaError
+from score_codeql.errors import ConfigError, ScaError
 from score_codeql.logging_utils import setup_logging
 
 EXIT_FINDINGS = 3
@@ -164,6 +164,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--max-failed-command-pct", type=float, default=5.0)
     parser.add_argument("--max-commands-with-issues-pct", type=float, default=5.0)
+    parser.add_argument(
+        "--max-missing-commands-pct",
+        type=float,
+        default=0.0,
+        help="Tolerance for replayed commands that did not end up as compilations "
+        "in the database (default 0.0); independent of --max-failed-command-pct",
+    )
     parser.add_argument("--max-unique-parse-errors", type=int, default=0)
     parser.add_argument(
         "--exclude-glob",
@@ -197,7 +204,13 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         metavar="REGEX",
         help="Regex for the basename of every replayed/extracted compiler (repeatable; "
-        "empty string disables the compiler gate)",
+        "must not be empty, use --no-compiler-gate to disable the gate)",
+    )
+    parser.add_argument(
+        "--no-compiler-gate",
+        action="store_true",
+        help="Disable the compiler identity gate (the database is then not verified "
+        "to come from the production compiler); conflicts with --expect-compiler",
     )
     parser.add_argument(
         "--require-compiler-root",
@@ -221,6 +234,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Do not fail when the SARIF telemetry quality checks report problems "
         "(an empty ruleset and non-relative result URIs still fail)",
+    )
+    parser.add_argument(
+        "--no-fail-suppressions",
+        action="store_true",
+        help="Do not fail when in-source suppressions have no justification text "
+        "(they still hide findings and are reported)",
     )
     parser.add_argument(
         "--force-rebuild",
@@ -367,7 +386,15 @@ def run(args: argparse.Namespace) -> int:
         os.cpu_count() or 1, analysis.MAX_CODEQL_THREADS
     )
     category = args.sarif_category or f"static-analysis-codeql/{args.platform}"
-    patterns = compiler_check.resolve_expected(args.platform, args.expect_compiler)
+    if args.no_compiler_gate and args.expect_compiler:
+        raise ConfigError(
+            "--no-compiler-gate cannot be combined with --expect-compiler"
+        )
+    patterns = (
+        []
+        if args.no_compiler_gate
+        else compiler_check.resolve_expected(args.platform, args.expect_compiler)
+    )
     if args.expect_gcc_major is None:
         gcc_major = compiler_check.DEFAULT_EXPECT_GCC_MAJOR.get(args.platform)
     else:
@@ -474,10 +501,27 @@ def run(args: argparse.Namespace) -> int:
         diagnostics_dir=diagnostics_dir,
         work_dir=work_dir,
         execroot=outcome.execroot,
-        tolerance_pct=args.max_failed_command_pct,
+        tolerance_pct=args.max_missing_commands_pct,
         threads=threads,
         compilers_json=compilers_json,
     )
+    logging.info(
+        "> Database compilations: %s of %d replayed command(s) "
+        "(missing-commands tolerance %.1f%%)",
+        outcome.gate.extracted_commands,
+        outcome.replayed_commands,
+        args.max_missing_commands_pct,
+    )
+    if outcome.gate.status == "disabled":
+        logging.warning(
+            "compiler identity gate disabled (--no-compiler-gate): the database is "
+            "not verified to come from the production compiler"
+        )
+    elif outcome.gate.status == "unverified":
+        logging.warning(
+            "compiler identity gate unverified for: %s",
+            ", ".join(c.basename for c in outcome.gate.compilers if c.probe_skipped),
+        )
 
     logging.info("> Run queries")
     analysis.run_queries(
@@ -526,12 +570,18 @@ def run(args: argparse.Namespace) -> int:
         n: summary.load_counts(results_dir / f"{n}.sarif") for n in selected
     }
     combined_counts = summary.load_counts(combined)
+    extraction_stats = db_report.to_dict() | {
+        "analysed_commands": outcome.analysed_commands,
+        "excluded_commands": outcome.excluded_commands,
+        "replayed_commands": outcome.replayed_commands,
+        "extracted_commands": outcome.gate.extracted_commands,
+    }
     (results_dir / "summary.md").write_text(
         summary.build_summary(
             per_report=per_report_counts,
             combined=combined_counts,
             compilers=outcome.gate.to_json(),
-            extraction=db_report.to_dict(),
+            extraction=extraction_stats,
             pins=pins_data,
             dropped_external=pruned["results"],
         ),
@@ -543,9 +593,15 @@ def run(args: argparse.Namespace) -> int:
             "would drop or misplace these alerts (see sarif-summary.txt)"
         )
     if sarif_report.telemetry_missing:
+        details = list(sarif_report.unchecked)
+        if sarif_report.unevaluated_runs:
+            details.append(
+                "run(s) without telemetry: "
+                + ", ".join(str(i) for i in sarif_report.unevaluated_runs)
+            )
         logging.warning(
             "SARIF telemetry metrics are missing, quality checks not evaluated: %s",
-            ", ".join(sarif_report.unchecked),
+            ", ".join(details),
         )
     if sarif_report.empty_ruleset:
         raise ScaError(
@@ -562,6 +618,16 @@ def run(args: argparse.Namespace) -> int:
             raise ScaError(
                 f"{message}; pass --no-fail-sarif-quality to continue anyway"
             )
+    if combined_counts.unjustified:
+        message = (
+            f"{combined_counts.unjustified} in-source suppression(s) have no "
+            "justification text (see summary.md); add `// codeql[<rule-id>] "
+            "<reason>` above the suppressed line"
+        )
+        if args.no_fail_suppressions:
+            logging.warning("%s; continuing because of --no-fail-suppressions", message)
+        else:
+            raise ScaError(f"{message}; pass --no-fail-suppressions to continue anyway")
 
     logging.info("> Done. Results are stored in: %s", results_dir)
     if _fail_on_findings(args.fail_on, combined_counts):

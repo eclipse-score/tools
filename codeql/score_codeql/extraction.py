@@ -270,6 +270,13 @@ class ExtractionOutcome:
     execroot: Path
     replayed_commands: int
     gate: compiler_check.GateResult
+    analysed_commands: int = 0
+    excluded_commands: int = 0
+
+    @property
+    def generated_commands(self) -> int:
+        """Translation units in the generated compilation database."""
+        return self.analysed_commands + self.excluded_commands
 
 
 def run_extraction(
@@ -306,11 +313,16 @@ def run_extraction(
         settings.compile_commands, settings.compile_commands_execroot, execroot
     )
     logging.info("> Filter compile_commands for SCA replay")
-    compile_commands_filter.filter_commands(
+    analysed, excluded = compile_commands_filter.filter_commands(
         settings.compile_commands_execroot, settings.filtered, exclude_globs
     )
     count = validate_compilation_database(settings.filtered)
     entries = compile_commands_filter.load_entries(settings.filtered)
+    logging.info(
+        "Compile commands for replay: %d analysed, %d excluded (auto/explicit)",
+        analysed,
+        excluded,
+    )
 
     gate = compiler_check.GateResult(
         platform=settings.platform,
@@ -332,6 +344,10 @@ def run_extraction(
         )
         wrapper = prepare_wrapper(settings, gate.compilers)
         gate.wrapper = str(wrapper) if wrapper else None
+        if gate.disabled:
+            gate.status = "disabled"
+        elif gate.unverified:
+            gate.status = "unverified"
     except ScaError as exc:
         gate.status = "failed"
         gate.errors.append(str(exc))
@@ -360,7 +376,7 @@ def run_extraction(
         compiler_check.write_compilers_json(compilers_json, gate)
         raise
     compiler_check.write_compilers_json(compilers_json, gate)
-    return ExtractionOutcome(execroot, count, gate)
+    return ExtractionOutcome(execroot, count, gate, analysed, excluded)
 
 
 def prepare_wrapper(

@@ -259,3 +259,62 @@ def test_sarif_without_telemetry_warns_instead_of_passing_silently() -> None:
     assert "no cpp/telemetry metrics in this SARIF" in report.text
     assert "compiler errors" in report.unchecked
     assert "syntax errors" in report.unchecked
+
+
+def test_metric_only_ruleset_does_not_count_as_analysed() -> None:
+    metrics = [_metric("cpp/telemetry/extraction-metrics", "syntax errors", 0)]
+    run = _run([], metrics)
+    run["tool"] = {
+        "driver": {"rules": [{"id": "cpp/telemetry/extraction-metrics"}]},
+        "extensions": [{"rules": [{"id": "cpp/telemetry/database-quality"}]}],
+    }
+    report = check_sarif.analyze([run])
+    assert report.empty_ruleset and report.quality_failed
+    assert check_sarif.non_telemetry_rule_count([run]) == 0
+    with_result = json.loads(json.dumps(run))
+    with_result["tool"]["extensions"][0]["rules"].append({"id": "cpp/errors"})
+    assert check_sarif.non_telemetry_rule_count([with_result]) == 1
+
+
+def test_percentage_metrics_use_the_worst_run() -> None:
+    name = "Percentage of functions without errors"
+    rule = "cpp/telemetry/database-quality"
+    healthy = _run([], [_metric(rule, name, 100.0)])
+    broken = _run([], [_metric(rule, name, 91.0)])
+    report = check_sarif.analyze([healthy, broken])
+    assert report.quality_failed
+    assert "91.0%" in report.text
+    assert check_sarif.get_metric([healthy, broken], rule, name) == 91.0
+
+
+def test_count_metrics_are_summed_across_runs() -> None:
+    rule = "cpp/telemetry/extraction-metrics"
+    first = _run([], [_metric(rule, "compiler errors", 2)])
+    second = _run([], [_metric(rule, "compiler errors", 3)])
+    report = check_sarif.analyze([first, second])
+    assert report.quality_failed
+    assert (
+        check_sarif.get_metric([first, second], rule, "compiler errors", combine="sum")
+        == 5.0
+    )
+
+
+def test_percentage_formatting_does_not_hide_a_deficit() -> None:
+    assert check_sarif.format_percentage(100.0) == "100.0%"
+    assert check_sarif.format_percentage(99.9897) == "99.9897%"
+    assert check_sarif.format_percentage(96.5) == "96.5%"
+
+
+def test_run_without_telemetry_next_to_a_measured_run_is_reported() -> None:
+    measured = _run(
+        [],
+        [
+            _metric("cpp/telemetry/extraction-metrics", "syntax errors", 0),
+            _metric("cpp/telemetry/extraction-metrics", "compiler errors", 0),
+        ],
+    )
+    report = check_sarif.analyze([measured, _run([])])
+    assert not report.quality_failed
+    assert report.telemetry_missing
+    assert "run 1 carry no cpp/telemetry metrics" in report.text
+    assert "their database quality was not evaluated" in report.text

@@ -121,8 +121,8 @@ codeql_sca(
 | `extra_pack_data` | Labels (filegroups) with all files of those packs. | (runfiles only) |
 | `exclude_globs` | Extra glob patterns removed from the compile commands. | `--exclude-glob=X` |
 | `auto_exclude_dirs` | Directory names excluded automatically. `None` keeps the default (`test`, `tests`, `utests`, `mock`, `mocks`); `[]` disables the automatic exclusion. | `--auto-exclude-dir=X` / `--no-auto-exclude` |
-| `extraction_thresholds` | Dict of extraction quality gates: `max_failed_command_pct`, `max_commands_with_issues_pct`, `max_unique_parse_errors`. | `--max-failed-command-pct=N`, `--max-commands-with-issues-pct=N`, `--max-unique-parse-errors=N` |
-| `expected_compilers` | Regexes for the basename of every extracted compiler. `None` keeps the platform default; `[""]` disables the check. | `--expect-compiler=REGEX` |
+| `extraction_thresholds` | Dict of extraction quality gates: `max_failed_command_pct`, `max_commands_with_issues_pct`, `max_missing_commands_pct`, `max_unique_parse_errors`. | `--max-failed-command-pct=N`, `--max-commands-with-issues-pct=N`, `--max-missing-commands-pct=N`, `--max-unique-parse-errors=N` |
+| `expected_compilers` | Regexes for the basename of every extracted compiler. `None` keeps the platform default; `[""]` disables the check (translated to `--no-compiler-gate`). | `--expect-compiler=REGEX` |
 
 The macro defines a `py_binary` whose `args` contain the baked options **before**
 any option given on the command line. Precedence at `bazel run <name> -- ...`:
@@ -167,25 +167,39 @@ bazel run //codeql:sca -- [options] [targets...]
 | `--threads N`, `--ram MB` | CodeQL resources. Defaults: `min(cpu, 16)` threads, 75 % of available memory capped at 12288 MB. |
 | `--replay-jobs N` | Parallel compile-command replay jobs. Default `min(cpu, 16)`. |
 | `--max-failed-command-pct`, `--max-commands-with-issues-pct`, `--max-unique-parse-errors` | Extraction quality gates (defaults 5.0 / 5.0 / 0). |
+| `--max-missing-commands-pct` | Tolerance for replayed commands that did not end up as compilations in the database (default 0.0). Independent of `--max-failed-command-pct`: the replay tolerance covers transient replay failures, this gate covers a database that is missing translation units. `summary.md` reports replayed vs. extracted commands. |
 | `--exclude-glob GLOB` | Extra compile-commands exclusion (repeatable). |
 | `--auto-exclude-dir NAME`, `--no-auto-exclude` | Directory names whose targets are excluded automatically, or disable that. |
 | `--sarif-category STR` | Category of the combined SARIF. Default `static-analysis-codeql/<platform>`. |
-| `--expect-compiler REGEX` | Regex for the basename of every extracted compiler (repeatable). Default linux `^x86_64-unknown-linux-gnu-(gcc\|g\+\+\|c\+\+)$`, qnx `^(qcc\|q\+\+)$`. An empty string disables the check. |
+| `--expect-compiler REGEX` | Regex for the basename of every extracted compiler (repeatable). Default linux `^x86_64-unknown-linux-gnu-(gcc\|g\+\+\|c\+\+)$`, qnx `^(qcc\|q\+\+)$`. Must not be empty; pass `--no-compiler-gate` to disable the gate explicitly. |
+| `--no-compiler-gate` | Disable the compiler identity gate. `compilers.json` and `summary.md` then report `disabled`, so a run never looks verified when it is not. Conflicts with `--expect-compiler`. |
 | `--require-compiler-root PATH` | Mimicked compilers must resolve below this directory. Default `bazel info output_base` (hermetic toolchains live in `<output_base>/external`); empty disables. |
 | `--expect-gcc-major N` | Required `__GNUC__` of the compiler. Default 12 on linux, none on qnx; `0` disables. |
 | `--force-rebuild` | Force a non-cached, non-uploaded materialising build (only needed when generated files are missing after a cached build). |
 | `--codeql-cli PATH` | CodeQL launcher; overrides `$SCORE_CODEQL_CLI` (for experiments, defeats the pin). |
 | `--fail-on {none,error,warning}` | Optional gate on the combined SARIF. Default `none`: findings never fail the run. |
 | `--no-fail-sarif-quality` | Do not fail when the SARIF telemetry quality checks report problems (see [SARIF quality checks](#sarif-quality-checks)). An empty ruleset and non-relative result URIs still fail. |
+| `--no-fail-suppressions` | Do not fail when in-source suppressions have no justification text (see [Suppressions](#suppressions)). They still hide findings and are reported in `summary.md`. |
 | `--bazel PATH` | Bazel executable for nested invocations (default `$BAZEL`, then `bazelisk`, then `bazel`). |
 | `--list-reports` | Print reports and presets and exit. |
 | `--print-pins` | Print CLI and pack versions (JSON) and exit; useful for cache keys. |
 | `-v`, `--verbose` | Verbose logging. |
 
 Exit code `0` means the analysis ran, regardless of findings. Non-zero is
-returned for tool, build or extraction failures, for `--fail-on` hits and for
+returned for tool, build or extraction failures, for `--fail-on` hits, for
 failing [SARIF quality checks](#sarif-quality-checks) unless
-`--no-fail-sarif-quality` is given.
+`--no-fail-sarif-quality` is given, and for unjustified suppressions unless
+`--no-fail-suppressions` is given.
+
+Every extractor log must carry the extractor's verdict (`Extractor exited
+successfully` or `Extractor exiting with code`). A log that cannot be read, or
+that has neither marker, fails the run: it is not evidence of a clean
+compilation, so a truncated or unknown log format can never look like a healthy
+extraction. Logs of this kind are counted separately in `extraction-summary.txt`
+and `summary.md` (*Unreadable extractor logs*, *Logs without a verdict*). The
+standalone checker (`python -m score_codeql.check_db`) has no defaults for
+`--max-failed-command-pct`/`--max-commands-with-issues-pct`; thresholds that were
+not given are reported as *not evaluated* instead of passing silently.
 
 Diagnostics of a compilation that the extractor completed successfully are
 *recovered*: they are no evidence of a broken extraction, so they do not count
@@ -217,7 +231,8 @@ carries its version (`<pack>@<version>:<path>`).
 Both presets run `codeql/cpp-queries:AlertSuppression.ql`, so
 `// codeql[<rule-id>]` comments in the analysed code are evaluated and the
 affected results are marked as suppressed in the SARIF file (they are counted in
-the "Suppressed" column of `summary.md`, not reported as findings).
+the "Suppressed" column of `summary.md`, not reported as findings; unjustified
+ones are gated, see [Suppressions](#suppressions)).
 
 ### Complexity thresholds
 
@@ -259,7 +274,7 @@ extractor log that feeds the [extraction quality gates](#cli-reference-codeqlsca
 
 | Check | Fails when |
 | --- | --- |
-| ruleset | the SARIF contains no rules at all, i.e. no query produced results |
+| ruleset | the SARIF contains no rules that can produce findings, i.e. no query produced results (`cpp/telemetry/*` metric rules do not count, so a metric-only run cannot pass) |
 | `Percentage of compilations without errors` | below 100 % |
 | `Percentage of source/header files without errors` | below 100 % |
 | `Percentage of successfully resolved #include directives` | below 100 % |
@@ -283,7 +298,12 @@ turns them into a warning (the standalone checker uses `--no-fail`). If the
 SARIF carries no `cpp/telemetry` metrics at all (for example a report that
 selects only complexity queries), the checks cannot be evaluated; that is
 written as a visible `WARN` line and logged, so a run never looks green merely
-because telemetry is missing.
+because telemetry is missing. The same applies to a single run without telemetry
+next to runs that have it.
+
+A SARIF may contain several runs (for example several databases or query sets).
+Percentages are then combined with `min` (the worst run decides) and counts are
+summed, so a healthy run can never hide a broken one.
 
 The checker can also be used standalone:
 
@@ -351,6 +371,18 @@ The `AlertSuppression.ql` query in `codeql-report` makes CodeQL recognise these
 comments; the tool then writes the justification into the SARIF
 `suppressions` of the result.
 
+A suppression without justification text hides a finding for free, so it is
+gated: the run fails if any in-source suppression has no `codeql[...]` comment
+with a reason (pass `--no-fail-suppressions` to continue anyway). `summary.md`
+counts them in the *Unjustified* column and names the rule to fix. Suppressions
+that cannot be mapped to their source line are reported as unresolved and count
+as unjustified. The standalone tool can gate them as well:
+
+```bash
+python -m score_codeql.sarif_suppressions results/code-scanning.sarif \
+    --source-root . --require-justification
+```
+
 ## Output layout
 
 Everything is written below `--output-dir` (default `<workspace>/_codeql_sca`).
@@ -404,12 +436,21 @@ A run can never silently analyse another compiler's build:
    alias of the wrapped compilers only because step 1 already verified those
    compilers (regex, root, `__clang__`/`__GNUC__`) and step 2 recorded how many
    commands were rewritten for each; the number of wrapper compilations must
-   match that total (within the failed-command threshold). Any other wrapper
+   match that total (within `--max-missing-commands-pct`). Any other wrapper
    path, or a wrapper mimic without a verified wrapped compiler, fails. In all
    cases the extracted compilations must not be fewer than the replayed commands.
 4. `summary.md` starts with a compiler table
    (`x86_64-unknown-linux-gnu-g++ | 12.2.0 | static | via wrapper | 57 commands | 57 extracted`),
    and `compilers.json` is shipped with the results.
+
+The gate is never silently absent:
+
+- A compiler whose identity probe fails (e.g. `qcc` on a QNX host without the
+  SDP) is recorded with `"identity": "skipped"` and the status becomes
+  `unverified`; the table shows `not queried` and a warning is logged.
+- `--no-compiler-gate` is the only way to disable the gate. It sets the status
+  to `disabled`, which `summary.md` spells out; an empty `--expect-compiler` is
+  rejected as a configuration error.
 
 ## Architecture
 
