@@ -74,7 +74,7 @@ def test_interpret_sarif_flags_and_category(fake_codeql: Path, tmp_path: Path) -
     )  # fmt: skip
     call = _calls(tmp_path)[0]
     for flag in (
-        "--format=sarif-latest",
+        "--format=sarifv2.1.0",
         "--no-sarif-minify",
         "--sarif-group-rules-by-pack",
         "--sarif-include-query-help=always",
@@ -83,6 +83,8 @@ def test_interpret_sarif_flags_and_category(fake_codeql: Path, tmp_path: Path) -
         "--additional-packs=/c",
     ):
         assert flag in call
+    # The schema is pinned, not left to the CLI's notion of "latest".
+    assert "--format=sarif-latest" not in call
     assert call[-2:] == [str(r) for r in REFS]
 
 

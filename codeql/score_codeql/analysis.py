@@ -33,8 +33,12 @@ from score_codeql.process import run_cmd
 MAX_CODEQL_THREADS = 16
 MAX_RAM_MB = 12288
 MAX_REPORT_WORKERS = 4
+# The SARIF schema is pinned instead of using `sarif-latest`, which (per
+# `codeql database interpret-results --help`) "will produce different versions of
+# SARIF between different CodeQL versions" and is therefore not suitable for
+# automation. With a pinned CLI the emitted format must be pinned as well.
 _SARIF_FLAGS = (
-    "--format=sarif-latest",
+    "--format=sarifv2.1.0",
     "--no-sarif-minify",
     "--sarif-group-rules-by-pack",
     "--sarif-include-query-help=always",

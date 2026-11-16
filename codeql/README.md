@@ -253,12 +253,18 @@ checksums because it cannot load `.bzl` files. Tests keep them consistent.
 | `codeql/misra-cpp-coding-standards` | 2.62.0 |
 | `score/code-complexity-queries` (local) | 1.0.0 |
 | `score/codeql-sca-diagnostics` (local) | 1.0.0 |
+| SARIF output format (`--format`) | `sarifv2.1.0` |
 | `bazel-compile-commands` (glibc >= 2.38) | 0.22.4 |
 | `bazel-compile-commands` (glibc < 2.38, Ubuntu 22.04 `.deb`) | 0.21.0 |
 
 Query packs are compiled by the pinned CLI at analysis time. External packs
 (coding standards) are downloaded with `codeql pack download <name>@<version>`
 into the pack cache and verified against the pinned version before use.
+
+Results are interpreted with `--format=sarifv2.1.0`, not `sarif-latest`: the
+latter produces different SARIF versions with different CLI versions (the CLI
+help calls it unsuitable for automation), so pinning the CLI without pinning the
+schema would let an unrelated upgrade change the uploaded SARIF.
 
 ### Upgrading the pins
 
