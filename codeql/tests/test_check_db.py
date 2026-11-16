@@ -70,9 +70,20 @@ def test_parse_errors_of_failed_extraction_are_reported(tmp_path: Path) -> None:
     assert "compiled from:" in text and "FAIL" in text
 
 
-def test_parse_errors_of_successful_extraction_are_ignored(tmp_path: Path) -> None:
+def test_parse_errors_of_successful_extraction_are_reported_as_recovered(
+    tmp_path: Path,
+) -> None:
     _log(tmp_path, "1", error=True, exit_ok=True)
-    assert check_db.analyze_database(tmp_path).unique_parse == 0
+    report = check_db.analyze_database(tmp_path)
+    assert report.unique_parse == 0 and report.passed
+    assert report.logs_with_recovered == 1 and report.unique_recovered == 1
+    text = check_db.format_report(report)
+    assert "RECOVERED EXTRACTOR DIAGNOSTICS (1)" in text
+    assert "a.cpp:3: error: expected a ';'" in text
+    assert "1 cmd(s), 1 unique (not gated)" in text
+    data = report.to_dict()
+    assert data["logs_with_recovered"] == 1 and data["unique_recovered"] == 1
+    assert data["recovered_pct"] == 100.0 and data["passed"] is True
 
 
 def test_thresholds(tmp_path: Path) -> None:
@@ -114,8 +125,30 @@ def test_command_fallback_for_source_name(tmp_path: Path) -> None:
         f"{PREFIX}Command: /x/extractor --mimic cc1plus -c main.cpp -o x\n"
         f"{PREFIX}Extractor exiting with code 1\n"
     )
-    source, errors, _internal, failed = check_db.analyze_log(directory / "1.log")
-    assert source == "main.cpp" and failed and errors == []
+    source, errors, _internal, failed, recovered = check_db.analyze_log(
+        directory / "1.log"
+    )
+    assert source == "main.cpp" and failed and errors == [] and recovered == []
+
+
+def test_failed_extraction_diagnostics_are_not_recovered(tmp_path: Path) -> None:
+    _log(tmp_path, "1", "bad.cpp", error=True, exit_ok=False)
+    report = check_db.analyze_database(tmp_path)
+    assert report.recovered_issues == [] and report.logs_with_recovered == 0
+    text = check_db.format_report(report)
+    assert "RECOVERED EXTRACTOR DIAGNOSTICS" not in text
+    assert "0 cmd(s), 0 unique (not gated)" in text
+
+
+def test_recovered_diagnostics_are_deduplicated_across_commands(tmp_path: Path) -> None:
+    for name in ("1", "2"):
+        _log(tmp_path, name, error=True, exit_ok=True)
+    report = check_db.analyze_database(tmp_path)
+    assert report.unique_parse == 0 and report.passed
+    assert report.logs_with_recovered == 2 and report.unique_recovered == 1
+    text = check_db.format_report(report)
+    assert text.count("a.cpp:3: error: expected a ';'") == 1
+    assert "compiled from:" in text
 
 
 def test_invalid_databases_raise(tmp_path: Path) -> None:

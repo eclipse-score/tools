@@ -153,11 +153,24 @@ def extraction_section(stats: Mapping[str, Any] | None) -> list[str]:
                 "Commands with issues",
                 f"{stats.get('logs_with_errors', 0)} ({stats.get('issues_pct', 0.0):.1f}%)",
             ),
+            (
+                "Commands with recovered diagnostics",
+                f"{stats.get('logs_with_recovered', 0)} "
+                f"({stats.get('recovered_pct', 0.0):.1f}%)",
+            ),
             ("Unique parse errors", stats.get("unique_parse", 0)),
+            ("Unique recovered diagnostics", stats.get("unique_recovered", 0)),
             ("Status", "PASS" if stats.get("passed", True) else "FAIL"),
         ],
     )
     lines.append("")
+    if stats.get("logs_with_recovered", 0):
+        lines.append(
+            "_Recovered diagnostics are informational: the extractor completed those "
+            "compilations, so they are not gated, but recoverable errors can still "
+            "affect the analysis._"
+        )
+        lines.append("")
     return lines
 
 

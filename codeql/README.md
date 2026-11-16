@@ -184,6 +184,16 @@ bazel run //codeql:sca -- [options] [targets...]
 Exit code `0` means the analysis ran, regardless of findings. Non-zero is
 returned for tool, build or extraction failures (and for `--fail-on` hits).
 
+Diagnostics of a compilation that the extractor completed successfully are
+*recovered*: they are no evidence of a broken extraction, so they do not count
+towards `--max-unique-parse-errors` (and the run keeps passing with the default
+limit of `0`). They are nevertheless retained and reported: section *recovered
+extractor diagnostics* of `results/extraction-summary.txt`, and the counters
+*Commands with recovered diagnostics* / *Unique recovered diagnostics* of
+`results/summary.md`. Recoverable errors can still limit how much of the code
+the analysis sees, so they are part of the analysis integrity report instead of
+being dropped.
+
 ## Reports and presets
 
 Defined in [`config/reports.toml`](config/reports.toml). Every pack reference
@@ -308,7 +318,7 @@ _codeql_sca/
 ├── results/
 │   ├── <report>.sarif, <report>.csv   one pair per selected report
 │   ├── code-scanning.sarif            single run with the SARIF category; upload this one
-│   ├── extraction-summary.txt         extraction statistics
+│   ├── extraction-summary.txt         extraction statistics and diagnostics
 │   ├── sarif-summary.txt              checks of the SARIF output
 │   ├── summary.md                     job summary (compiler table, counts, pins)
 │   ├── compilers.json                 compilers that produced the database

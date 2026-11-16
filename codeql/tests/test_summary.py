@@ -132,6 +132,26 @@ def test_summary_findings_pins_and_escaping() -> None:
     assert "| Commands with issues | 1 (1.8%) |" in text
 
 
+def test_summary_reports_recovered_extractor_diagnostics() -> None:
+    extraction = {
+        "total_logs": 2,
+        "failed_logs": 0,
+        "failed_pct": 0.0,
+        "logs_with_errors": 0,
+        "issues_pct": 0.0,
+        "logs_with_recovered": 1,
+        "recovered_pct": 50.0,
+        "unique_parse": 0,
+        "unique_recovered": 3,
+        "passed": True,
+    }
+    text = _build(extraction=extraction)
+    assert "| Commands with recovered diagnostics | 1 (50.0%) |" in text
+    assert "| Unique recovered diagnostics | 3 |" in text
+    assert "Recovered diagnostics are informational" in text
+    assert "Recovered diagnostics are informational" not in _build()
+
+
 def test_summary_handles_missing_inputs_and_failed_gate() -> None:
     text = _build(compilers=None, extraction=None, pins=None, combined=None)
     assert "_No compiler information available._" in text

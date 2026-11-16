@@ -16,6 +16,13 @@
 Reports parse/syntax errors in GCC style (sorted by file) and applies
 configurable extraction-quality thresholds.
 
+Diagnostics of a compilation that the extractor completed successfully are
+*recovered*: they are no evidence of a broken extraction, so they are not
+gated (``--max-unique-parse-errors`` defaults to 0 and would otherwise be
+unsatisfiable), but they are kept and reported.  Recoverable errors can still
+affect how much of the code the analysis sees, so they belong in the analysis
+integrity report (``extraction-summary.txt`` and ``summary.md``).
+
 Exit codes: 0 = thresholds met, 1 = a threshold failed or the database is invalid.
 """
 
@@ -54,10 +61,13 @@ class DbReport:
     failed_logs: int = 0
     logs_with_errors: int = 0
     logs_with_internal: int = 0
+    logs_with_recovered: int = 0
     unique_parse: int = 0
     unique_internal: int = 0
+    unique_recovered: int = 0
     show_all_warnings: bool = False
     issues: list[tuple[Issue, set[str]]] = field(default_factory=list)
+    recovered_issues: list[tuple[Issue, set[str]]] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
 
     @property
@@ -67,6 +77,12 @@ class DbReport:
     @property
     def issues_pct(self) -> float:
         return self.logs_with_errors / self.total_logs * 100 if self.total_logs else 0.0
+
+    @property
+    def recovered_pct(self) -> float:
+        return (
+            self.logs_with_recovered / self.total_logs * 100 if self.total_logs else 0.0
+        )
 
     @property
     def passed(self) -> bool:
@@ -80,7 +96,10 @@ class DbReport:
             "failed_pct": self.failed_pct,
             "logs_with_errors": self.logs_with_errors,
             "issues_pct": self.issues_pct,
+            "logs_with_recovered": self.logs_with_recovered,
+            "recovered_pct": self.recovered_pct,
             "unique_parse": self.unique_parse,
+            "unique_recovered": self.unique_recovered,
             "passed": self.passed,
         }
 
@@ -91,10 +110,18 @@ def _strip_log_prefix(line: str) -> str:
     return line
 
 
-def analyze_log(log_path: Path) -> tuple[str | None, list[Issue], list[Issue], bool]:
+def analyze_log(
+    log_path: Path,
+) -> tuple[str | None, list[Issue], list[Issue], bool, list[Issue]]:
     """Parse one extractor log.
 
-    Returns ``(source_file, parse_errors, internal_warnings, failed)``.
+    Returns ``(source_file, parse_errors, internal_warnings, failed, recovered)``.
+
+    ``recovered`` holds the diagnostics of a compilation that the extractor
+    completed successfully and for which it recorded no failure marker.  They
+    are not evidence of a broken extraction, hence not gated, but they are
+    returned instead of being dropped: recoverable errors can still affect the
+    analysis and are reported for the analysis integrity report.
     """
     source_file: str | None = None
     errors: list[Issue] = []
@@ -109,7 +136,7 @@ def analyze_log(log_path: Path) -> tuple[str | None, list[Issue], list[Issue], b
         text = log_path.read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
         logging.warning("Cannot read %s: %s", log_path, exc)
-        return None, [], [], False
+        return None, [], [], False, []
 
     def flush() -> None:
         if pending is not None:
@@ -154,11 +181,15 @@ def analyze_log(log_path: Path) -> tuple[str | None, list[Issue], list[Issue], b
             succeeded = True
 
     flush()
-    # Parse errors of an extraction that exited successfully are spurious
-    # (the extractor recovered).
+    # A log with the success marker and without any failure marker means the
+    # extractor completed this compilation: its diagnostics are recovered ones,
+    # not evidence of a broken extraction.  The gate follows the extractor's
+    # verdict, but the messages are retained - recoverable errors can still
+    # affect the analysis, so they are reported (informational, not gated).
+    recovered: list[Issue] = []
     if succeeded and not failed:
-        errors = []
-    return source_file, errors, internal, failed
+        recovered, errors = errors, []
+    return source_file, errors, internal, failed, recovered
 
 
 def extractor_log_dir(db_path: Path) -> Path:
@@ -193,8 +224,9 @@ def analyze_database(
 
     report = DbReport(total_logs=len(log_files), show_all_warnings=show_all_warnings)
     sources: dict[Issue, set[str]] = defaultdict(set)
+    recovered_sources: dict[Issue, set[str]] = defaultdict(set)
     for log_path in log_files:
-        src, errors, internal, failed = analyze_log(log_path)
+        src, errors, internal, failed, recovered = analyze_log(log_path)
         label = src or f"<unknown, log={log_path.name}>"
         if failed:
             report.failed_logs += 1
@@ -202,6 +234,10 @@ def analyze_database(
             report.logs_with_errors += 1
             for issue in errors:
                 sources[issue].add(label)
+        if recovered:
+            report.logs_with_recovered += 1
+            for issue in recovered:
+                recovered_sources[issue].add(label)
         if show_all_warnings:
             if internal:
                 report.logs_with_internal += 1
@@ -209,10 +245,12 @@ def analyze_database(
                 sources[issue].add(label)
 
     report.issues = sorted(sources.items(), key=lambda kv: kv[0])
+    report.recovered_issues = sorted(recovered_sources.items(), key=lambda kv: kv[0])
     report.unique_parse = sum(
         1 for (file_, *_), _s in report.issues if file_ != _INTERNAL_FILE
     )
     report.unique_internal = len(report.issues) - report.unique_parse
+    report.unique_recovered = len(report.recovered_issues)
 
     if (
         max_failed_command_pct is not None
@@ -246,6 +284,25 @@ def format_report(report: DbReport, color: bool = False) -> str:
         else ("",) * 6
     )
     sep = "=" * 70
+
+    def render(items: list[tuple[Issue, set[str]]]) -> list[str]:
+        rendered: list[str] = []
+        for (err_file, err_line, severity, message), src_files in items:
+            loc = f"{err_file}:{err_line}" if err_line else err_file
+            if severity in ("error", "catastrophic error"):
+                sev = f"{red}{bold}{severity}{reset}"
+            elif severity == "warning":
+                sev = f"{yellow}warning{reset}"
+            else:
+                sev = f"{cyan}note{reset}"
+            lines = message.splitlines() or [""]
+            rendered.append(f"{bold}{loc}{reset}: {sev}: {lines[0]}")
+            rendered.extend(f"  {body}" for body in lines[1:])
+            rendered.extend(
+                f"  {cyan}-> compiled from:{reset} {sf}" for sf in sorted(src_files)
+            )
+        return rendered
+
     out: list[str] = [
         "",
         sep,
@@ -254,20 +311,24 @@ def format_report(report: DbReport, color: bool = False) -> str:
     ]
     if report.issues:
         out.append("")
-    for (err_file, err_line, severity, message), src_files in report.issues:
-        loc = f"{err_file}:{err_line}" if err_line else err_file
-        if severity in ("error", "catastrophic error"):
-            sev = f"{red}{bold}{severity}{reset}"
-        elif severity == "warning":
-            sev = f"{yellow}warning{reset}"
-        else:
-            sev = f"{cyan}note{reset}"
-        lines = message.splitlines() or [""]
-        out.append(f"{bold}{loc}{reset}: {sev}: {lines[0]}")
-        out.extend(f"  {body}" for body in lines[1:])
-        out.extend(f"  {cyan}-> compiled from:{reset} {sf}" for sf in sorted(src_files))
-    if report.issues:
+        out.extend(render(report.issues))
         out.append("")
+
+    if report.recovered_issues:
+        out += [
+            sep,
+            f"RECOVERED EXTRACTOR DIAGNOSTICS ({len(report.recovered_issues)}) "
+            "- informational, not gated",
+            sep,
+            "",
+        ]
+        out.extend(render(report.recovered_issues))
+        out += [
+            "",
+            "  The extractor completed these compilations, so they do not indicate a",
+            "  broken extraction. They are reported because recoverable errors can",
+            "  still affect the analysis (analysis integrity report).",
+        ]
 
     status = (
         f"{red}{bold}FAIL{reset}" if report.failures else f"{green}{bold}PASS{reset}"
@@ -279,6 +340,10 @@ def format_report(report: DbReport, color: bool = False) -> str:
     )
     out.append(
         f"  Commands with issues  : {report.logs_with_errors}  ({report.issues_pct:.1f}%)"
+    )
+    out.append(
+        f"  Recovered diagnostics : {report.logs_with_recovered} cmd(s), "
+        f"{report.unique_recovered} unique (not gated)"
     )
     if report.show_all_warnings:
         pct = (

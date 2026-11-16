@@ -448,6 +448,12 @@ def run(args: argparse.Namespace) -> int:
     db_text = check_db.format_report(db_report)
     (results_dir / "extraction-summary.txt").write_text(db_text, encoding="utf-8")
     print(db_text, end="")
+    if db_report.unique_recovered:
+        logging.info(
+            "> %d recovered extractor diagnostic(s) reported in "
+            "extraction-summary.txt and summary.md (informational, not gated)",
+            db_report.unique_recovered,
+        )
     if not db_report.passed:
         raise ScaError(
             "extraction quality thresholds failed: " + "; ".join(db_report.failures)
