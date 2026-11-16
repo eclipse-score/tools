@@ -176,13 +176,16 @@ bazel run //codeql:sca -- [options] [targets...]
 | `--force-rebuild` | Force a non-cached, non-uploaded materialising build (only needed when generated files are missing after a cached build). |
 | `--codeql-cli PATH` | CodeQL launcher; overrides `$SCORE_CODEQL_CLI` (for experiments, defeats the pin). |
 | `--fail-on {none,error,warning}` | Optional gate on the combined SARIF. Default `none`: findings never fail the run. |
+| `--no-fail-sarif-quality` | Do not fail when the SARIF telemetry quality checks report problems (see [SARIF quality checks](#sarif-quality-checks)). An empty ruleset and non-relative result URIs still fail. |
 | `--bazel PATH` | Bazel executable for nested invocations (default `$BAZEL`, then `bazelisk`, then `bazel`). |
 | `--list-reports` | Print reports and presets and exit. |
 | `--print-pins` | Print CLI and pack versions (JSON) and exit; useful for cache keys. |
 | `-v`, `--verbose` | Verbose logging. |
 
 Exit code `0` means the analysis ran, regardless of findings. Non-zero is
-returned for tool, build or extraction failures (and for `--fail-on` hits).
+returned for tool, build or extraction failures, for `--fail-on` hits and for
+failing [SARIF quality checks](#sarif-quality-checks) unless
+`--no-fail-sarif-quality` is given.
 
 Diagnostics of a compilation that the extractor completed successfully are
 *recovered*: they are no evidence of a broken extraction, so they do not count
@@ -246,6 +249,47 @@ profile is reported with the id
 instantiations are not reported separately — the alert points at the class
 template and counts the members of its declaration, so the number is the same for
 every instantiation.
+
+## SARIF quality checks
+
+`results/sarif-summary.txt` is written by `score_codeql.check_sarif`. The checks
+are derived from the `@kind metric` telemetry queries that
+`cpp-code-scanning.qls` includes, so they describe the **database** — not the
+extractor log that feeds the [extraction quality gates](#cli-reference-codeqlsca).
+
+| Check | Fails when |
+| --- | --- |
+| ruleset | the SARIF contains no rules at all, i.e. no query produced results |
+| `Percentage of compilations without errors` | below 100 % |
+| `Percentage of source/header files without errors` | below 100 % |
+| `Percentage of successfully resolved #include directives` | below 100 % |
+| `Percentage of functions without errors` | below 100 % |
+| `Percentage of non-error expressions` | below 100 % |
+| `Percentage of lines of code without errors` | below 100 % |
+| `syntax errors`, `compiler errors` | non-zero; the most frequent compiler messages are printed below the check |
+
+Together these percentages quantify how much of the code the queries could see.
+A value below 100 % means declarations are missing, expressions became
+`ErrorExpr`/`ErroneousType` and data flow through the affected code is lost, so
+findings can be silently missing. `Percentage of calls with an explicit
+target`, `Percentage of expressions with a known type` and `Percentage of
+variables with a known type` are legitimately below 100 % (indirect calls,
+template-dependent types); they are reported as `INFO` lines in `--verbose`
+mode only.
+
+An empty ruleset is always fatal — a run that analysed nothing must not pass.
+The metric checks fail the `sca` run by default; `--no-fail-sarif-quality`
+turns them into a warning (the standalone checker uses `--no-fail`). If the
+SARIF carries no `cpp/telemetry` metrics at all (for example a report that
+selects only complexity queries), the checks cannot be evaluated; that is
+written as a visible `WARN` line and logged, so a run never looks green merely
+because telemetry is missing.
+
+The checker can also be used standalone:
+
+```bash
+python -m score_codeql.check_sarif _codeql_sca/results/code-scanning.sarif -v
+```
 
 ## Pinned versions
 

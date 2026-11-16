@@ -217,6 +217,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--fail-on", choices=["none", "error", "warning"], default="none"
     )
     parser.add_argument(
+        "--no-fail-sarif-quality",
+        action="store_true",
+        help="Do not fail when the SARIF telemetry quality checks report problems "
+        "(an empty ruleset and non-relative result URIs still fail)",
+    )
+    parser.add_argument(
         "--force-rebuild",
         action="store_true",
         help="Force a non-cached, non-uploaded materialising build",
@@ -536,10 +542,26 @@ def run(args: argparse.Namespace) -> int:
             "SARIF result locations are not workspace-relative; GitHub Code Scanning "
             "would drop or misplace these alerts (see sarif-summary.txt)"
         )
-    if sarif_report.quality_failed:
+    if sarif_report.telemetry_missing:
         logging.warning(
-            "SARIF quality checks reported problems (see sarif-summary.txt)"
+            "SARIF telemetry metrics are missing, quality checks not evaluated: %s",
+            ", ".join(sarif_report.unchecked),
         )
+    if sarif_report.empty_ruleset:
+        raise ScaError(
+            "the combined SARIF contains no rules, so no query produced results "
+            "(see sarif-summary.txt)"
+        )
+    if sarif_report.quality_failed:
+        message = "SARIF quality checks failed (see sarif-summary.txt)"
+        if args.no_fail_sarif_quality:
+            logging.warning(
+                "%s; continuing because of --no-fail-sarif-quality", message
+            )
+        else:
+            raise ScaError(
+                f"{message}; pass --no-fail-sarif-quality to continue anyway"
+            )
 
     logging.info("> Done. Results are stored in: %s", results_dir)
     if _fail_on_findings(args.fail_on, combined_counts):

@@ -14,13 +14,25 @@
 """Summarise a CodeQL SARIF file and validate it for Code Scanning.
 
 Prints the frequency of every rule id, tool notifications and database-quality
-metrics. Two kinds of checks produce a failing exit status:
+metrics. Three kinds of checks produce a failing exit status:
 
 * **Result location URIs** must be workspace-relative. Absolute paths,
   ``..`` escapes, ``bazel-*`` output trees and ``external/`` paths are dropped or
   misplaced by GitHub Code Scanning, so they are rejected here.
-* **Quality metrics** (compilations without errors, syntax errors, compiler
-  errors) fail unless ``--no-fail`` is given.
+* **An empty ruleset** means no query produced results, so nothing was analysed.
+  This always fails, also with ``--no-fail``.
+* **Quality metrics** fail unless ``--no-fail`` is given. The gated metrics are
+  the telemetry percentages that quantify how much of the database was extracted
+  without errors (compilations, source/header files, ``#include`` directives,
+  functions, expressions, lines of code) plus the number of syntax and compiler
+  errors. Percentages that are legitimately below 100 % (calls with an explicit
+  target, expressions and variables with a known type) are reported as ``INFO``
+  in verbose mode only.
+
+If the SARIF carries no ``cpp/telemetry`` metrics at all (for example because the
+selected report contains no ``@kind metric`` queries), the quality checks cannot
+be evaluated. That is reported with a visible ``WARN`` line so a run never looks
+green because telemetry is missing.
 
 Missing or invalid SARIF input always fails.
 """
@@ -42,6 +54,49 @@ from score_codeql.logging_utils import setup_logging
 
 _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _MAX_REPORTED_URI_VIOLATIONS = 20
+_TELEMETRY_PREFIX = "cpp/telemetry/"
+
+# Every one of these metrics counts the fraction of the database that was
+# extracted without errors. A value below 100 % means the analysed code is only
+# partially visible to the queries (missing declarations, error expressions,
+# broken data flow), so they are gated.
+_GATED_PERCENTAGES = (
+    ("cpp/telemetry/database-quality", "Percentage of compilations without errors"),
+    (
+        "cpp/telemetry/database-quality",
+        "Percentage of source/header files without errors",
+    ),
+    (
+        "cpp/telemetry/database-quality",
+        "Percentage of successfully resolved #include directives",
+    ),
+    ("cpp/telemetry/database-quality", "Percentage of functions without errors"),
+    ("cpp/telemetry/database-quality", "Percentage of non-error expressions"),
+    ("cpp/telemetry/database-quality", "Percentage of lines of code without errors"),
+)
+
+# Reported for information only: indirect calls and template-dependent types
+# legitimately keep these below 100 %.
+_INFORMATIONAL_PERCENTAGES = (
+    ("cpp/telemetry/database-quality", "Percentage of calls with an explicit target"),
+    ("cpp/telemetry/database-quality", "Percentage of expressions with a known type"),
+    ("cpp/telemetry/database-quality", "Percentage of variables with a known type"),
+)
+
+_GATED_COUNTS = (
+    ("cpp/telemetry/extraction-metrics", "syntax errors"),
+    ("cpp/telemetry/extraction-metrics", "compiler errors"),
+)
+
+
+@dataclass
+class QualityResult:
+    """Outcome of the SARIF telemetry quality checks."""
+
+    lines: list[str] = field(default_factory=list)
+    failed: bool = False
+    empty_ruleset: bool = False
+    unchecked: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -50,7 +105,14 @@ class SarifReport:
 
     lines: list[str] = field(default_factory=list)
     quality_failed: bool = False
+    empty_ruleset: bool = False
+    unchecked: list[str] = field(default_factory=list)
     uri_violations: list[str] = field(default_factory=list)
+
+    @property
+    def telemetry_missing(self) -> bool:
+        """Some gated quality checks could not be evaluated (metric absent)."""
+        return bool(self.unchecked)
 
     @property
     def text(self) -> str:
@@ -129,12 +191,17 @@ def check_result_uris(runs: list[dict[str, Any]]) -> list[str]:
     return sorted(problems.values())
 
 
+def _metric_results(run: dict[str, Any]) -> list[dict[str, Any]]:
+    results = run.get("properties", {}).get("metricResults", []) or []
+    return results if isinstance(results, list) else []
+
+
 def get_metric(
     runs: list[dict[str, Any]], rule_id: str, metric_name: str
 ) -> float | None:
     """Value of a named metric from ``properties.metricResults``, or ``None``."""
     for run in runs:
-        for metric in run.get("properties", {}).get("metricResults", []):
+        for metric in _metric_results(run):
             if (
                 metric.get("ruleId") == rule_id
                 and metric.get("message", {}).get("text", "") == metric_name
@@ -143,10 +210,19 @@ def get_metric(
     return None
 
 
+def has_telemetry(runs: list[dict[str, Any]]) -> bool:
+    """Whether the SARIF carries any ``cpp/telemetry`` metric at all."""
+    return any(
+        str(metric.get("ruleId", "")).startswith(_TELEMETRY_PREFIX)
+        for run in runs
+        for metric in _metric_results(run)
+    )
+
+
 def get_compiler_error_details(runs: list[dict[str, Any]]) -> list[str]:
     errors = []
     for run in runs:
-        for metric in run.get("properties", {}).get("metricResults", []):
+        for metric in _metric_results(run):
             if metric.get("ruleId") == "cpp/telemetry/compiler-errors":
                 msg = metric.get("message", {}).get("text", "")
                 if msg:
@@ -171,60 +247,87 @@ def results_frequency(runs: list[dict[str, Any]]) -> list[tuple[str, int]]:
     return sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))
 
 
-def _quality_lines(runs: list[dict[str, Any]], verbose: bool) -> tuple[list[str], bool]:
-    lines: list[str] = []
-    failed = False
+def _quality_lines(runs: list[dict[str, Any]], verbose: bool) -> QualityResult:
+    result = QualityResult()
 
     def check(label: str, ok: bool | None, detail: str = "") -> None:
-        nonlocal failed
         suffix = f" ({detail})" if detail else ""
         if ok is None:
             if verbose:
-                lines.append(f"[quality check] SKIP: {label}{suffix}")
+                result.lines.append(f"[quality check] SKIP: {label}{suffix}")
         elif ok:
             if verbose:
-                lines.append(f"[quality check] PASS: {label}{suffix}")
+                result.lines.append(f"[quality check] PASS: {label}{suffix}")
         else:
-            failed = True
-            lines.append(f"[quality check] FAIL: {label}{suffix}")
+            result.failed = True
+            result.lines.append(f"[quality check] FAIL: {label}{suffix}")
 
     rule_count = sum(
         len(source.get("rules", [])) for run in runs for source in _rule_sources(run)
     )
-    check("Expect number of rules > 0, actual:", rule_count > 0, f"{rule_count} rules")
+    label = "Expect number of rules > 0, actual:"
+    if rule_count > 0:
+        check(label, True, f"{rule_count} rules")
+    else:
+        result.failed = True
+        result.empty_ruleset = True
+        result.lines.append(
+            f"[quality check] FAIL: {label} (0 rules; no query produced results, "
+            "check the selected reports and the resolved packs)"
+        )
 
-    pct = get_metric(
-        runs,
-        "cpp/telemetry/database-quality",
-        "Percentage of compilations without errors",
-    )
-    label = "Expect: compilations without errors == 100%, actual:"
-    check(
-        label,
-        None if pct is None else pct >= 100.0,
-        "metric not found" if pct is None else f"{pct:.1f}%",
-    )
+    telemetry = has_telemetry(runs)
 
-    syntax = get_metric(runs, "cpp/telemetry/extraction-metrics", "syntax errors")
-    label = "Expect: syntax errors == 0, actual:"
-    check(
-        label,
-        None if syntax is None else int(syntax) == 0,
-        "metric not found" if syntax is None else str(int(syntax)),
-    )
+    for rule_id, metric_name in _GATED_PERCENTAGES:
+        pct = get_metric(runs, rule_id, metric_name)
+        check(
+            f"Expect: {metric_name.lower()} == 100%, actual:",
+            None if pct is None else pct >= 100.0,
+            "metric not found" if pct is None else f"{pct:.1f}%",
+        )
 
-    compiler = get_metric(runs, "cpp/telemetry/extraction-metrics", "compiler errors")
-    label = "Expect: compiler errors == 0, actual:"
-    check(
-        label,
-        None if compiler is None else int(compiler) == 0,
-        "metric not found" if compiler is None else str(int(compiler)),
-    )
+    counts: dict[str, float | None] = {}
+    for rule_id, metric_name in _GATED_COUNTS:
+        counts[metric_name] = get_metric(runs, rule_id, metric_name)
+        count = counts[metric_name]
+        check(
+            f"Expect: {metric_name} == 0, actual:",
+            None if count is None else int(count) == 0,
+            "metric not found" if count is None else str(int(count)),
+        )
+        if count is None:
+            result.unchecked.append(metric_name)
+
+    compiler = counts["compiler errors"]
     if compiler is not None and int(compiler) > 0:
-        lines.extend(
+        result.lines.extend(
             f"[quality check]          {d}" for d in get_compiler_error_details(runs)
         )
-    return lines, failed
+
+    if verbose:
+        for rule_id, metric_name in _INFORMATIONAL_PERCENTAGES:
+            pct = get_metric(runs, rule_id, metric_name)
+            shown = "metric not found" if pct is None else f"{pct:.1f}%"
+            result.lines.append(
+                f"[quality check] INFO: {metric_name.lower()}, actual: ({shown})"
+            )
+
+    if telemetry:
+        if result.unchecked:
+            result.lines.append(
+                "[quality check] WARN: metric missing, not evaluated: "
+                + ", ".join(result.unchecked)
+            )
+    else:
+        result.unchecked = [name for _id, name in _GATED_PERCENTAGES] + [
+            name for _id, name in _GATED_COUNTS
+        ]
+        result.lines.append(
+            "[quality check] WARN: no cpp/telemetry metrics in this SARIF; "
+            "database quality checks were not evaluated (do the selected reports "
+            "contain @kind metric queries?)"
+        )
+    return result
 
 
 def rules_table(runs: list[dict[str, Any]]) -> list[str]:
@@ -265,8 +368,11 @@ def analyze(runs: list[dict[str, Any]], verbose: bool = False) -> SarifReport:
     prefix = "[results] " if verbose else ""
     for rule_id, count in results_frequency(runs):
         report.lines.append(f"{prefix}{count:5d}  {rule_id}")
-    quality, report.quality_failed = _quality_lines(runs, verbose)
-    report.lines.extend(quality)
+    quality = _quality_lines(runs, verbose)
+    report.quality_failed = quality.failed
+    report.empty_ruleset = quality.empty_ruleset
+    report.unchecked = list(quality.unchecked)
+    report.lines.extend(quality.lines)
     if verbose:
         report.lines.extend(rules_table(runs))
     report.lines.extend(notification_lines(runs))
@@ -288,7 +394,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-fail",
         action="store_true",
-        help="Return 0 when quality metrics fail (URI violations and invalid input still fail)",
+        help="Return 0 when quality metrics fail (an empty ruleset, URI violations "
+        "and invalid input still fail)",
     )
     parser.add_argument(
         "--no-uri-check",
@@ -305,6 +412,8 @@ def main(argv: list[str] | None = None) -> int:
         return exc.exit_code
     print(report.text, end="")
     if report.uri_violations and not args.no_uri_check:
+        return 1
+    if report.empty_ruleset:
         return 1
     return 1 if report.quality_failed and not args.no_fail else 0
 

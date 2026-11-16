@@ -144,7 +144,16 @@ def test_database_quality_metric_below_100_percent_fails(tmp_path: Path) -> None
 
 
 def test_no_rules_is_a_quality_failure() -> None:
-    assert check_sarif.analyze([_run([], rules=0)]).quality_failed
+    report = check_sarif.analyze([_run([], rules=0)])
+    assert report.quality_failed
+    assert report.empty_ruleset
+    assert "no query produced results" in report.text
+
+
+def test_empty_ruleset_fails_even_with_no_fail(tmp_path: Path) -> None:
+    sarif = _write(tmp_path, [_run([], rules=0)])
+    assert check_sarif.main([str(sarif), "--no-fail"]) == 1
+    assert check_sarif.main([str(sarif)]) == 1
 
 
 def test_invalid_input_is_reported(tmp_path: Path) -> None:
@@ -185,3 +194,68 @@ def test_notifications_and_ruleset_in_verbose_mode(
     assert "[toolExecutionNotification] n/1: careful" in out
     assert "ignored" not in out
     assert "[ruleset] r0" in out
+
+
+def _metric(rule_id: str, name: str, value: float) -> dict:
+    return {"ruleId": rule_id, "message": {"text": name}, "value": value}
+
+
+@pytest.mark.parametrize(
+    "metric_name",
+    [name for _rule_id, name in check_sarif._GATED_PERCENTAGES],
+)
+def test_every_gated_percentage_below_100_fails(metric_name: str) -> None:
+    metrics = [_metric("cpp/telemetry/database-quality", metric_name, 99.0)]
+    report = check_sarif.analyze([_run([], metrics)])
+    assert report.quality_failed
+    assert metric_name.lower() in report.text
+
+
+def test_percentage_metrics_are_not_reported_as_information_only() -> None:
+    assert "Percentage of compilations without errors" not in [
+        name for _rule_id, name in check_sarif._INFORMATIONAL_PERCENTAGES
+    ]
+
+
+def test_informational_percentage_below_100_does_not_fail() -> None:
+    metrics = [
+        _metric(
+            "cpp/telemetry/database-quality",
+            "Percentage of calls with an explicit target",
+            42.0,
+        )
+    ]
+    report = check_sarif.analyze([_run([], metrics)], verbose=True)
+    assert not report.quality_failed
+    assert "INFO: percentage of calls with an explicit target" in report.text
+    assert "42.0%" in report.text
+
+
+def test_absent_percentage_metrics_are_skipped() -> None:
+    metrics = [
+        _metric("cpp/telemetry/extraction-metrics", "syntax errors", 0),
+        _metric("cpp/telemetry/extraction-metrics", "compiler errors", 0),
+    ]
+    report = check_sarif.analyze([_run([], metrics)], verbose=True)
+    assert not report.quality_failed
+    assert not report.telemetry_missing
+    assert "SKIP: Expect: percentage of compilations without errors" in report.text
+    assert "WARN" not in report.text
+
+
+def test_missing_count_metric_is_warned_but_not_fatal() -> None:
+    metrics = [_metric("cpp/telemetry/extraction-metrics", "syntax errors", 0)]
+    report = check_sarif.analyze([_run([], metrics)])
+    assert not report.quality_failed
+    assert report.telemetry_missing
+    assert report.unchecked == ["compiler errors"]
+    assert "WARN: metric missing, not evaluated: compiler errors" in report.text
+
+
+def test_sarif_without_telemetry_warns_instead_of_passing_silently() -> None:
+    report = check_sarif.analyze([_run([])])
+    assert not report.quality_failed
+    assert report.telemetry_missing
+    assert "no cpp/telemetry metrics in this SARIF" in report.text
+    assert "compiler errors" in report.unchecked
+    assert "syntax errors" in report.unchecked

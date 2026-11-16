@@ -339,6 +339,76 @@ def test_pipeline_rejects_non_workspace_relative_uris(
     assert "not workspace-relative" in capsys.readouterr().err
 
 
+def _combined_writer(monkeypatch: pytest.MonkeyPatch, sarif: dict) -> None:
+    def fake_combined(codeql, db, refs, output, **kwargs):
+        output.write_text(json.dumps(sarif))
+
+    monkeypatch.setattr(analysis, "generate_combined_sarif", fake_combined)
+
+
+def _telemetry(compiler_errors: int = 0) -> dict:
+    run = json.loads(json.dumps(SARIF))
+    run["runs"][0]["properties"] = {
+        "metricResults": [
+            {
+                "ruleId": "cpp/telemetry/extraction-metrics",
+                "message": {"text": "syntax errors"},
+                "value": 0,
+            },
+            {
+                "ruleId": "cpp/telemetry/extraction-metrics",
+                "message": {"text": "compiler errors"},
+                "value": compiler_errors,
+            },
+        ]
+    }
+    return run
+
+
+def test_pipeline_sarif_quality_failure_is_fatal_unless_disabled(
+    pipeline: dict[str, list],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _combined_writer(monkeypatch, _telemetry(compiler_errors=2))
+    args = ["//a/...", "--safety-level=QM", "--pack-cache-dir", str(tmp_path / "c")]
+    assert cli.main(args) == 1
+    assert "SARIF quality checks failed" in capsys.readouterr().err
+    assert cli.main([*args, "--no-fail-sarif-quality"]) == 0
+    assert "continuing because of --no-fail-sarif-quality" in capsys.readouterr().err
+
+
+def test_pipeline_empty_ruleset_is_fatal_even_when_quality_is_not_gated(
+    pipeline: dict[str, list],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    sarif = _telemetry()
+    sarif["runs"][0]["tool"]["extensions"] = []
+    _combined_writer(monkeypatch, sarif)
+    rc = cli.main(
+        [
+            "//a/...",
+            "--pack-cache-dir",
+            str(tmp_path / "c"),
+            "--no-fail-sarif-quality",
+        ]
+    )
+    assert rc == 1
+    assert "contains no rules" in capsys.readouterr().err
+
+
+def test_pipeline_missing_telemetry_is_logged(
+    pipeline: dict[str, list],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert cli.main(["//a/...", "--pack-cache-dir", str(tmp_path / "c")]) == 0
+    assert "SARIF telemetry metrics are missing" in capsys.readouterr().err
+
+
 def test_pipeline_cli_version_mismatch_is_fatal(
     pipeline: dict[str, list],
     tmp_path: Path,
