@@ -77,7 +77,8 @@ bazel run @score_tools//codeql:sca -- --print-pins
 bazel run @score_tools//codeql:list_rules -- --safety-level=ASIL --output-dir=/tmp/rules
 ```
 
-The first run downloads the CodeQL bundle (165 MB), `bazel-compile-commands`
+The first run downloads the CodeQL bundle (about 480 MB, the full linux64
+bundle; 2.21.4 has no C/C++-only variant), `bazel-compile-commands`
 and, per selected report, the external query packs from the CodeQL registry
 (`ghcr.io`, about 180 MB for CERT and MISRA). The pack cache lives in
 `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs` and can be cached in CI.
@@ -244,9 +245,9 @@ checksums because it cannot load `.bzl` files. Tests keep them consistent.
 
 | Artifact | Version |
 | --- | --- |
-| CodeQL bundle (C/C++ only, linux64) | 2.27.4 |
-| `codeql/cpp-queries` (in bundle) | 1.10.0 |
-| `codeql/cpp-all` (in bundle) | 12.4.0 |
+| CodeQL bundle (linux64) | 2.21.4 |
+| `codeql/cpp-queries` (in bundle) | 1.4.1 |
+| `codeql/cpp-all` (in bundle) | 5.0.0 |
 | `codeql/cert-cpp-coding-standards` | 2.62.0 |
 | `codeql/cert-c-coding-standards` | 2.62.0 |
 | `codeql/misra-cpp-coding-standards` | 2.62.0 |

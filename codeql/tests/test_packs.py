@@ -45,14 +45,14 @@ def test_cli_info_and_version_pin(
     fake_codeql: Path, tmp_path: Path, config_env: dict
 ) -> None:
     info = pk.get_cli_info(fake_codeql)
-    assert info.version == "2.27.4"
+    assert info.version == "2.21.4"
     assert info.distribution == tmp_path / "dist"
     pins = cfg.load_pins(config_env["SCORE_CODEQL_PACKS"])
     pk.check_cli_version(info, pins)
     with pytest.raises(
-        ScaError, match="2.26.0 does not match the pinned version 2.27.4"
+        ScaError, match="2.20.0 does not match the pinned version 2.21.4"
     ):
-        pk.check_cli_version(pk.CliInfo("2.26.0", info.distribution), pins)
+        pk.check_cli_version(pk.CliInfo("2.20.0", info.distribution), pins)
 
 
 def test_cli_info_rejects_garbage(tmp_path: Path) -> None:
@@ -65,12 +65,12 @@ def test_cli_info_rejects_garbage(tmp_path: Path) -> None:
 
 def test_bundled_pack_is_not_downloaded(fake_codeql: Path, tmp_path: Path) -> None:
     dist = tmp_path / "dist"
-    _pack(dist / "qlpacks", "codeql/cpp-queries", "1.10.0", ("AlertSuppression.ql",))
+    _pack(dist / "qlpacks", "codeql/cpp-queries", "1.4.1", ("AlertSuppression.ql",))
     resolved = pk.ensure_packs(
-        fake_codeql, [_ref("codeql/cpp-queries@1.10.0:AlertSuppression.ql")],
+        fake_codeql, [_ref("codeql/cpp-queries@1.4.1:AlertSuppression.ql")],
         cache_dir=tmp_path / "cache", distribution=dist, local_packs={},
     )  # fmt: skip
-    assert [(p.origin, p.version) for p in resolved] == [("bundle", "1.10.0")]
+    assert [(p.origin, p.version) for p in resolved] == [("bundle", "1.4.1")]
     assert not any(c[:2] == ["pack", "download"] for c in _calls(tmp_path))
 
 
@@ -210,20 +210,20 @@ def test_additional_packs_value_and_default_cache(tmp_path: Path) -> None:
 def test_pins_json_records_resolution(tmp_path: Path, config_env: dict) -> None:
     pins = cfg.load_pins(config_env["SCORE_CODEQL_PACKS"])
     resolved = [
-        pk.ResolvedPack("codeql/cpp-queries", "1.10.0", "bundle", Path("/b")),
+        pk.ResolvedPack("codeql/cpp-queries", "1.4.1", "bundle", Path("/b")),
         pk.ResolvedPack("acme/own", None, "local", Path("/l")),
     ]
-    data = pk.pins_json(pins, pk.CliInfo("2.27.4", Path("/d")), resolved)
-    assert data["codeql_cli"] == data["codeql_cli_actual"] == "2.27.4"
+    data = pk.pins_json(pins, pk.CliInfo("2.21.4", Path("/d")), resolved)
+    assert data["codeql_cli"] == data["codeql_cli_actual"] == "2.21.4"
     assert data["resolved"][0] == {
-        "pack": "codeql/cpp-queries@1.10.0",
+        "pack": "codeql/cpp-queries@1.4.1",
         "origin": "bundle",
         "path": "/b",
     }
     assert data["resolved"][1]["pack"] == "acme/own"
     target = tmp_path / "out" / "pins.json"
     pk.write_pins_json(target, data)
-    assert json.loads(target.read_text())["packs"]["codeql/cpp-queries"] == "1.10.0"
+    assert json.loads(target.read_text())["packs"]["codeql/cpp-queries"] == "1.4.1"
 
 
 def _ensure(codeql, tmp_path, refs, **overrides):
@@ -240,10 +240,10 @@ def _ensure(codeql, tmp_path, refs, **overrides):
 def test_stub_shadowing_a_bundled_pack_in_the_cache_is_rejected(
     fake_codeql: Path, tmp_path: Path
 ) -> None:
-    _pack(tmp_path / "dist" / "qlpacks", "codeql/cpp-queries", "1.10.0", ("a.qls",))
-    stub = _pack(tmp_path / "cache", "codeql/cpp-queries", "1.10.0")
+    _pack(tmp_path / "dist" / "qlpacks", "codeql/cpp-queries", "1.4.1", ("a.qls",))
+    stub = _pack(tmp_path / "cache", "codeql/cpp-queries", "1.4.1")
     with pytest.raises(ScaError, match="would shadow") as info:
-        _ensure(fake_codeql, tmp_path, ["codeql/cpp-queries@1.10.0:a.qls"])
+        _ensure(fake_codeql, tmp_path, ["codeql/cpp-queries@1.4.1:a.qls"])
     message = str(info.value)
     assert str(stub.parent) in message and "bundled with the CodeQL CLI" in message
     assert not any(c[:2] == ["pack", "download"] for c in _calls(tmp_path))
@@ -309,9 +309,9 @@ def test_redownload_that_is_still_incomplete_fails_with_the_missing_path(
 def test_missing_suite_in_bundled_or_local_pack_is_an_error_without_changes(
     fake_codeql: Path, tmp_path: Path
 ) -> None:
-    bundled = _pack(tmp_path / "dist" / "qlpacks", "codeql/cpp-queries", "1.10.0")
+    bundled = _pack(tmp_path / "dist" / "qlpacks", "codeql/cpp-queries", "1.4.1")
     with pytest.raises(ScaError, match="bundled pack.*suite.qls is missing"):
-        _ensure(fake_codeql, tmp_path, ["codeql/cpp-queries@1.10.0:suite.qls"])
+        _ensure(fake_codeql, tmp_path, ["codeql/cpp-queries@1.4.1:suite.qls"])
     assert bundled.is_dir()
     pack = tmp_path / "mine"
     pack.mkdir()

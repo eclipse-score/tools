@@ -16,7 +16,7 @@
 ``reports.toml``::
 
     [reports.<name>]
-    packs = ["codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls", ...]
+    packs = ["codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls", ...]
 
     [presets]
     QM = ["<report>", ...]
@@ -24,10 +24,10 @@
 ``packs.toml``::
 
     [codeql_cli]
-    version = "2.27.4"
+    version = "2.21.4"
 
     [packs]
-    "codeql/cpp-queries" = "1.10.0"
+    "codeql/cpp-queries" = "1.4.1"
 
     [local]
     "score/code-complexity-queries" = "1.0.0"

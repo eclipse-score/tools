@@ -24,7 +24,7 @@ from score_codeql import list_rules
 
 def test_output_name() -> None:
     ref = cfg.parse_pack_ref(
-        "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls"
+        "codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls"
     )
     assert list_rules.output_name(ref) == "cpp-queries-cpp-code-scanning"
     assert list_rules.output_name(cfg.parse_pack_ref("a/b@1.0.0")) == "b"
@@ -62,9 +62,9 @@ def test_end_to_end_with_fake_cli(
     monkeypatch.setenv("FAKE_CODEQL_QUERIES", json.dumps(queries))
     monkeypatch.setenv("SCORE_CODEQL_CLI", str(fake_codeql))
     # Bundled pack present in the fake distribution, the rest is "downloaded".
-    bundled = tmp_path / "dist" / "qlpacks" / "codeql" / "cpp-queries" / "1.10.0"
+    bundled = tmp_path / "dist" / "qlpacks" / "codeql" / "cpp-queries" / "1.4.1"
     bundled.mkdir(parents=True)
-    (bundled / "qlpack.yml").write_text("name: codeql/cpp-queries\nversion: 1.10.0\n")
+    (bundled / "qlpack.yml").write_text("name: codeql/cpp-queries\nversion: 1.4.1\n")
     (bundled / "codeql-suites").mkdir()
     (bundled / "codeql-suites" / "cpp-code-scanning.qls").write_text("")
     out = tmp_path / "rules"

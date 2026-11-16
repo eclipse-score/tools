@@ -23,14 +23,14 @@ def _load(config_env: dict[str, Path], *extra: Path) -> cfg.ReportsConfig:
 
 
 def test_parse_pack_ref_splits_name_version_path() -> None:
-    ref = cfg.parse_pack_ref("codeql/cpp-queries@1.10.0:codeql-suites/x.qls")
+    ref = cfg.parse_pack_ref("codeql/cpp-queries@1.4.1:codeql-suites/x.qls")
     assert (ref.name, ref.version, ref.path) == (
         "codeql/cpp-queries",
-        "1.10.0",
+        "1.4.1",
         "codeql-suites/x.qls",
     )
-    assert str(ref) == "codeql/cpp-queries@1.10.0:codeql-suites/x.qls"
-    assert ref.pack == "codeql/cpp-queries@1.10.0"
+    assert str(ref) == "codeql/cpp-queries@1.4.1:codeql-suites/x.qls"
+    assert ref.pack == "codeql/cpp-queries@1.4.1"
 
 
 def test_parse_pack_ref_local_and_unversioned() -> None:
@@ -40,7 +40,7 @@ def test_parse_pack_ref_local_and_unversioned() -> None:
     assert local.name == "score/code-complexity-queries"
     bare = cfg.parse_pack_ref("codeql/cpp-queries:AlertSuppression.ql")
     assert bare.version is None and bare.path == "AlertSuppression.ql"
-    assert cfg.parse_pack_ref("codeql/cpp-all@12.4.0").path is None
+    assert cfg.parse_pack_ref("codeql/cpp-all@5.0.0").path is None
 
 
 @pytest.mark.parametrize("bad", ["cpp-queries@1.0.0", "", "a/b c@1", "a/b@:x"])
@@ -86,7 +86,7 @@ def test_consumer_file_adds_replaces_and_overrides_presets(
     consumer.write_text(
         """
 [reports.extra]
-packs = ["codeql/cpp-queries@1.10.0:AlertSuppression.ql"]
+packs = ["codeql/cpp-queries@1.4.1:AlertSuppression.ql"]
 
 [reports.complexity]
 packs = ["score/code-complexity-queries@1.0.0:suites/other.qls"]
@@ -147,7 +147,7 @@ def test_union_refs_deduplicates_in_order(config_env: dict[str, Path]) -> None:
     config = _load(config_env)
     refs = cfg.union_refs(cfg.refs_of(config, ["base", "safety"]))
     assert [str(r) for r in refs] == [
-        "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+        "codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls",
         "codeql/cert-cpp-coding-standards@2.62.0:codeql-suites/cert-cpp-l1.qls",
         "codeql/misra-cpp-coding-standards@2.62.0:codeql-suites/misra-cpp-required.qls",
     ]
@@ -155,8 +155,8 @@ def test_union_refs_deduplicates_in_order(config_env: dict[str, Path]) -> None:
 
 def test_load_pins(config_env: dict[str, Path]) -> None:
     pins = cfg.load_pins(config_env["SCORE_CODEQL_PACKS"])
-    assert pins.codeql_version == "2.27.4"
-    assert pins.packs["codeql/cpp-queries"] == "1.10.0"
+    assert pins.codeql_version == "2.21.4"
+    assert pins.packs["codeql/cpp-queries"] == "1.4.1"
     assert pins.as_json()["local_packs"]["score/code-complexity-queries"] == "1.0.0"
 
 
@@ -166,12 +166,12 @@ def test_load_pins(config_env: dict[str, Path]) -> None:
         ('[packs]\n"a/b" = "1.0.0"\n', r"\[codeql_cli\]"),
         ('[codeql_cli]\nversion = "latest"\n', "not an exact version"),
         (
-            '[codeql_cli]\nversion = "2.27.4"\n[packs]\n"a/b" = "^1.0"\n',
+            '[codeql_cli]\nversion = "2.21.4"\n[packs]\n"a/b" = "^1.0"\n',
             "not an exact version",
         ),
-        ('[codeql_cli]\nversion = "2.27.4"\n[extra]\n', "unknown top-level key"),
+        ('[codeql_cli]\nversion = "2.21.4"\n[extra]\n', "unknown top-level key"),
         (
-            '[codeql_cli]\nversion = "2.27.4"\n[packs]\n"a/b" = "1.0.0"\n[local]\n"a/b" = "1.0.0"\n',
+            '[codeql_cli]\nversion = "2.21.4"\n[packs]\n"a/b" = "1.0.0"\n[local]\n"a/b" = "1.0.0"\n',
             "both",
         ),
     ],

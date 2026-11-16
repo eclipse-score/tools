@@ -10,7 +10,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
-"""Pinned CodeQL CLI bundle (C/C++ only), exposed to the `//codeql:sca` tool."""
+"""Pinned CodeQL CLI bundle (linux64), exposed to the `//codeql:sca` tool."""
 
 filegroup(
     name = "bundle",

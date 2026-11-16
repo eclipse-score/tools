@@ -13,18 +13,18 @@
 
 [reports.codeql-report]
 packs = [
-  "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+  "codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls",
   "codeql/cert-cpp-coding-standards@2.62.0:codeql-suites/cert-cpp-l1.qls",
   "codeql/cert-c-coding-standards@2.62.0:codeql-suites/cert-c-l1.qls",
-  "codeql/cpp-queries@1.10.0:AlertSuppression.ql",
+  "codeql/cpp-queries@1.4.1:AlertSuppression.ql",
 ]
 
 [reports.codeql-report-safety]
 packs = [
-  "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+  "codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls",
   "codeql/cert-cpp-coding-standards@2.62.0:codeql-suites/cert-cpp-l1.qls",
   "codeql/cert-c-coding-standards@2.62.0:codeql-suites/cert-c-l1.qls",
-  "codeql/cpp-queries@1.10.0:AlertSuppression.ql",
+  "codeql/cpp-queries@1.4.1:AlertSuppression.ql",
   "codeql/misra-cpp-coding-standards@2.62.0:codeql-suites/misra-cpp-mandatory.qls",
   "codeql/misra-cpp-coding-standards@2.62.0:codeql-suites/misra-cpp-required.qls",
 ]

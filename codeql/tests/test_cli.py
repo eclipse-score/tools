@@ -85,7 +85,7 @@ def test_print_pins(
 ) -> None:
     assert cli.main(["--print-pins"]) == 0
     data = json.loads(capsys.readouterr().out)
-    assert data["codeql_cli"] == "2.27.4"
+    assert data["codeql_cli"] == "2.21.4"
     assert data["packs"]["codeql/cert-cpp-coding-standards"] == "2.62.0"
 
 
@@ -101,7 +101,7 @@ def test_list_reports_includes_consumer_reports(
     config_env: dict[str, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     extra = tmp_path / "mine.toml"
-    extra.write_text('[reports.mine]\npacks = ["codeql/cpp-queries@1.10.0:x.ql"]\n')
+    extra.write_text('[reports.mine]\npacks = ["codeql/cpp-queries@1.4.1:x.ql"]\n')
     assert cli.main(["--list-reports", f"--reports-file={extra}"]) == 0
     assert "mine" in capsys.readouterr().out
 
@@ -345,9 +345,9 @@ def test_pipeline_cli_version_mismatch_is_fatal(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    monkeypatch.setenv("FAKE_CODEQL_VERSION", "2.26.0")
+    monkeypatch.setenv("FAKE_CODEQL_VERSION", "2.20.0")
     assert cli.main(["//a/...", "--pack-cache-dir", str(tmp_path / "c")]) == 1
-    assert "does not match the pinned version 2.27.4" in capsys.readouterr().err
+    assert "does not match the pinned version 2.21.4" in capsys.readouterr().err
     assert not pipeline["settings"]
 
 

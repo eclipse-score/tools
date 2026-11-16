@@ -68,12 +68,13 @@ http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "ht
 
 http_file = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_file")
 
-# CodeQL bundle v2.27.4, C/C++ only (contains cpp-queries 1.10.0, cpp-all 12.4.0).
+# CodeQL bundle v2.21.4, linux64 (contains cpp-queries 1.4.1, cpp-all 5.0.0).
+# 2.21.4 has no C/C++-only bundle, so the full bundle is used.
 http_archive(
     name = "codeql_bundle",
     build_file = "//codeql/third_party:codeql_bundle.BUILD",
-    sha256 = "eea5a76ed6778892278a387c4362fef8d03e5a9c3795f5d5022d496fccfd5388",
-    urls = ["https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.4/codeql-bundle-cpp-linux64.tar.zst"],
+    sha256 = "6da9f3df228d4e162af877569240a627c1af22f6adbd26352b22357fb8bd7545",
+    urls = ["https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.21.4/codeql-bundle-linux64.tar.zst"],
 )
 
 # bazel-compile-commands for hosts with glibc >= 2.38.

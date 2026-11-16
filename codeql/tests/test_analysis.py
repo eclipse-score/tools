@@ -45,7 +45,7 @@ def test_default_threads_and_ram(
 
 
 REFS = [
-    cfg.parse_pack_ref("codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls"),
+    cfg.parse_pack_ref("codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls"),
     cfg.parse_pack_ref("score/code-complexity-queries@1.0.0:suites/thresholds.qls"),
 ]
 

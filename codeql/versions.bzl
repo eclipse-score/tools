@@ -25,12 +25,13 @@ the same URLs and checksums inline. When bumping a pin, update all of:
 `codeql/tests` fails when they disagree.
 """
 
-CODEQL_CLI_VERSION = "2.27.4"
-CODEQL_BUNDLE_URL = "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.4/codeql-bundle-cpp-linux64.tar.zst"
-CODEQL_BUNDLE_SHA256 = "eea5a76ed6778892278a387c4362fef8d03e5a9c3795f5d5022d496fccfd5388"
+CODEQL_CLI_VERSION = "2.21.4"
+# 2.21.4 has no C/C++-only bundle, so the full linux64 bundle is pinned.
+CODEQL_BUNDLE_URL = "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.21.4/codeql-bundle-linux64.tar.zst"
+CODEQL_BUNDLE_SHA256 = "6da9f3df228d4e162af877569240a627c1af22f6adbd26352b22357fb8bd7545"
 
-CODEQL_CPP_QUERIES_VERSION = "1.10.0"
-CODEQL_CPP_ALL_VERSION = "12.4.0"
+CODEQL_CPP_QUERIES_VERSION = "1.4.1"
+CODEQL_CPP_ALL_VERSION = "5.0.0"
 CODING_STANDARDS_VERSION = "2.62.0"
 
 BCC_VERSION = "0.22.4"

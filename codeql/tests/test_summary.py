@@ -98,9 +98,9 @@ def _build(**overrides) -> str:
         extraction={"total_logs": 57, "failed_logs": 0, "failed_pct": 0.0,
                     "logs_with_errors": 1, "issues_pct": 1.8, "unique_parse": 0, "passed": True},
         pins={
-            "codeql_cli": "2.27.4",
-            "codeql_cli_actual": "2.27.4",
-            "resolved": [{"pack": "codeql/cpp-queries@1.10.0", "origin": "bundle"}],
+            "codeql_cli": "2.21.4",
+            "codeql_cli_actual": "2.21.4",
+            "resolved": [{"pack": "codeql/cpp-queries@1.4.1", "origin": "bundle"}],
         },
     )  # fmt: skip
     options.update(overrides)
@@ -127,8 +127,8 @@ def test_summary_findings_pins_and_escaping() -> None:
     assert "| **combined (Code Scanning)** | 1 | 0 | 0 | 0 | 1 |" in text
     assert "| r/a | 1 |" in text
     assert "src/a\\|b.cpp" in text
-    assert "| CodeQL CLI | 2.27.4 |" in text
-    assert "| codeql/cpp-queries@1.10.0 | bundle |" in text
+    assert "| CodeQL CLI | 2.21.4 |" in text
+    assert "| codeql/cpp-queries@1.4.1 | bundle |" in text
     assert "| Commands with issues | 1 (1.8%) |" in text
 
 
@@ -143,7 +143,7 @@ def test_summary_handles_missing_inputs_and_failed_gate() -> None:
 
 def test_pins_fall_back_to_pinned_versions() -> None:
     text = _build(
-        pins={"codeql_cli": "2.27.4", "packs": {"a/b": "1.0.0"}, "local_packs": {}},
+        pins={"codeql_cli": "2.21.4", "packs": {"a/b": "1.0.0"}, "local_packs": {}},
     )
     assert "| a/b@1.0.0 |  |" in text
 
@@ -160,7 +160,7 @@ def test_summarize_directory_and_main(tmp_path: Path) -> None:
     (tmp_path / "one.sarif").write_text(sarif)
     (tmp_path / "code-scanning.sarif").write_text(sarif)
     (tmp_path / "compilers.json").write_text(json.dumps(_compilers()))
-    (tmp_path / "pins.json").write_text(json.dumps({"codeql_cli": "2.27.4"}))
+    (tmp_path / "pins.json").write_text(json.dumps({"codeql_cli": "2.21.4"}))
     assert summary.main([str(tmp_path)]) == 0
     text = (tmp_path / "summary.md").read_text()
     assert "| one | 0 | 1 | 0 | 0 | 1 |" in text

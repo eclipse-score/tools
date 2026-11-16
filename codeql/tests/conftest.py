@@ -25,13 +25,13 @@ import pytest
 REPORTS_TOML = """\
 [reports.base]
 packs = [
-  "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+  "codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls",
   "codeql/cert-cpp-coding-standards@2.62.0:codeql-suites/cert-cpp-l1.qls",
 ]
 
 [reports.safety]
 packs = [
-  "codeql/cpp-queries@1.10.0:codeql-suites/cpp-code-scanning.qls",
+  "codeql/cpp-queries@1.4.1:codeql-suites/cpp-code-scanning.qls",
   "codeql/misra-cpp-coding-standards@2.62.0:codeql-suites/misra-cpp-required.qls",
 ]
 
@@ -45,10 +45,10 @@ ASIL = ["safety", "complexity"]
 
 PACKS_TOML = """\
 [codeql_cli]
-version = "2.27.4"
+version = "2.21.4"
 
 [packs]
-"codeql/cpp-queries" = "1.10.0"
+"codeql/cpp-queries" = "1.4.1"
 "codeql/cert-cpp-coding-standards" = "2.62.0"
 "codeql/misra-cpp-coding-standards" = "2.62.0"
 
@@ -85,7 +85,7 @@ if fail and fail in " ".join(args):
     sys.exit(3)
 if args[:1] == ["version"]:
     print(json.dumps({{
-        "version": os.environ.get("FAKE_CODEQL_VERSION", "2.27.4"),
+        "version": os.environ.get("FAKE_CODEQL_VERSION", "2.21.4"),
         "unpackedLocation": os.environ["FAKE_CODEQL_DIST"],
     }}))
 elif args[:2] == ["pack", "download"]:
