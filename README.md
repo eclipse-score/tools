@@ -20,6 +20,7 @@ projects. Choose a component below to find its setup and usage instructions.
 | --- | --- |
 | [Repository Cache](repo_cache/README.md) | Maintains local checkouts of repositories in a GitHub organization for tools that operate across many repositories. |
 | [Repository Policy Sync](repo_policy_sync/README.md) | Evaluates repository policies across a GitHub organization and can open reviewable pull requests to apply them. |
+| [Rust Dependency Audit](rust_dependency_audit/README.md) | Audits Rust dependencies across repositories and cross-references them against `score-crates` as GitHub Pages. |
 | [SCORE pytest](score_pytest/README.md) | Provides a Bazel rule for pytest and a plugin that adds structured metadata to JUnit reports. |
 | [Copyright Checker](cr_checker/README.md) | Checks copyright headers and supports pre-commit and Bazel integrations. |
 
