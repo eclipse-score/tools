@@ -511,35 +511,75 @@ def collect_inputs(inputs: list[str], exts=None):
 
 
 SPDX_PATTERN = re.compile(r"SPDX-License-Identifier", re.IGNORECASE)
-HEADER_START_PATTERN = re.compile(r"^\s*(#|//|/\*|\*|'|<!--|\.\.)")
+SPDX_ID_PATTERN = re.compile(r"SPDX-License-Identifier:\s*(\S+)", re.IGNORECASE)
+HEADER_START_PATTERN = re.compile(r"^\s*(#|//|/\*|/'|\*|'|<!--|\.\.)")
 BORDER_LINE_PATTERN = re.compile(r"^\s*(<!--)?[\s/*#'\-=+]*(-->)?\s*$")
+BLOCK_COMMENT_DELIMITERS = (("/*", "*/"), ("<!--", "-->"), ("/'", "'/"))
+COMMENT_DECORATION_PATTERN = re.compile(r"[\s/*#'\-=+]*")
+COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4}(?:\s*-\s*\d{4})?)")
+
+
+def extract_block_comment(lines, terminator):
+    """Return comment lines without the closing delimiter, or None if unsafe.
+
+    The first terminator ends the comment regardless of its contents. Text after
+    it on the same line cannot be included in a whole-line header replacement.
+    The caller supplies a bounded window so an unclosed comment cannot trigger
+    an unbounded scan through the document.
+    """
+    for index, line in enumerate(lines):
+        if terminator in line:
+            before, after = line.split(terminator, 1)
+            if after.strip():
+                return None
+            return lines[:index] + [before]
+    return None
+
+
+def has_replaceable_block_tail(comment_lines, spdx_index):
+    """Require a complete SPDX identifier followed only by header decoration.
+
+    A closing delimiter may share the SPDX line, follow it on a decorated line,
+    or follow one separate border. Other text is preserved by refusing repair.
+    Multi-token license expressions are also refused: replacement compares a
+    single license identifier and must not discard part of an expression.
+    """
+    spdx_line = comment_lines[spdx_index]
+    identifier = SPDX_ID_PATTERN.search(spdx_line)
+    if identifier is None or spdx_line[identifier.end() :].strip():
+        return False
+
+    tail = comment_lines[spdx_index + 1 :]
+    if not tail:
+        return True
+    if len(tail) > 2 or not COMMENT_DECORATION_PATTERN.fullmatch(tail[-1]):
+        return False
+    # The last entry holds the text before the terminator; any preceding line
+    # must be a decorative border rather than arbitrary comment content.
+    return len(tail) == 1 or bool(
+        BORDER_FILL_PATTERN.search(tail[0]) and BORDER_LINE_PATTERN.fullmatch(tail[0])
+    )
 
 
 def find_existing_header(path, encoding, offset, max_lines):
-    """
-    Locates an existing (possibly malformed) copyright header at the top of a file.
+    """Locate a contiguous, safely replaceable copyright comment at the file top.
 
-    The header spans from the first line after `offset` through the line holding
-    ``SPDX-License-Identifier``, plus the following line if it is a pure border
-    line (e.g. ``****``, `` ****/``, ``---- -->``).
+    ``offset`` preserves leading characters such as a shebang. SPDX must occur
+    within ``max_lines`` lines after that offset. Two additional lines allow a
+    block comment to end with an optional border and a separate delimiter.
 
-    Args:
-        path (Path): A `pathlib.Path` object pointing to the file.
-        encoding (str): Encoding type to use when reading the file.
-        offset (int): Number of characters to skip (e.g. shebang line).
-        max_lines (int): Maximum number of lines to search for the SPDX line.
-                         Prevents treating real code as part of the header.
+    Block comment boundaries are determined before validating their contents.
+    Only an SPDX identifier and optional decoration may precede the closing
+    delimiter at the end of the header. Line comments and RST comments must
+    remain contiguous through SPDX and their optional final border.
 
-    Returns:
-        tuple[int, str] | None: ``(num_chars, header_text)`` where `num_chars` is the
-        length of the header in characters (counted from `offset`), or None if the
-        file does not start with a comment block containing ``Copyright`` and
-        ``SPDX-License-Identifier`` within `max_lines`.
+    Return ``(num_chars, header_text)`` from the offset through the whole header,
+    or None when a boundary or the replaceable content cannot be established.
     """
     with open(path, "r", encoding=encoding) as handle:
         handle.read(offset)
         lines = []
-        for _ in range(max_lines + 1):  # +1 for a possible closing border line
+        for _ in range(max_lines + 2):
             line = handle.readline()
             if not line:
                 break
@@ -549,46 +589,58 @@ def find_existing_header(path, encoding, offset, max_lines):
         LOGGER.debug("File does not start with a comment in: %s", path)
         return None
 
+    first_line = lines[0].lstrip()
+    terminator = next(
+        (
+            closing
+            for opening, closing in BLOCK_COMMENT_DELIMITERS
+            if first_line.startswith(opening)
+        ),
+        None,
+    )
+    comment_lines = lines
+    if terminator is not None:
+        comment_lines = extract_block_comment(lines, terminator)
+        if comment_lines is None:
+            return None
+
     spdx_index = next(
-        (i for i, line in enumerate(lines[:max_lines]) if SPDX_PATTERN.search(line)),
+        (
+            i
+            for i, line in enumerate(comment_lines[:max_lines])
+            if SPDX_PATTERN.search(line)
+        ),
         None,
     )
     if spdx_index is None:
         LOGGER.debug("No SPDX line within %d lines in: %s", max_lines, path)
         return None
 
-    end = spdx_index + 1
-    if (
-        end < len(lines)
-        and BORDER_FILL_PATTERN.search(lines[end])
-        and BORDER_LINE_PATTERN.match(lines[end])
-    ):
-        end += 1
-
-    # Only replace a contiguous comment. A nearby SPDX line must never
-    # cause intervening source or code after a comment terminator to be deleted.
-    first_line = lines[0].lstrip()
-    if first_line.startswith(("/*", "<!--")):
-        terminator = "*/" if first_line.startswith("/*") else "-->"
-        for index, line in enumerate(lines[:end]):
-            if terminator in line:
-                if index != end - 1 or line.split(terminator, 1)[1].strip():
-                    return None
-                break
-        else:
-            # Without a terminator the end of a block comment is ambiguous.
+    if terminator is not None:
+        if not has_replaceable_block_tail(comment_lines, spdx_index):
             return None
-    elif first_line.rstrip() == "..":
-        # An RST comment ends when its body is no longer indented.
-        if any(line.strip() and not line.startswith("   ") for line in lines[1:end]):
-            return None
+        end = len(comment_lines)
     else:
-        prefix = re.match(r"(?:\#|//|')", first_line)
-        if prefix is None or any(
-            line.strip() and not line.lstrip().startswith(prefix.group())
-            for line in lines[:end]
+        end = spdx_index + 1
+        if (
+            end < len(lines)
+            and BORDER_FILL_PATTERN.search(lines[end])
+            and BORDER_LINE_PATTERN.fullmatch(lines[end])
         ):
-            return None
+            end += 1
+        if first_line.rstrip() == "..":
+            # An RST comment ends when its body is no longer indented.
+            if any(
+                line.strip() and not line.startswith("   ") for line in lines[1:end]
+            ):
+                return None
+        else:
+            prefix = re.match(r"(?:\#|//|')", first_line)
+            if prefix is None or any(
+                line.strip() and not line.lstrip().startswith(prefix.group())
+                for line in lines[:end]
+            ):
+                return None
 
     header_text = "".join(lines[:end])
     if not re.search(r"Copyright", header_text, re.IGNORECASE):
@@ -596,10 +648,6 @@ def find_existing_header(path, encoding, offset, max_lines):
         return None
 
     return len(header_text), header_text
-
-
-SPDX_ID_PATTERN = re.compile(r"SPDX-License-Identifier:\s*(\S+)", re.IGNORECASE)
-COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4}(?:\s*-\s*\d{4})?)")
 
 
 def fix_wrong_copyright(
