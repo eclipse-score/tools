@@ -42,6 +42,13 @@ jobs:
         run: |
           uv run --locked ruff check .
           uv run --locked ruff format --check .
+      - name: Build the CodeQL tooling
+        run: bazel build //codeql/...
+      - name: Smoke-test the CodeQL tool
+        run: |
+          bazel run //codeql:sca -- --list-reports
+          bazel run //codeql:sca -- --print-pins
+          bazel run //codeql:list_rules -- --help
       - name: Build the Python wheels
         run: |
           uv build --package cr-checker --wheel

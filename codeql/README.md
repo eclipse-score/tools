@@ -1,0 +1,619 @@
+<!-- ----------------------------------------------------------------------------
+  Copyright (c) 2026 Contributors to the Eclipse Foundation
+
+  See the NOTICE file(s) distributed with this work for additional
+  information regarding copyright ownership.
+
+  This program and the accompanying materials are made available under the
+  terms of the Apache License Version 2.0 which is available at
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  SPDX-License-Identifier: Apache-2.0
+----------------------------------------------------------------------------- -->
+
+# CodeQL static analysis (SCA)
+
+Bazel-integrated CodeQL analysis for C/C++ code bases. The package provides the
+pinned CodeQL CLI, an orchestration tool (`//codeql:sca`), report and preset
+definitions, local query packs and a macro (`codeql_sca`) that turns all of it
+into one runnable target per repository.
+
+- Both Linux and QNX builds are analysed by **replaying the compile commands**
+  of a Bazel build under the CodeQL tracer (no full rebuild under the tracer).
+- The analysis uses the **production compiler** (GCC for Linux, `qcc`/`q++` for
+  QNX). There is no Clang fallback; if the production compiler cannot be
+  extracted, the run fails (see [Compiler identity gate](#compiler-identity-gate)).
+- Everything is pinned: CodeQL CLI, query packs, `bazel-compile-commands`. No
+  "latest" is downloaded anywhere.
+- Linux x86_64 hosts only (`target_compatible_with = @platforms//os:linux`).
+
+## Quick start
+
+Add the module to your `MODULE.bazel`:
+
+```starlark
+bazel_dep(name = "score_tools", version = "<release>")
+```
+
+Define a target in `tools/codeql/BUILD`:
+
+```starlark
+load("@score_tools//codeql:defs.bzl", "codeql_sca")
+
+codeql_sca(
+    name = "sca_linux",
+    targets = [
+        "//score/...",
+        "-//score/mock/...",
+    ],
+    configs = ["x86_64-linux"],
+    safety_level = "QM",
+)
+```
+
+Run it:
+
+```bash
+# QM preset (code scanning + CERT + complexity) with the baked defaults
+bazel run //tools/codeql:sca_linux
+
+# ASIL preset (code scanning + CERT + MISRA mandatory/required + complexity)
+bazel run //tools/codeql:sca_linux -- --safety-level=ASIL
+
+# Analyse other targets only (positional targets replace the baked ones)
+bazel run //tools/codeql:sca_linux -- //score/time/... -//score/time/mock/...
+
+# One specific report (the complexity checks of the ASIL profile, for example)
+bazel run //tools/codeql:sca_linux -- --report=codeql-report-complexity-asil
+
+# Without the macro: generic tool, everything on the command line
+bazel run @score_tools//codeql:sca -- --config=x86_64-linux --safety-level=QM //score/...
+
+# Information only (no analysis)
+bazel run @score_tools//codeql:sca -- --list-reports
+bazel run @score_tools//codeql:sca -- --print-pins
+
+# Rule inventory: one `queries.csv` per pack reference of the selected reports
+bazel run @score_tools//codeql:list_rules -- --safety-level=ASIL --output-dir=/tmp/rules
+
+# Pack cache from the release assets instead of the registry (see below)
+bazel run @score_tools//codeql:fetch_packs -- --cache-dir=/opt/codeql-packs
+```
+
+The first run downloads the CodeQL bundle (about 550 MB; there is no C/C++-only
+bundle before CLI 2.27.1), `bazel-compile-commands`
+and, per selected report, the external query packs - from the coding-standards
+release assets (see [Packs without the registry](#packs-without-the-registry)),
+with `codeql pack download` (`ghcr.io`, about 200 MB for CERT and MISRA) as the
+fallback for CLIs that can read the registry copy. The pack cache lives in
+`${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs` and can be cached in CI; the
+tool deletes other versions of a pinned pack from it, because the CLI refuses to
+resolve a pack that is present in several versions.
+
+### Packs without the registry
+
+The external packs can also come from the release assets instead of `ghcr.io` —
+for an air-gapped build, or when the CLI has to stay on a version that cannot
+read the registry copy (see [Upgrading the pins](#upgrading-the-pins)). The
+release zip holds the same packs (byte-identical), and `score_tools` only needs
+the cache layout `<cache>/<scope>/<name>/<version>/`, i.e. the unpacked pack
+root:
+
+```bash
+# Build the pack cache once (release job, image build). The sha256 is checked
+# against the checksum pinned in versions.bzl; no registry, no credentials.
+bazel run @score_tools//codeql:fetch_packs -- --cache-dir=/opt/codeql-packs
+
+# Then every run picks it up - one variable, no target or CLI changes:
+export SCORE_CODEQL_PACK_CACHE=/opt/codeql-packs
+bazel run //tools/codeql:sca_linux -- --safety-level=ASIL
+```
+
+`fetch_packs` installs the packs pinned in `config/packs.toml` (except
+`codeql/cpp-queries` and `codeql/cpp-all`, which ship with the bundle), reports
+`installed`/`present` per pack and prunes other versions. It runs offline apart
+from the one asset download; `--zip` installs an already downloaded asset and
+`--sha256` overrides the pinned checksum. `--pack-cache-dir` (or the
+`SCORE_CODEQL_PACK_CACHE` variable, which applies to `sca`, `list_rules` and
+`fetch_packs` alike) selects the cache; an explicit flag wins over the variable,
+the variable wins over `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs`.
+
+Without Bazel, `unzip` the asset and extract each `<pack>.tgz` into
+`<cache>/codeql/<pack>/<version>/`. Either way, add nothing else to the cache:
+it is passed to the CLI with `--additional-packs`, so a
+`common-*-coding-standards` or `autosar-*` directory there shadows the copy
+inside the packs' `.codeql/libraries/` and the run fails. The packs are
+self-contained, so compilation works offline; with the 2.63.0 assets the rule
+inventory is byte-identical to a registry run, and `pins.json` reports
+`"origin": "cached"` for them.
+
+## `codeql_sca` macro
+
+```starlark
+load("@score_tools//codeql:defs.bzl", "codeql_sca")
+
+codeql_sca(
+    name,
+    targets,
+    configs = [],
+    bazel_options = [],
+    platform = "linux",
+    safety_level = None,
+    reports = [],
+    reports_file = None,
+    extra_packs = [],
+    extra_pack_data = [],
+    exclude_globs = [],
+    auto_exclude_dirs = None,
+    extraction_thresholds = {},
+    expected_compilers = None,
+    visibility = None,
+)
+```
+
+| Attribute | Meaning | Tool option it bakes in |
+| --- | --- | --- |
+| `name` | Name of the runnable target. | |
+| `targets` | **Required.** Positive and negative (`-//pkg/...`) Bazel target patterns. | `--default-target=PATTERN` (repeated) |
+| `configs` | Bazel `--config` values for the build and the compile-commands generation. | `--config=X` |
+| `bazel_options` | Extra Bazel build flags. | `--bazel-option=X` |
+| `platform` | `"linux"` (default) or `"qnx"`. | `--platform=P` |
+| `safety_level` | Preset from `reports.toml`: `"QM"`, `"ASIL"` or `None`. | `--safety-level=L` |
+| `reports` | Explicit report names, merged with the preset. | `--report=X` |
+| `reports_file` | Label (or list of labels) of a consumer `reports.toml` extending the defaults. | `--reports-file=$(rlocationpath <label>)` |
+| `extra_packs` | Labels of the `qlpack.yml` of consumer-local CodeQL packs. | `--additional-pack-qlpack=$(rlocationpath <label>)` |
+| `extra_pack_data` | Labels (filegroups) with all files of those packs. | (runfiles only) |
+| `exclude_globs` | Extra glob patterns removed from the compile commands. | `--exclude-glob=X` |
+| `auto_exclude_dirs` | Directory names excluded automatically. `None` keeps the default (`test`, `tests`, `utests`, `mock`, `mocks`); `[]` disables the automatic exclusion. | `--auto-exclude-dir=X` / `--no-auto-exclude` |
+| `extraction_thresholds` | Dict of extraction quality gates: `max_failed_command_pct`, `max_commands_with_issues_pct`, `max_missing_commands_pct`, `max_unique_parse_errors`. | `--max-failed-command-pct=N`, `--max-commands-with-issues-pct=N`, `--max-missing-commands-pct=N`, `--max-unique-parse-errors=N` |
+| `expected_compilers` | Regexes for the basename of every extracted compiler. `None` keeps the platform default; `[""]` disables the check (translated to `--no-compiler-gate`). | `--expect-compiler=REGEX` |
+
+The macro defines a `py_binary` whose `args` contain the baked options **before**
+any option given on the command line. Precedence at `bazel run <name> -- ...`:
+
+1. Scalar options (`--platform`, `--safety-level`, thresholds, `--output-dir`, ...):
+   the **last** occurrence wins, so a command-line value overrides the macro.
+2. Repeatable options (`--config`, `--bazel-option`, `--report`, `--exclude-glob`,
+   `--auto-exclude-dir`, `--expect-compiler`, `--reports-file`, ...): command-line
+   values are **appended** to the baked ones.
+3. Positional targets on the command line **replace** the macro's `targets`
+   (the macro passes them as `--default-target`, which is only used when no
+   positional target is given).
+
+`reports_file` and `extra_packs` are passed as runfiles paths
+(`$(rlocationpath ...)`). The tool resolves such a value through the Bazel
+runfiles whenever it is not an existing file on disk, and for `extra_packs` uses
+the parent directory of the resolved `qlpack.yml` as an additional pack
+directory. Consumer reports with a new name are added, reports with an existing
+name replace the default, and consumer `[presets]` replace the preset of the same
+name.
+
+## CLI reference (`//codeql:sca`)
+
+```
+bazel run //codeql:sca -- [options] [targets...]
+```
+
+| Option | Description |
+| --- | --- |
+| `targets...` | Positional Bazel target patterns, negative patterns (`-//pkg/...`) allowed. Required unless the macro baked defaults in. |
+| `--default-target PATTERN` | Targets used when no positional target is given (repeatable; used by the macro). |
+| `-c`, `--config NAME` | Bazel `--config` (repeatable). |
+| `--bazel-option OPT` | Extra Bazel build flag, also forwarded to `bazel-compile-commands` (repeatable). |
+| `--platform {linux,qnx}` | Extraction platform. |
+| `--safety-level {QM,ASIL}` | Report preset from `reports.toml` `[presets]`. |
+| `-r`, `--report NAME` | Report to run (repeatable). |
+| `--reports-file PATH` | Consumer `reports.toml` extending the defaults (repeatable; a runfiles path is accepted). |
+| `--additional-pack-dir PATH` | Directory with consumer-local CodeQL packs (repeatable). |
+| `--additional-pack-qlpack PATH` | `qlpack.yml` of a consumer-local pack; its parent is used as pack directory (runfiles path accepted). |
+| `--output-dir PATH` | Output directory. Default `<workspace>/_codeql_sca` with `results/` and `work/`. |
+| `--pack-cache-dir PATH` | Cache for downloaded query packs; a pre-populated directory is used as is (see [Packs without the registry](#packs-without-the-registry)). Default `$SCORE_CODEQL_PACK_CACHE`, else `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs`. |
+| `--threads N`, `--ram MB` | CodeQL resources. Defaults: `min(cpu, 16)` threads, 75 % of available memory capped at 12288 MB. |
+| `--replay-jobs N` | Parallel compile-command replay jobs. Default `min(cpu, 16)`. |
+| `--max-failed-command-pct`, `--max-commands-with-issues-pct`, `--max-unique-parse-errors` | Extraction quality gates (defaults 5.0 / 5.0 / 0). |
+| `--max-missing-commands-pct` | Tolerance for replayed commands that did not end up as compilations in the database (default 0.0). Independent of `--max-failed-command-pct`: the replay tolerance covers transient replay failures, this gate covers a database that is missing translation units. `summary.md` reports replayed vs. extracted commands. |
+| `--exclude-glob GLOB` | Extra compile-commands exclusion (repeatable). |
+| `--auto-exclude-dir NAME`, `--no-auto-exclude` | Directory names whose targets are excluded automatically, or disable that. |
+| `--sarif-category STR` | Category of the combined SARIF. Default `static-analysis-codeql/<platform>`. |
+| `--expect-compiler REGEX` | Regex for the basename of every extracted compiler (repeatable). Default linux `^x86_64-unknown-linux-gnu-(gcc\|g\+\+\|c\+\+)$`, qnx `^(qcc\|q\+\+)$`. Must not be empty; pass `--no-compiler-gate` to disable the gate explicitly. |
+| `--no-compiler-gate` | Disable the compiler identity gate. `compilers.json` and `summary.md` then report `disabled`, so a run never looks verified when it is not. Conflicts with `--expect-compiler`. |
+| `--require-compiler-root PATH` | Mimicked compilers must resolve below this directory. Default `bazel info output_base` (hermetic toolchains live in `<output_base>/external`); empty disables. |
+| `--expect-gcc-major N` | Required `__GNUC__` of the compiler. Default 12 on linux, none on qnx; `0` disables. |
+| `--force-rebuild` | Force a non-cached, non-uploaded materialising build (only needed when generated files are missing after a cached build). |
+| `--codeql-cli PATH` | CodeQL launcher; overrides `$SCORE_CODEQL_CLI` (for experiments, defeats the pin). |
+| `--fail-on {none,error,warning}` | Optional gate on the combined SARIF. Default `none`: findings never fail the run. |
+| `--no-fail-sarif-quality` | Do not fail when the SARIF telemetry quality checks report problems (see [SARIF quality checks](#sarif-quality-checks)). An empty ruleset and non-relative result URIs still fail. |
+| `--no-fail-suppressions` | Do not fail when in-source suppressions have no justification text (see [Suppressions](#suppressions)). They still hide findings and are reported in `summary.md`. |
+| `--bazel PATH` | Bazel executable for nested invocations (default `$BAZEL`, then `bazelisk`, then `bazel`). |
+| `--list-reports` | Print reports and presets and exit. |
+| `--print-pins` | Print CLI and pack versions (JSON) and exit; useful for cache keys. |
+| `-v`, `--verbose` | Verbose logging. |
+
+Exit code `0` means the analysis ran, regardless of findings. Non-zero is
+returned for tool, build or extraction failures, for `--fail-on` hits, for
+failing [SARIF quality checks](#sarif-quality-checks) unless
+`--no-fail-sarif-quality` is given, and for unjustified suppressions unless
+`--no-fail-suppressions` is given.
+
+Every extractor log must carry the extractor's verdict (`Extractor exited
+successfully` or `Extractor exiting with code`). A log that cannot be read, or
+that has neither marker, fails the run: it is not evidence of a clean
+compilation, so a truncated or unknown log format can never look like a healthy
+extraction. Logs of this kind are counted separately in `extraction-summary.txt`
+and `summary.md` (*Unreadable extractor logs*, *Logs without a verdict*). The
+standalone checker (`python -m score_codeql.check_db`) has no defaults for
+`--max-failed-command-pct`/`--max-commands-with-issues-pct`; thresholds that were
+not given are reported as *not evaluated* instead of passing silently.
+
+Diagnostics of a compilation that the extractor completed successfully are
+*recovered*: they are no evidence of a broken extraction, so they do not count
+towards `--max-unique-parse-errors` (and the run keeps passing with the default
+limit of `0`). They are nevertheless retained and reported: section *recovered
+extractor diagnostics* of `results/extraction-summary.txt`, and the counters
+*Commands with recovered diagnostics* / *Unique recovered diagnostics* of
+`results/summary.md`. Recoverable errors can still limit how much of the code
+the analysis sees, so they are part of the analysis integrity report instead of
+being dropped.
+
+## Reports and presets
+
+Defined in [`config/reports.toml`](config/reports.toml). Every pack reference
+carries its version (`<pack>@<version>:<path>`).
+
+| Report | Contents |
+| --- | --- |
+| `codeql-report` | Code scanning + CERT C++ L1 + CERT C L1 + `AlertSuppression.ql` (QM profile) |
+| `codeql-report-safety` | `codeql-report` + MISRA C++ mandatory/required (ASIL profile) |
+| `codeql-report-complexity-qm` | Size/complexity checks with the QM thresholds (`score/code-complexity-queries`) |
+| `codeql-report-complexity-asil` | Size/complexity checks with the ASIL thresholds (`score/code-complexity-queries`) |
+
+| Preset (`--safety-level`) | Reports |
+| --- | --- |
+| `QM` | `codeql-report`, `codeql-report-complexity-qm` |
+| `ASIL` | `codeql-report-safety`, `codeql-report-complexity-asil` |
+
+Both presets run `codeql/cpp-queries:AlertSuppression.ql`, so
+`// codeql[<rule-id>]` comments in the analysed code are evaluated and the
+affected results are marked as suppressed in the SARIF file (they are counted in
+the "Suppressed" column of `summary.md`, not reported as findings; unjustified
+ones are gated, see [Suppressions](#suppressions)).
+
+### Complexity thresholds
+
+CodeQL compiles the thresholds into the queries, so each profile has its own
+query set: `src/qm` and `src/asil` read their limits from
+[`queries/code-complexity/lib/Thresholds.qll`](queries/code-complexity/lib/Thresholds.qll);
+each set contains the size/complexity checks **and** the public-interface check.
+The profile-independent checks (`goto` statements, recursion) live in
+`src/common` and are part of both suites.
+
+| Metric | QM | ASIL |
+| --- | --- | --- |
+| Lines of code per function | 200 | 100 |
+| Lines of code per file | 4000 | 2000 |
+| Cyclomatic complexity per function | 20 | 10 |
+| Parameters per function | 7 | 5 |
+| `goto` statements per function | 0 | 0 |
+| Recursive paths per function | 0 | 0 |
+| Public interfaces per component | 10 | 3 |
+
+"Component" is a class or struct of the analysed sources, its public interfaces
+are its member functions that are neither `private` nor `protected` (members of
+a `struct` are public without a specifier). Exceeding the limit of the active
+profile is reported with the id
+`score/cpp/<profile>/public-interfaces-per-component`; the per-profile checks use
+`score/cpp/<profile>/...`, the shared ones `score/cpp/...`. The check is advisory
+(`@problem.severity recommendation`, SARIF level `note`, so it does not trip
+`--fail-on warning`); all other complexity checks are warnings. Template
+instantiations are not reported separately — the alert points at the class
+template and counts the members of its declaration, so the number is the same for
+every instantiation.
+
+## SARIF quality checks
+
+`results/sarif-summary.txt` is written by `score_codeql.check_sarif`. The checks
+are derived from the `@kind metric` telemetry queries that
+`cpp-code-scanning.qls` includes, so they describe the **database** — not the
+extractor log that feeds the [extraction quality gates](#cli-reference-codeqlsca).
+
+| Check | Fails when |
+| --- | --- |
+| ruleset | the SARIF contains no rules that can produce findings, i.e. no query produced results (`cpp/telemetry/*` metric rules do not count, so a metric-only run cannot pass) |
+| `Percentage of compilations without errors` | below 100 % |
+| `Percentage of source/header files without errors` | below 100 % |
+| `Percentage of successfully resolved #include directives` | below 100 % |
+| `syntax errors`, `compiler errors` | non-zero; the most frequent compiler messages are printed below the check |
+
+Together these percentages quantify how much of the code the queries could see.
+A value below 100 % means declarations are missing or translation units were not
+extracted, so findings can be silently missing. They are deterministic: a
+legitimate build keeps them at exactly 100 %, so a failure always points at a
+real problem (a broken toolchain, an unparsed construct, a database built from
+incomplete compile commands).
+
+Three further telemetry percentages count **`ErrorExpr` nodes**, which is not
+the same as "the extractor failed". They are not gated, only reported:
+
+* `Percentage of functions without errors`
+* `Percentage of non-error expressions`
+* `Percentage of lines of code without errors`
+
+Any `new` expression whose placement-new argument goes through
+`std::allocator_traits::construct` (every `std::vector::emplace_back`,
+`std::make_shared`, `std::function` construction, ...) contributes an
+`ErrorExpr` for its allocator-call argument; CodeQL's own `Function.hasErrors()`
+excludes exactly that node for the same reason, but the telemetry queries do not.
+The remaining nodes carry no source location at all (`file://:0:0:0:0`), so no
+source change can remove them. Gating these percentages therefore fails every
+C++ project that uses the standard library while saying nothing about the
+analysed sources. They are printed as `INFO` lines — also without `--verbose` —
+so the deficit stays visible and a real regression (a translation unit dropping
+out of the database) can still be spotted.
+
+`Percentage of calls with an explicit target`, `Percentage of expressions with a
+known type` and `Percentage of variables with a known type` are legitimately
+below 100 % as well (indirect calls, template-dependent types); they are noisy by
+nature and reported as `INFO` lines in `--verbose` mode only.
+
+An empty ruleset is always fatal — a run that analysed nothing must not pass.
+The gated metric checks fail the `sca` run by default; `--no-fail-sarif-quality`
+turns them into a warning (the standalone checker uses `--no-fail`). If the
+SARIF carries no `cpp/telemetry` metrics at all (for example a report that
+selects only complexity queries), the checks cannot be evaluated; that is
+written as a visible `WARN` line and logged, so a run never looks green merely
+because telemetry is missing. The same applies to a single run without telemetry
+next to runs that have it.
+
+A SARIF may contain several runs (for example several databases or query sets).
+Percentages are then combined with `min` (the worst run decides) and counts are
+summed, so a healthy run can never hide a broken one.
+
+The checker can also be used standalone:
+
+```bash
+python -m score_codeql.check_sarif _codeql_sca/results/code-scanning.sarif -v
+```
+
+## Pinned versions
+
+All pins are recorded in [`versions.bzl`](versions.bzl) and
+[`config/packs.toml`](config/packs.toml); `MODULE.bazel` repeats the URLs and
+checksums because it cannot load `.bzl` files. Tests keep them consistent.
+
+| Artifact | Version |
+| --- | --- |
+| CodeQL bundle (linux64) | 2.23.9 |
+| `codeql/cpp-queries` (in bundle) | 1.5.8 |
+| `codeql/cpp-all` (in bundle) | 6.1.4 |
+| `codeql/cert-cpp-coding-standards` | 2.63.0 |
+| `codeql/cert-c-coding-standards` | 2.63.0 |
+| `codeql/misra-cpp-coding-standards` | 2.63.0 |
+| `score/code-complexity-queries` (local) | 1.0.0 |
+| `score/codeql-sca-diagnostics` (local) | 1.0.0 |
+| SARIF output format (`--format`) | `sarifv2.1.0` |
+| `bazel-compile-commands` (glibc >= 2.38) | 0.22.4 |
+| `bazel-compile-commands` (glibc < 2.38, Ubuntu 22.04 `.deb`) | 0.21.0 |
+
+Query packs are compiled by the pinned CLI at analysis time. External packs
+(coding standards) are installed from the coding-standards release asset into the
+pack cache and verified against the pinned version before use; when that asset is
+unreachable, `codeql pack download <name>@<version>` is used instead (only CLIs
+>= 2.26.3 can read the registry copy of v2.63.0).
+
+Results are interpreted with `--format=sarifv2.1.0`, not `sarif-latest`: the
+latter produces different SARIF versions with different CLI versions (the CLI
+help calls it unsuitable for automation), so pinning the CLI without pinning the
+schema would let an unrelated upgrade change the uploaded SARIF.
+
+### Upgrading the pins
+
+1. Check for newer releases (`gh release list -R github/codeql-action` for CLI
+   and bundle, `gh release list -R github/codeql-coding-standards` for the
+   standards) and decide on the new versions. Two things have tripped up
+   previous upgrades:
+   * A coding-standards release can only be downloaded from the CodeQL registry
+     once its packs are published there, which lags the GitHub release: verify
+     with `codeql pack download codeql/cert-cpp-coding-standards@<version>` (the
+     registry's `tags/list` is authoritative). v2.63.0 (2026-11-16) needed a
+     day before its packs appeared. The release assets ship with the release, so
+     a pack cache can be built from them right away.
+   * The release notes' "Supported versions" name the CLI the packs were built
+     and validated with - 2.23.9 for v2.63.0 - and that is the pin to use. With
+     CLI < 2.26.3 the registry copy cannot be downloaded: the v2.63.0 packs are
+     uploaded with OCI descriptors (`config.digest` instead of the inline
+     `config.metadata` of 2.62.0) - the upload fix from the CLI 2.26.3 release
+     notes ("Fixed the pack upload format to comply with the OCI-image-manifest
+     specification") - and 2.23.9 fails on every download of v2.63.0 with
+     `UnrecognizedPropertyException ... "digest"`. `ensure_packs` therefore
+     falls back to the release asset (see
+     [Packs without the registry](#packs-without-the-registry)) when the
+     download fails, so a CLI that cannot read the registry copy is fine as long
+     as the assets are reachable.
+2. Update, in one change: `versions.bzl`, the `http_archive`/`http_file` blocks
+   in `MODULE.bazel` (URLs and sha256), `config/packs.toml`,
+   `config/reports.toml`, the table above and `queries/*/qlpack.yml`
+   (`codeql/cpp-all` must match the version shipped in the new bundle).
+3. Regenerate the lock files with the **new** CLI:
+   `cd codeql/queries/<pack> && codeql pack install`. They stay at
+   `dependencies: {}`, because `codeql/cpp-all` is resolved from the bundle
+   rather than from the registry.
+4. Check that the suites still exist at the new versions and that the new
+   coding-standards release runs on the new CLI (a small C++ database is
+   enough; compile time and warnings are worth recording). The coding-standards
+   packs carry the libraries they were built against in
+   `.codeql/libraries/` (v2.63.0: `codeql/cpp-all` 6.1.4), so they compile
+   against their own `cpp-all` while `queries/*` use the one from the bundle.
+5. Run `uv run --locked pytest`, `bazel build //codeql/...` and
+   `bazel run //codeql:sca -- --print-pins`.
+
+## Suppressions
+
+Justified findings are suppressed in the source with a comment on or directly
+before the flagged line:
+
+```cpp
+// codeql[cpp/unused-local-variable] kept for debugger inspection
+int unused = 0;
+```
+
+The `AlertSuppression.ql` query in `codeql-report` makes CodeQL recognise these
+comments; the tool then writes the justification into the SARIF
+`suppressions` of the result.
+
+A suppression without justification text hides a finding for free, so it is
+gated: the run fails if any in-source suppression has no `codeql[...]` comment
+with a reason (pass `--no-fail-suppressions` to continue anyway). `summary.md`
+counts them in the *Unjustified* column and names the rule to fix. Suppressions
+that cannot be mapped to their source line are reported as unresolved and count
+as unjustified. The standalone tool can gate them as well:
+
+```bash
+python -m score_codeql.sarif_suppressions results/code-scanning.sarif \
+    --source-root . --require-justification
+```
+
+## Output layout
+
+Everything is written below `--output-dir` (default `<workspace>/_codeql_sca`).
+The workspace root (including a developer's own `compile_commands.json`) is
+never modified.
+
+```
+_codeql_sca/
+├── results/
+│   ├── <report>.sarif, <report>.csv   one pair per selected report
+│   ├── code-scanning.sarif            single run with the SARIF category; upload this one
+│   ├── extraction-summary.txt         extraction statistics and diagnostics
+│   ├── sarif-summary.txt              checks of the SARIF output
+│   ├── summary.md                     job summary (compiler table, counts, pins)
+│   ├── compilers.json                 compilers that produced the database
+│   └── pins.json                      CLI and pack versions actually resolved
+└── work/
+    ├── db/                            CodeQL database
+    ├── compile_commands*.json         generated and filtered compile commands
+    ├── bin/                           compiled codeql_cc_wrapper, unpacked helper binaries
+    └── logs/
+```
+
+`code-scanning.sarif` is the only file that is uploaded to Code Scanning, so
+results in code that is not part of the repository — Bazel external
+repositories, the hermetic toolchain and its sysroot, system headers — are
+removed from it (the per-report SARIF/CSV files keep them, and `summary.md`
+states how many were dropped). A result whose location *is* a repository file
+but is not expressed workspace-relative (for example `bazel-out/...`) fails the
+run instead, because Code Scanning would drop or misplace that alert.
+
+## Compiler identity gate
+
+A run can never silently analyse another compiler's build:
+
+1. **Before replay**, the filtered compile commands are checked: every distinct
+   original compiler must match `--expect-compiler` and must not define
+   `__clang__`.
+2. **Static compilers** (such as the hermetic GCC driver) cannot be hooked by the
+   tracer, so they are started through `codeql_cc_wrapper`; a static compiler
+   that was not rewritten is an error.
+3. **After extraction**, `queries/diagnostics/ExtractedCompilers.ql` lists what
+   the tracer observed. The extractor is started as
+   `extractor --mimic <observed> <args...>`, so the observed program is the
+   argument following `--mimic`. A dynamic driver shows up as its `cc1`/`cc1plus`
+   child; basenames `<triple>-(gcc|g++|c++)` and `cc1|cc1plus` are accepted and
+   the path must lie below `--require-compiler-root` (the Bazel output base),
+   which rejects a fall-back to the host `/usr/bin/g++` or to Clang. For a static
+   driver behind `codeql_cc_wrapper` the database only names the **wrapper**, not
+   the real compiler. A mimic of the wrapper built in this run is accepted as an
+   alias of the wrapped compilers only because step 1 already verified those
+   compilers (regex, root, `__clang__`/`__GNUC__`) and step 2 recorded how many
+   commands were rewritten for each; the number of wrapper compilations must
+   match that total (within `--max-missing-commands-pct`). Any other wrapper
+   path, or a wrapper mimic without a verified wrapped compiler, fails. In all
+   cases the extracted compilations must not be fewer than the replayed commands.
+4. `summary.md` starts with a compiler table
+   (`x86_64-unknown-linux-gnu-g++ | 12.2.0 | static | via wrapper | 57 commands | 57 extracted`),
+   and `compilers.json` is shipped with the results.
+
+The gate is never silently absent:
+
+- A compiler whose identity probe fails (e.g. `qcc` on a QNX host without the
+  SDP) is recorded with `"identity": "skipped"` and the status becomes
+  `unverified`; the table shows `not queried` and a warning is logged.
+- `--no-compiler-gate` is the only way to disable the gate. It sets the status
+  to `disabled`, which `summary.md` spells out; an empty `--expect-compiler` is
+  rejected as a configuration error.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    M["codeql_sca macro (defs.bzl)"] -->|baked args| S["//codeql:sca (score_codeql)"]
+    S -->|1 init| DB[("CodeQL database")]
+    S -->|2 bazel build| B["Bazel"]
+    S -->|3 compile_commands.json| BCC["scripts/bcc.sh + bcc_bazel_wrapper.sh"]
+    BCC --> F["compile_commands_filter"]
+    F -->|4 replay under tracer| R["replay (+ codeql_cc_wrapper for static compilers)"]
+    R --> DB
+    DB -->|5 check_db, compiler gate| S
+    S -->|6 finalize, run-queries| Q["pinned packs + queries/*"]
+    Q -->|7 interpret-results| O["results/*.sarif, *.csv, summary.md"]
+```
+
+Layout of the package:
+
+| Path | Purpose |
+| --- | --- |
+| `defs.bzl` | `codeql_sca` macro and `codeql_sca_binary` building block. |
+| `BUILD` | `//codeql:sca`, `//codeql:list_rules`, `//codeql:fetch_packs`, the `score_codeql` library and the file groups. |
+| `versions.bzl` | Pinned versions, URLs and checksums (documentation/test source of truth). |
+| `third_party/*.BUILD` | BUILD files of the downloaded repositories `@codeql_bundle` and `@bazel_compile_commands`. |
+| `config/reports.toml`, `config/packs.toml` | Reports/presets and pinned pack versions. |
+| `queries/code-complexity/` | Local pack `score/code-complexity-queries` with its lock file. |
+| `queries/diagnostics/` | Local pack `score/codeql-sca-diagnostics` (`ExtractedCompilers.ql`). |
+| `wrapper/codeql_cc_wrapper.c` | Source of the dynamic launcher for static compilers (compiled at runtime into `work/bin`, no binary is committed). |
+| `scripts/bcc.sh` | Starts the pinned `bazel-compile-commands`. |
+| `scripts/bcc_bazel_wrapper.sh` | Bazel wrapper for `bazel-compile-commands` (clears `--platforms` for `bazel info`). |
+| `score_codeql/` | The Python tool (standard library only). |
+
+The Bazel repositories `@codeql_bundle`, `@bazel_compile_commands` and
+`@bazel_compile_commands_jammy_deb` are declared in `MODULE.bazel` and fetched
+lazily, so users of other `score_tools` components never download them. They are
+private to this module: the tool finds them through `$(rlocationpath ...)`
+environment variables (`SCORE_CODEQL_*`) resolved with `python.runfiles`, so it
+works from any consumer workspace.
+
+### `bazel-compile-commands` selection
+
+`scripts/bcc.sh` runs the release binary when the host glibc is at least 2.38.
+On older hosts (Ubuntu 22.04: glibc 2.35) it unpacks the pinned jammy `.deb` with
+`dpkg-deb -x` into `<output-dir>/bin` and uses that binary. Nothing is downloaded
+at runtime. `SCORE_CODEQL_BCC_OVERRIDE=<path>` selects an explicit binary; a
+`bazel-compile-commands` on `PATH` is deliberately **not** used because it would
+defeat the pin. The `.deb` is kept as an `http_file`: `http_archive(type = "deb")` (verified
+with Bazel 8.8.2) only splits the `ar` container and leaves `data.tar` packed, so
+the payload is unpacked at runtime, which needs `dpkg-deb` (present on
+Debian/Ubuntu hosts).
+
+`@codeql_bundle//:codeql_cli` is a file group (not an `sh_binary`) that carries
+the whole bundle as runfiles, because the CLI locates `tools/`, `cpp/` and
+`qlpacks/` next to itself. No `rules_shell` dependency is needed.
+
+## Alternatives considered
+
+- **Bazel-integrated extractors**
+  ([hedronvision](https://github.com/hedronvision/bazel-compile-commands-extractor),
+  [helly25](https://github.com/helly25/bazel-compile-commands-extractor)):
+  hedronvision is unmaintained since 06/2024; helly25 produced incorrect
+  compile commands in our environment. `kiron1/bazel-compile-commands` is used.
+- **Full rebuild under the CodeQL tracer**: far more compilations than needed
+  (external code, tests) and statically linked compilers are invisible to the
+  `LD_PRELOAD` tracer. Compile commands are filtered and replayed instead.
+- **Replacing static compilers with the host GCC or Clang**: wrong built-in
+  includes/defines and a different front end than the product uses. The wrapper
+  keeps the original compiler.
+- **Pre-compiled query packs**: dropped; the pinned CLI compiles the packs at
+  analysis time, which keeps the pins simple.
+- **Unpinned or "latest" packs**: not reproducible; every pack is pinned.
+
+## SARIF viewer
+
+Install the **SARIF Viewer** VS Code extension (`ms-sarifvscode.sarif-viewer`)
+for inline highlighting of findings in `results/*.sarif`.
