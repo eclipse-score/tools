@@ -13,6 +13,12 @@
 
 load("@rules_python//python:defs.bzl", "py_library")
 load(":defs.bzl", "codeql_sca_binary", "codeql_tool_binary")
+load(
+    ":versions.bzl",
+    "CODING_STANDARDS_PACKS_SHA256",
+    "CODING_STANDARDS_PACKS_URL",
+    "CODING_STANDARDS_VERSION",
+)
 
 package(default_visibility = ["//visibility:public"])
 
@@ -23,6 +29,7 @@ exports_files(
         "queries/code-complexity/qlpack.yml",
         "queries/diagnostics/qlpack.yml",
         "score_codeql/__main__.py",
+        "score_codeql/fetch_packs.py",
         "score_codeql/list_rules.py",
         "scripts/bcc.sh",
         "scripts/bcc_bazel_wrapper.sh",
@@ -39,6 +46,7 @@ py_library(
         # both targets would emit the same .pyc).
         exclude = [
             "score_codeql/__main__.py",
+            "score_codeql/fetch_packs.py",
             "score_codeql/list_rules.py",
         ],
         allow_empty = True,
@@ -56,6 +64,18 @@ codeql_sca_binary(name = "sca")
 codeql_tool_binary(
     name = "list_rules",
     main = "//codeql:score_codeql/list_rules.py",
+)
+
+# Fill a pack cache from the coding-standards release asset (no registry):
+# `bazel run //codeql:fetch_packs -- --cache-dir=/opt/codeql-packs`
+codeql_tool_binary(
+    name = "fetch_packs",
+    main = "//codeql:score_codeql/fetch_packs.py",
+    args = [
+        "--version={}".format(CODING_STANDARDS_VERSION),
+        "--asset-url={}".format(CODING_STANDARDS_PACKS_URL),
+        "--sha256={}".format(CODING_STANDARDS_PACKS_SHA256),
+    ],
 )
 
 filegroup(

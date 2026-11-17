@@ -207,6 +207,18 @@ def test_additional_packs_value_and_default_cache(tmp_path: Path) -> None:
     assert pk.default_pack_cache({}).parts[-3:] == (".cache", "score-codeql", "packs")
 
 
+def test_default_pack_cache_prefers_the_deployment_override() -> None:
+    environ = {
+        "XDG_CACHE_HOME": "/x",
+        "SCORE_CODEQL_PACK_CACHE": "/deployed/packs",
+    }
+    assert pk.default_pack_cache(environ) == Path("/deployed/packs")
+    # An empty or blank override falls back to the XDG default.
+    assert pk.default_pack_cache(
+        {"XDG_CACHE_HOME": "/x", "SCORE_CODEQL_PACK_CACHE": "  "}
+    ) == Path("/x/score-codeql/packs")
+
+
 def test_pins_json_records_resolution(tmp_path: Path, config_env: dict) -> None:
     pins = cfg.load_pins(config_env["SCORE_CODEQL_PACKS"])
     resolved = [
@@ -330,6 +342,23 @@ def test_wrong_version_in_cache_is_replaced(fake_codeql: Path, tmp_path: Path) -
         fake_codeql, tmp_path, ["codeql/cert-cpp-coding-standards@2.62.0:a.qls"]
     )
     assert resolved[0].origin == "downloaded"
+
+
+def test_other_cached_versions_of_a_pinned_pack_are_removed(
+    fake_codeql: Path, tmp_path: Path
+) -> None:
+    cache = tmp_path / "cache"
+    _pack(cache, "codeql/cert-cpp-coding-standards", "2.62.0", ("a.qls",))
+    current = _pack(cache, "codeql/cert-cpp-coding-standards", "2.63.0", ("a.qls",))
+    unrelated = _pack(cache, "codeql/misra-cpp-coding-standards", "2.63.0", ("b.qls",))
+    resolved = pk.ensure_packs(
+        fake_codeql, [_ref("codeql/cert-cpp-coding-standards@2.63.0:a.qls")],
+        cache_dir=cache, distribution=tmp_path / "dist", local_packs={},
+        listed_external=["codeql/misra-cpp-coding-standards"],
+    )  # fmt: skip
+    assert (resolved[0].origin, resolved[0].path) == ("cached", current)
+    assert not (cache / "codeql/cert-cpp-coding-standards/2.62.0").exists()
+    assert unrelated.is_dir()
 
 
 def test_tests_cannot_touch_the_real_cache(isolated_home: Path, tmp_path: Path) -> None:

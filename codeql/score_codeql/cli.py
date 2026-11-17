@@ -142,7 +142,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--pack-cache-dir",
         default=None,
-        help="Pack cache (default: ~/.cache/score-codeql/packs)",
+        help="Pack cache (default: $SCORE_CODEQL_PACK_CACHE or "
+        "~/.cache/score-codeql/packs)",
     )
     parser.add_argument(
         "--threads",

@@ -24,12 +24,17 @@ metrics. Three kinds of checks produce a failing exit status:
   excluded from that count: they only exist to carry metrics and would make a
   metric-only run look like an analysed one.
 * **Quality metrics** fail unless ``--no-fail`` is given. The gated metrics are
-  the telemetry percentages that quantify how much of the database was extracted
-  without errors (compilations, source/header files, ``#include`` directives,
-  functions, expressions, lines of code) plus the number of syntax and compiler
-  errors. Percentages that are legitimately below 100 % (calls with an explicit
-  target, expressions and variables with a known type) are reported as ``INFO``
-  in verbose mode only. In a multi-run SARIF the worst run decides for a
+  the telemetry percentages that are deterministic evidence of a broken
+  extraction (compilations, source/header files, ``#include`` directives) plus
+  the number of syntax and compiler errors. The ``ErrorExpr``-based percentages
+  (functions, expressions, lines of code) are **not** gated: they count every
+  ``ErrorExpr`` the extractor synthesised, including documented artefacts such
+  as the first argument of an allocator call, so they stay below 100 % for any
+  project that uses the standard library. They are still reported as ``INFO``
+  lines so a real deficit remains visible. Percentages that are legitimately
+  below 100 % for type-resolution reasons (calls with an explicit target,
+  expressions and variables with a known type) are reported as ``INFO`` in
+  verbose mode only. In a multi-run SARIF the worst run decides for a
   percentage (``min``) and counts are summed, so a healthy run can never mask a
   broken one.
 
@@ -61,10 +66,8 @@ _SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _MAX_REPORTED_URI_VIOLATIONS = 20
 _TELEMETRY_PREFIX = "cpp/telemetry/"
 
-# Every one of these metrics counts the fraction of the database that was
-# extracted without errors. A value below 100 % means the analysed code is only
-# partially visible to the queries (missing declarations, error expressions,
-# broken data flow), so they are gated.
+# Gated: a value below 100 % here means whole translation units or headers were
+# not extracted, which no legitimate build produces.
 _GATED_PERCENTAGES = (
     ("cpp/telemetry/database-quality", "Percentage of compilations without errors"),
     (
@@ -75,14 +78,29 @@ _GATED_PERCENTAGES = (
         "cpp/telemetry/database-quality",
         "Percentage of successfully resolved #include directives",
     ),
+)
+
+# Not gated, always reported as INFO: these three percentages count every
+# `ErrorExpr` the extractor synthesised, not only the ones that indicate a
+# broken compilation. One large artefact is documented by CodeQL itself:
+# `Function.hasErrors()` excludes the first argument of an allocator call
+# because it is *always* extracted as `ErrorExpr` (placement new through
+# `std::allocator_traits::construct`, i.e. every `std::vector::emplace_back`,
+# `std::make_shared`, `std::function` construction, ...). The telemetry queries
+# do not apply that exclusion, and the remaining nodes carry no source location
+# at all (`file://:0:0:0:0`), so no source change can remove them either.
+# Gating these at 100 % fails every C++ project that uses the standard library
+# without saying anything about the analysed sources. The values are still
+# printed so a real regression (a translation unit dropping out) stays visible.
+_INFORMATIONAL_PERCENTAGES = (
     ("cpp/telemetry/database-quality", "Percentage of functions without errors"),
     ("cpp/telemetry/database-quality", "Percentage of non-error expressions"),
     ("cpp/telemetry/database-quality", "Percentage of lines of code without errors"),
 )
 
-# Reported for information only: indirect calls and template-dependent types
-# legitimately keep these below 100 %.
-_INFORMATIONAL_PERCENTAGES = (
+# Not gated, `--verbose` only: indirect calls and template-dependent types
+# legitimately keep these below 100 %, and they are noisy by nature.
+_VERBOSE_PERCENTAGES = (
     ("cpp/telemetry/database-quality", "Percentage of calls with an explicit target"),
     ("cpp/telemetry/database-quality", "Percentage of expressions with a known type"),
     ("cpp/telemetry/database-quality", "Percentage of variables with a known type"),
@@ -344,8 +362,16 @@ def _quality_lines(runs: list[dict[str, Any]], verbose: bool) -> QualityResult:
             f"[quality check]          {d}" for d in get_compiler_error_details(runs)
         )
 
-    if verbose:
+    if telemetry:
         for rule_id, metric_name in _INFORMATIONAL_PERCENTAGES:
+            pct = get_metric(runs, rule_id, metric_name)
+            shown = "metric not found" if pct is None else format_percentage(pct)
+            result.lines.append(
+                f"[quality check] INFO: {metric_name.lower()}, actual: ({shown})"
+            )
+
+    if verbose:
+        for rule_id, metric_name in _VERBOSE_PERCENTAGES:
             pct = get_metric(runs, rule_id, metric_name)
             shown = "metric not found" if pct is None else format_percentage(pct)
             result.lines.append(

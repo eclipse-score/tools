@@ -217,6 +217,29 @@ def test_percentage_metrics_are_not_reported_as_information_only() -> None:
     ]
 
 
+@pytest.mark.parametrize(
+    "metric_name",
+    [name for _rule_id, name in check_sarif._INFORMATIONAL_PERCENTAGES],
+)
+def test_error_expr_percentages_below_100_do_not_fail(metric_name: str) -> None:
+    """`ErrorExpr` counts are partly the extractor's own artefact (allocator call
+    arguments), so they must never fail a run -- also without ``--verbose``."""
+    metrics = [_metric("cpp/telemetry/database-quality", metric_name, 99.9327)]
+    report = check_sarif.analyze([_run([], metrics)])
+    assert not report.quality_failed
+    assert f"INFO: {metric_name.lower()}, actual: (99.9327%)" in report.text
+
+
+def test_no_error_expr_percentage_is_gated() -> None:
+    gated = {name for _rule_id, name in check_sarif._GATED_PERCENTAGES}
+    for name in (
+        "Percentage of functions without errors",
+        "Percentage of non-error expressions",
+        "Percentage of lines of code without errors",
+    ):
+        assert name not in gated
+
+
 def test_informational_percentage_below_100_does_not_fail() -> None:
     metrics = [
         _metric(
@@ -229,6 +252,21 @@ def test_informational_percentage_below_100_does_not_fail() -> None:
     assert not report.quality_failed
     assert "INFO: percentage of calls with an explicit target" in report.text
     assert "42.0%" in report.text
+
+
+def test_type_resolution_percentages_are_verbose_only() -> None:
+    assert "Percentage of calls with an explicit target" not in [
+        name for _rule_id, name in check_sarif._INFORMATIONAL_PERCENTAGES
+    ]
+    assert "Percentage of calls with an explicit target" in [
+        name for _rule_id, name in check_sarif._VERBOSE_PERCENTAGES
+    ]
+
+
+def test_informational_percentage_is_skipped_without_telemetry() -> None:
+    report = check_sarif.analyze([_run([])])
+    assert "INFO: percentage of non-error expressions" not in report.text
+    assert "no cpp/telemetry metrics in this SARIF" in report.text
 
 
 def test_absent_percentage_metrics_are_skipped() -> None:
@@ -277,7 +315,7 @@ def test_metric_only_ruleset_does_not_count_as_analysed() -> None:
 
 
 def test_percentage_metrics_use_the_worst_run() -> None:
-    name = "Percentage of functions without errors"
+    name = "Percentage of successfully resolved #include directives"
     rule = "cpp/telemetry/database-quality"
     healthy = _run([], [_metric(rule, name, 100.0)])
     broken = _run([], [_metric(rule, name, 91.0)])

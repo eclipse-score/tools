@@ -63,6 +63,22 @@ def test_bundle_url_contains_the_pinned_cli_version(pins: cfg.Pins) -> None:
     )
 
 
+def test_release_asset_matches_the_pinned_coding_standards_version(
+    pins: cfg.Pins,
+) -> None:
+    bzl = _bzl_constants()
+    version = bzl["CODING_STANDARDS_VERSION"]
+    assert version == pins.packs["codeql/cert-cpp-coding-standards"]
+    assert f"/v{version}/" in bzl["CODING_STANDARDS_PACKS_URL"]
+    assert re.fullmatch(r"[0-9a-f]{64}", bzl["CODING_STANDARDS_PACKS_SHA256"])
+
+
+def test_readme_documents_the_offline_pack_cache() -> None:
+    readme = _need(CODEQL_DIR / "README.md").read_text(encoding="utf-8")
+    assert "//codeql:fetch_packs" in readme
+    assert "SCORE_CODEQL_PACK_CACHE" in readme
+
+
 def test_module_bazel_carries_the_same_artifacts() -> None:
     module = _need(REPO_ROOT / "MODULE.bazel").read_text(encoding="utf-8")
     bzl = _bzl_constants()

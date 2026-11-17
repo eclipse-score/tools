@@ -21,8 +21,12 @@ Every referenced pack must resolve to exactly the pinned version:
 * ``local``      - a query pack from a local directory (this repository or a consumer)
 
 The cache layout is ``<cache>/<scope>/<name>/<version>/qlpack.yml``, so it can be
-restored from a CI cache. Registry credentials (``GITHUB_TOKEN`` /
-``CODEQL_REGISTRIES_AUTH``) are inherited from the environment and never logged.
+restored from a CI cache. ``$SCORE_CODEQL_PACK_CACHE`` or ``--pack-cache-dir``
+selects the cache; ``fetch_packs`` fills it from the release assets, without the
+registry. Other versions of a pinned pack are removed from the cache, because the
+CLI refuses to resolve a pack that is present more than once. Registry
+credentials (``GITHUB_TOKEN`` / ``CODEQL_REGISTRIES_AUTH``) are inherited from the
+environment and never logged.
 """
 
 from __future__ import annotations
@@ -43,6 +47,8 @@ from score_codeql.process import run_capture, run_cmd
 _NAME_RE = re.compile(r"^name:\s*['\"]?([^\s'\"#]+)", re.MULTILINE)
 _VERSION_RE = re.compile(r"^version:\s*['\"]?([^\s'\"#]+)", re.MULTILINE)
 
+ENV_PACK_CACHE = "SCORE_CODEQL_PACK_CACHE"
+
 
 @dataclass(frozen=True)
 class CliInfo:
@@ -61,8 +67,16 @@ class ResolvedPack:
 
 
 def default_pack_cache(environ: Mapping[str, str] | None = None) -> Path:
-    """``${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs``."""
+    """Pack cache: ``$SCORE_CODEQL_PACK_CACHE`` or ``${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs``.
+
+    The environment variable lets a deployment or CI job point every run at a
+    pre-populated cache (see ``fetch_packs``) without changing the targets or
+    passing ``--pack-cache-dir``.
+    """
     env = os.environ if environ is None else environ
+    override = env.get(ENV_PACK_CACHE, "").strip()
+    if override:
+        return Path(override).expanduser()
     base = env.get("XDG_CACHE_HOME") or str(Path.home() / ".cache")
     return Path(base) / "score-codeql" / "packs"
 
@@ -118,7 +132,8 @@ def _pack_dir(root: Path, name: str, version: str) -> Path:
     return root / name / version
 
 
-def _has_pack(directory: Path, version: str) -> bool:
+def has_pack(directory: Path, version: str) -> bool:
+    """``qlpack.yml`` in *directory* declares *version*."""
     qlpack = directory / "qlpack.yml"
     if not qlpack.is_file():
         return False
@@ -175,9 +190,37 @@ def check_cache_shadowing(
 
 def _pack_problems(directory: Path, version: str, paths: Iterable[str]) -> list[str]:
     """What is wrong with the pack in *directory* (empty list if it is usable)."""
-    if not _has_pack(directory, version):
+    if not has_pack(directory, version):
         return [f"qlpack.yml with version {version} is missing"]
     return [f"{p} is missing" for p in paths if not (directory / p).exists()]
+
+
+def remove_other_versions(cache_dir: Path, name: str, version: str) -> None:
+    """Delete every other version of *name* from the pack cache.
+
+    The cache is passed to the CLI with ``--additional-packs``, which offers all
+    versions found below it. From 2.26 on the CLI fails with "Referenced pack
+    '<name>' was found in multiple locations" instead of picking the pinned one,
+    so a cache that survived a version bump would break every run. The cache is
+    disposable (it is re-downloaded on demand), so stale versions are removed.
+    """
+    pack_root = cache_dir / name
+    if not pack_root.is_dir():
+        return
+    for entry in sorted(pack_root.iterdir()):
+        if entry.name == version or entry.is_symlink() or not entry.is_dir():
+            continue
+        logging.info(
+            "Removing other cached version %s@%s from %s", name, entry.name, cache_dir
+        )
+        try:
+            shutil.rmtree(entry)
+        except OSError as exc:
+            raise ScaError(
+                f"cannot remove the stale pack version {entry} from the cache: the "
+                f"CodeQL CLI refuses to resolve a pack that exists in more than one "
+                f"version ({exc})"
+            ) from exc
 
 
 def ensure_packs(
@@ -230,7 +273,7 @@ def ensure_packs(
         if not version:
             raise ConfigError(f"pack reference {name} has no version")
         bundled = _pack_dir(distribution / "qlpacks", name, version)
-        if _has_pack(bundled, version):
+        if has_pack(bundled, version):
             problems = _pack_problems(bundled, version, wanted)
             if problems:
                 raise ScaError(
@@ -263,6 +306,7 @@ def ensure_packs(
                     f"{'; '.join(problems)}"
                 )
         resolved.append(ResolvedPack(name, version, origin, cached))
+        remove_other_versions(cache_dir, name, version)
     return resolved
 
 

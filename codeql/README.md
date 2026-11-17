@@ -75,13 +75,57 @@ bazel run @score_tools//codeql:sca -- --print-pins
 
 # Rule inventory: one `queries.csv` per pack reference of the selected reports
 bazel run @score_tools//codeql:list_rules -- --safety-level=ASIL --output-dir=/tmp/rules
+
+# Pack cache from the release assets instead of the registry (see below)
+bazel run @score_tools//codeql:fetch_packs -- --cache-dir=/opt/codeql-packs
 ```
 
-The first run downloads the CodeQL bundle (about 480 MB, the full linux64
-bundle; 2.21.4 has no C/C++-only variant), `bazel-compile-commands`
+The first run downloads the CodeQL C/C++-only bundle (about 165 MB; the full
+linux64 bundle is 550 MB and only differs by the other languages' query packs),
+`bazel-compile-commands`
 and, per selected report, the external query packs from the CodeQL registry
-(`ghcr.io`, about 180 MB for CERT and MISRA). The pack cache lives in
-`${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs` and can be cached in CI.
+(`ghcr.io`, about 200 MB for CERT and MISRA; `fetch_packs` installs the same packs
+from the release assets instead). The pack cache lives in
+`${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs` and can be cached in CI; the
+tool deletes other versions of a pinned pack from it, because the CLI refuses to
+resolve a pack that is present in several versions.
+
+### Packs without the registry
+
+The external packs can also come from the release assets instead of `ghcr.io` —
+for an air-gapped build, or when the CLI has to stay on a version that cannot
+read the registry copy (see [Upgrading the pins](#upgrading-the-pins)). The
+release zip holds the same packs (byte-identical), and `score_tools` only needs
+the cache layout `<cache>/<scope>/<name>/<version>/`, i.e. the unpacked pack
+root:
+
+```bash
+# Build the pack cache once (release job, image build). The sha256 is checked
+# against the checksum pinned in versions.bzl; no registry, no credentials.
+bazel run @score_tools//codeql:fetch_packs -- --cache-dir=/opt/codeql-packs
+
+# Then every run picks it up - one variable, no target or CLI changes:
+export SCORE_CODEQL_PACK_CACHE=/opt/codeql-packs
+bazel run //tools/codeql:sca_linux -- --safety-level=ASIL
+```
+
+`fetch_packs` installs the packs pinned in `config/packs.toml` (except
+`codeql/cpp-queries` and `codeql/cpp-all`, which ship with the bundle), reports
+`installed`/`present` per pack and prunes other versions. It runs offline apart
+from the one asset download; `--zip` installs an already downloaded asset and
+`--sha256` overrides the pinned checksum. `--pack-cache-dir` (or the
+`SCORE_CODEQL_PACK_CACHE` variable, which applies to `sca`, `list_rules` and
+`fetch_packs` alike) selects the cache; an explicit flag wins over the variable,
+the variable wins over `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs`.
+
+Without Bazel, `unzip` the asset and extract each `<pack>.tgz` into
+`<cache>/codeql/<pack>/<version>/`. Either way, add nothing else to the cache:
+it is passed to the CLI with `--additional-packs`, so a
+`common-*-coding-standards` or `autosar-*` directory there shadows the copy
+inside the packs' `.codeql/libraries/` and the run fails. The packs are
+self-contained, so compilation works offline; with the 2.63.0 assets the rule
+inventory is byte-identical to a registry run, and `pins.json` reports
+`"origin": "cached"` for them.
 
 ## `codeql_sca` macro
 
@@ -163,7 +207,7 @@ bazel run //codeql:sca -- [options] [targets...]
 | `--additional-pack-dir PATH` | Directory with consumer-local CodeQL packs (repeatable). |
 | `--additional-pack-qlpack PATH` | `qlpack.yml` of a consumer-local pack; its parent is used as pack directory (runfiles path accepted). |
 | `--output-dir PATH` | Output directory. Default `<workspace>/_codeql_sca` with `results/` and `work/`. |
-| `--pack-cache-dir PATH` | Cache for downloaded query packs. Default `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs`. |
+| `--pack-cache-dir PATH` | Cache for downloaded query packs; a pre-populated directory is used as is (see [Packs without the registry](#packs-without-the-registry)). Default `$SCORE_CODEQL_PACK_CACHE`, else `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs`. |
 | `--threads N`, `--ram MB` | CodeQL resources. Defaults: `min(cpu, 16)` threads, 75 % of available memory capped at 12288 MB. |
 | `--replay-jobs N` | Parallel compile-command replay jobs. Default `min(cpu, 16)`. |
 | `--max-failed-command-pct`, `--max-commands-with-issues-pct`, `--max-unique-parse-errors` | Extraction quality gates (defaults 5.0 / 5.0 / 0). |
@@ -278,22 +322,41 @@ extractor log that feeds the [extraction quality gates](#cli-reference-codeqlsca
 | `Percentage of compilations without errors` | below 100 % |
 | `Percentage of source/header files without errors` | below 100 % |
 | `Percentage of successfully resolved #include directives` | below 100 % |
-| `Percentage of functions without errors` | below 100 % |
-| `Percentage of non-error expressions` | below 100 % |
-| `Percentage of lines of code without errors` | below 100 % |
 | `syntax errors`, `compiler errors` | non-zero; the most frequent compiler messages are printed below the check |
 
 Together these percentages quantify how much of the code the queries could see.
-A value below 100 % means declarations are missing, expressions became
-`ErrorExpr`/`ErroneousType` and data flow through the affected code is lost, so
-findings can be silently missing. `Percentage of calls with an explicit
-target`, `Percentage of expressions with a known type` and `Percentage of
-variables with a known type` are legitimately below 100 % (indirect calls,
-template-dependent types); they are reported as `INFO` lines in `--verbose`
-mode only.
+A value below 100 % means declarations are missing or translation units were not
+extracted, so findings can be silently missing. They are deterministic: a
+legitimate build keeps them at exactly 100 %, so a failure always points at a
+real problem (a broken toolchain, an unparsed construct, a database built from
+incomplete compile commands).
+
+Three further telemetry percentages count **`ErrorExpr` nodes**, which is not
+the same as "the extractor failed". They are not gated, only reported:
+
+* `Percentage of functions without errors`
+* `Percentage of non-error expressions`
+* `Percentage of lines of code without errors`
+
+Any `new` expression whose placement-new argument goes through
+`std::allocator_traits::construct` (every `std::vector::emplace_back`,
+`std::make_shared`, `std::function` construction, ...) contributes an
+`ErrorExpr` for its allocator-call argument; CodeQL's own `Function.hasErrors()`
+excludes exactly that node for the same reason, but the telemetry queries do not.
+The remaining nodes carry no source location at all (`file://:0:0:0:0`), so no
+source change can remove them. Gating these percentages therefore fails every
+C++ project that uses the standard library while saying nothing about the
+analysed sources. They are printed as `INFO` lines — also without `--verbose` —
+so the deficit stays visible and a real regression (a translation unit dropping
+out of the database) can still be spotted.
+
+`Percentage of calls with an explicit target`, `Percentage of expressions with a
+known type` and `Percentage of variables with a known type` are legitimately
+below 100 % as well (indirect calls, template-dependent types); they are noisy by
+nature and reported as `INFO` lines in `--verbose` mode only.
 
 An empty ruleset is always fatal — a run that analysed nothing must not pass.
-The metric checks fail the `sca` run by default; `--no-fail-sarif-quality`
+The gated metric checks fail the `sca` run by default; `--no-fail-sarif-quality`
 turns them into a warning (the standalone checker uses `--no-fail`). If the
 SARIF carries no `cpp/telemetry` metrics at all (for example a report that
 selects only complexity queries), the checks cannot be evaluated; that is
@@ -319,12 +382,12 @@ checksums because it cannot load `.bzl` files. Tests keep them consistent.
 
 | Artifact | Version |
 | --- | --- |
-| CodeQL bundle (linux64) | 2.21.4 |
-| `codeql/cpp-queries` (in bundle) | 1.4.1 |
-| `codeql/cpp-all` (in bundle) | 5.0.0 |
-| `codeql/cert-cpp-coding-standards` | 2.62.0 |
-| `codeql/cert-c-coding-standards` | 2.62.0 |
-| `codeql/misra-cpp-coding-standards` | 2.62.0 |
+| CodeQL bundle (C/C++-only, linux64) | 2.27.4 |
+| `codeql/cpp-queries` (in bundle) | 1.10.0 |
+| `codeql/cpp-all` (in bundle) | 12.4.0 |
+| `codeql/cert-cpp-coding-standards` | 2.63.0 |
+| `codeql/cert-c-coding-standards` | 2.63.0 |
+| `codeql/misra-cpp-coding-standards` | 2.63.0 |
 | `score/code-complexity-queries` (local) | 1.0.0 |
 | `score/codeql-sca-diagnostics` (local) | 1.0.0 |
 | SARIF output format (`--format`) | `sarifv2.1.0` |
@@ -342,18 +405,40 @@ schema would let an unrelated upgrade change the uploaded SARIF.
 
 ### Upgrading the pins
 
-1. Check for newer releases (`gh release list -R github/codeql-action`,
-   `gh release list -R github/codeql-coding-standards`) and decide on the new
-   versions.
+1. Check for newer releases (`gh release list -R github/codeql-action` for CLI
+   and bundle, `gh release list -R github/codeql-coding-standards` for the
+   standards) and decide on the new versions. Two things have tripped up
+   previous upgrades:
+   * A coding-standards release can only be pinned once its packs are in the
+     CodeQL registry, which lags the GitHub release: verify with
+     `codeql pack download codeql/cert-cpp-coding-standards@<version>` (the
+     registry's `tags/list` is authoritative). v2.63.0 (2026-11-16) needed a
+     day before its packs appeared.
+   * The release notes' "Supported versions" still name CLI 2.23.9: that is the
+     `buildMetadata.cliVersion` the packs were built and validated with, not a
+     download constraint. The registry copy is uploaded with OCI descriptors
+     (`config.digest` instead of the inline `config.metadata` of 2.62.0) — the
+     upload fix from the CLI 2.26.3 release notes ("Fixed the pack upload format
+     to comply with the OCI-image-manifest specification") — which 2.23.9 cannot
+     parse: every download of v2.63.0 fails with
+     `UnrecognizedPropertyException ... "digest"`, while 2.26.3 and 2.27.4
+     download it. The 2.23.9-compatible channel stays the release assets (see
+     [Packs without the registry](#packs-without-the-registry)). Expect the
+     coding-standards bump to need a CLI bump too.
 2. Update, in one change: `versions.bzl`, the `http_archive`/`http_file` blocks
    in `MODULE.bazel` (URLs and sha256), `config/packs.toml`,
    `config/reports.toml`, the table above and `queries/*/qlpack.yml`
    (`codeql/cpp-all` must match the version shipped in the new bundle).
 3. Regenerate the lock files with the **new** CLI:
-   `cd codeql/queries/<pack> && codeql pack install`.
+   `cd codeql/queries/<pack> && codeql pack install`. They stay at
+   `dependencies: {}`, because `codeql/cpp-all` is resolved from the bundle
+   rather than from the registry.
 4. Check that the suites still exist at the new versions and that the new
    coding-standards release runs on the new CLI (a small C++ database is
-   enough; compile time and warnings are worth recording).
+   enough; compile time and warnings are worth recording). The coding-standards
+   packs carry the libraries they were built against in
+   `.codeql/libraries/` (v2.63.0: `codeql/cpp-all` 6.1.4), so they compile
+   against their own `cpp-all` while `queries/*` use the one from the bundle.
 5. Run `uv run --locked pytest`, `bazel build //codeql/...` and
    `bazel run //codeql:sca -- --print-pins`.
 
@@ -473,7 +558,7 @@ Layout of the package:
 | Path | Purpose |
 | --- | --- |
 | `defs.bzl` | `codeql_sca` macro and `codeql_sca_binary` building block. |
-| `BUILD` | `//codeql:sca`, the `score_codeql` library and the file groups. |
+| `BUILD` | `//codeql:sca`, `//codeql:list_rules`, `//codeql:fetch_packs`, the `score_codeql` library and the file groups. |
 | `versions.bzl` | Pinned versions, URLs and checksums (documentation/test source of truth). |
 | `third_party/*.BUILD` | BUILD files of the downloaded repositories `@codeql_bundle` and `@bazel_compile_commands`. |
 | `config/reports.toml`, `config/packs.toml` | Reports/presets and pinned pack versions. |
