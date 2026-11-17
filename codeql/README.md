@@ -80,12 +80,12 @@ bazel run @score_tools//codeql:list_rules -- --safety-level=ASIL --output-dir=/t
 bazel run @score_tools//codeql:fetch_packs -- --cache-dir=/opt/codeql-packs
 ```
 
-The first run downloads the CodeQL C/C++-only bundle (about 165 MB; the full
-linux64 bundle is 550 MB and only differs by the other languages' query packs),
-`bazel-compile-commands`
-and, per selected report, the external query packs from the CodeQL registry
-(`ghcr.io`, about 200 MB for CERT and MISRA; `fetch_packs` installs the same packs
-from the release assets instead). The pack cache lives in
+The first run downloads the CodeQL bundle (about 550 MB; there is no C/C++-only
+bundle before CLI 2.27.1), `bazel-compile-commands`
+and, per selected report, the external query packs - from the coding-standards
+release assets (see [Packs without the registry](#packs-without-the-registry)),
+with `codeql pack download` (`ghcr.io`, about 200 MB for CERT and MISRA) as the
+fallback for CLIs that can read the registry copy. The pack cache lives in
 `${XDG_CACHE_HOME:-~/.cache}/score-codeql/packs` and can be cached in CI; the
 tool deletes other versions of a pinned pack from it, because the CLI refuses to
 resolve a pack that is present in several versions.
@@ -382,9 +382,9 @@ checksums because it cannot load `.bzl` files. Tests keep them consistent.
 
 | Artifact | Version |
 | --- | --- |
-| CodeQL bundle (C/C++-only, linux64) | 2.27.4 |
-| `codeql/cpp-queries` (in bundle) | 1.10.0 |
-| `codeql/cpp-all` (in bundle) | 12.4.0 |
+| CodeQL bundle (linux64) | 2.23.9 |
+| `codeql/cpp-queries` (in bundle) | 1.5.8 |
+| `codeql/cpp-all` (in bundle) | 6.1.4 |
 | `codeql/cert-cpp-coding-standards` | 2.63.0 |
 | `codeql/cert-c-coding-standards` | 2.63.0 |
 | `codeql/misra-cpp-coding-standards` | 2.63.0 |
@@ -395,8 +395,10 @@ checksums because it cannot load `.bzl` files. Tests keep them consistent.
 | `bazel-compile-commands` (glibc < 2.38, Ubuntu 22.04 `.deb`) | 0.21.0 |
 
 Query packs are compiled by the pinned CLI at analysis time. External packs
-(coding standards) are downloaded with `codeql pack download <name>@<version>`
-into the pack cache and verified against the pinned version before use.
+(coding standards) are installed from the coding-standards release asset into the
+pack cache and verified against the pinned version before use; when that asset is
+unreachable, `codeql pack download <name>@<version>` is used instead (only CLIs
+>= 2.26.3 can read the registry copy of v2.63.0).
 
 Results are interpreted with `--format=sarifv2.1.0`, not `sarif-latest`: the
 latter produces different SARIF versions with different CLI versions (the CLI
@@ -409,22 +411,24 @@ schema would let an unrelated upgrade change the uploaded SARIF.
    and bundle, `gh release list -R github/codeql-coding-standards` for the
    standards) and decide on the new versions. Two things have tripped up
    previous upgrades:
-   * A coding-standards release can only be pinned once its packs are in the
-     CodeQL registry, which lags the GitHub release: verify with
-     `codeql pack download codeql/cert-cpp-coding-standards@<version>` (the
+   * A coding-standards release can only be downloaded from the CodeQL registry
+     once its packs are published there, which lags the GitHub release: verify
+     with `codeql pack download codeql/cert-cpp-coding-standards@<version>` (the
      registry's `tags/list` is authoritative). v2.63.0 (2026-11-16) needed a
-     day before its packs appeared.
-   * The release notes' "Supported versions" still name CLI 2.23.9: that is the
-     `buildMetadata.cliVersion` the packs were built and validated with, not a
-     download constraint. The registry copy is uploaded with OCI descriptors
-     (`config.digest` instead of the inline `config.metadata` of 2.62.0) — the
-     upload fix from the CLI 2.26.3 release notes ("Fixed the pack upload format
-     to comply with the OCI-image-manifest specification") — which 2.23.9 cannot
-     parse: every download of v2.63.0 fails with
-     `UnrecognizedPropertyException ... "digest"`, while 2.26.3 and 2.27.4
-     download it. The 2.23.9-compatible channel stays the release assets (see
-     [Packs without the registry](#packs-without-the-registry)). Expect the
-     coding-standards bump to need a CLI bump too.
+     day before its packs appeared. The release assets ship with the release, so
+     a pack cache can be built from them right away.
+   * The release notes' "Supported versions" name the CLI the packs were built
+     and validated with - 2.23.9 for v2.63.0 - and that is the pin to use. With
+     CLI < 2.26.3 the registry copy cannot be downloaded: the v2.63.0 packs are
+     uploaded with OCI descriptors (`config.digest` instead of the inline
+     `config.metadata` of 2.62.0) - the upload fix from the CLI 2.26.3 release
+     notes ("Fixed the pack upload format to comply with the OCI-image-manifest
+     specification") - and 2.23.9 fails on every download of v2.63.0 with
+     `UnrecognizedPropertyException ... "digest"`. `ensure_packs` therefore
+     falls back to the release asset (see
+     [Packs without the registry](#packs-without-the-registry)) when the
+     download fails, so a CLI that cannot read the registry copy is fine as long
+     as the assets are reachable.
 2. Update, in one change: `versions.bzl`, the `http_archive`/`http_file` blocks
    in `MODULE.bazel` (URLs and sha256), `config/packs.toml`,
    `config/reports.toml`, the table above and `queries/*/qlpack.yml`

@@ -17,7 +17,9 @@ Every referenced pack must resolve to exactly the pinned version:
 
 * ``bundle``     - shipped inside the CodeQL distribution (``<dist>/qlpacks``)
 * ``cached``     - already present in the pack cache directory
-* ``downloaded`` - fetched with ``codeql pack download --dir=<cache> name@version``
+* ``downloaded`` - fetched with ``codeql pack download --dir=<cache> name@version``,
+                   or from the coding-standards release asset when the CLI cannot
+                   read the registry copy of the pinned packs
 * ``local``      - a query pack from a local directory (this repository or a consumer)
 
 The cache layout is ``<cache>/<scope>/<name>/<version>/qlpack.yml``, so it can be
@@ -31,11 +33,17 @@ environment and never logged.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import re
 import shutil
+import tarfile
+import tempfile
+import urllib.parse
+import urllib.request
+import zipfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -48,6 +56,18 @@ _NAME_RE = re.compile(r"^name:\s*['\"]?([^\s'\"#]+)", re.MULTILINE)
 _VERSION_RE = re.compile(r"^version:\s*['\"]?([^\s'\"#]+)", re.MULTILINE)
 
 ENV_PACK_CACHE = "SCORE_CODEQL_PACK_CACHE"
+
+# Packs provided by the coding-standards release asset (everything the CodeQL
+# bundle does not ship).
+CODING_STANDARDS_PACK_SUFFIX = "-coding-standards"
+# Release asset holding the same packs as the registry copy (byte-identical),
+# used when `codeql pack download` cannot fetch them - CLI 2.23.9 cannot parse
+# the OCI descriptors of the v2.63.0 registry copy. Keep in sync with
+# CODING_STANDARDS_PACKS_URL in versions.bzl (a test compares them).
+CODING_STANDARDS_ASSET_URL = (
+    "https://github.com/github/codeql-coding-standards/releases/download/"
+    "v{version}/coding-standards-codeql-packs.zip"
+)
 
 
 @dataclass(frozen=True)
@@ -223,6 +243,191 @@ def remove_other_versions(cache_dir: Path, name: str, version: str) -> None:
             ) from exc
 
 
+CHECKSUMS_NAME = "checksums.txt"
+_TIMEOUT = 120
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+
+
+def sha256_of(path: Path) -> str:
+    """Hex sha256 of the file at *path*."""
+    digest = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def parse_checksums(text: str) -> dict[str, str]:
+    """``{file name: sha256}`` from a ``sha256sum``-style file."""
+    sums: dict[str, str] = {}
+    for line in text.splitlines():
+        fields = line.split()
+        if len(fields) == 2 and _SHA256_RE.match(fields[0].lower()):
+            sums[fields[1].lstrip("*")] = fields[0].lower()
+    return sums
+
+
+def download(url: str, target: Path) -> None:
+    """Download *url* to *target* (no credentials; the release assets are public)."""
+    logging.info("Downloading %s", url)
+    try:
+        with urllib.request.urlopen(url, timeout=_TIMEOUT) as response:
+            with target.open("wb") as fh:
+                shutil.copyfileobj(response, fh)
+    except OSError as exc:
+        raise ScaError(f"cannot download {url}: {exc}") from exc
+
+
+def expected_sha256(asset_url: str, asset_name: str, sha256: str | None) -> str:
+    """Pinned checksum of the asset, from *sha256* or the release's checksums."""
+    if sha256:
+        return sha256.lower()
+    url = urllib.parse.urljoin(asset_url, CHECKSUMS_NAME)
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / CHECKSUMS_NAME
+        download(url, path)
+        try:
+            sums = parse_checksums(path.read_text(encoding="utf-8"))
+        except OSError as exc:
+            raise ScaError(f"cannot read {url}: {exc}") from exc
+    if asset_name not in sums:
+        raise ScaError(f"{url} has no sha256 for {asset_name}")
+    return sums[asset_name]
+
+
+def asset_member(archive: zipfile.ZipFile, pack: str) -> zipfile.ZipInfo:
+    """The ``<pack>.tgz`` member of the asset that holds *pack*."""
+    wanted = f"{pack.rsplit('/', 1)[-1]}.tgz"
+    matches = [
+        info for info in archive.infolist() if Path(info.filename).name == wanted
+    ]
+    if len(matches) != 1:
+        raise ScaError(
+            f"the release asset must contain exactly one {wanted}, it contains "
+            f"{len(matches)}"
+        )
+    return matches[0]
+
+
+def _normalize_modes(root: Path) -> None:
+    """Readable directories (0755) and files (0644) below *root*.
+
+    The tarballs in the release asset are built on a CI runner and may carry
+    restrictive modes; the cache is read by the user (or CI job) that runs the
+    analysis, so make it readable regardless.
+    """
+    for path in (root, *root.rglob("*")):
+        if path.is_symlink():
+            continue
+        path.chmod(0o755 if path.is_dir() else 0o644)
+
+
+def install_pack(
+    archive: zipfile.ZipFile, pack: str, version: str, cache_dir: Path
+) -> tuple[str, Path]:
+    """Unpack *pack* into the cache; ``("present"|"installed", pack directory)``."""
+    target = _pack_dir(cache_dir, pack, version)
+    if has_pack(target, version):
+        remove_other_versions(cache_dir, pack, version)
+        return "present", target
+    member = asset_member(archive, pack)
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        # Unpack next to the target and rename, so an interrupted run never
+        # leaves a half-written pack that would later look usable.
+        staging = Path(tempfile.mkdtemp(prefix=f".{version}.", dir=target.parent))
+    except OSError as exc:
+        raise ScaError(
+            f"cannot write the pack cache {cache_dir}: {exc} (use a writable "
+            "--cache-dir or $SCORE_CODEQL_PACK_CACHE)"
+        ) from exc
+    try:
+        try:
+            with (
+                archive.open(member) as raw,
+                tarfile.open(fileobj=raw, mode="r:gz") as tar,
+            ):
+                tar.extractall(staging, filter="data")
+        except (tarfile.TarError, zipfile.BadZipFile, OSError) as exc:
+            raise ScaError(f"cannot unpack {member.filename}: {exc}") from exc
+        name, found = read_qlpack(staging)
+        if (name, found) != (pack, version):
+            raise ScaError(
+                f"{member.filename} contains {name}@{found}, expected {pack}@{version}"
+            )
+        _normalize_modes(staging)
+        if target.exists():
+            shutil.rmtree(target)
+        staging.rename(target)
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
+    remove_other_versions(cache_dir, pack, version)
+    return "installed", target
+
+
+def is_released_pack(name: str) -> bool:
+    """Is *name* one of the packs shipped in the coding-standards release asset?"""
+    return name.endswith(CODING_STANDARDS_PACK_SUFFIX)
+
+
+def install_released_packs(packs: Mapping[str, str], cache_dir: Path) -> None:
+    """Install *packs* from the coding-standards release asset (no registry).
+
+    Used when ``codeql pack download`` cannot fetch them - the pinned CLI may be
+    too old to parse the OCI descriptors of the registry copy (2.23.9 fails with
+    ``UnrecognizedPropertyException ... "digest"`` for the v2.63.0 packs). The
+    asset is verified against the release's ``checksums.txt`` and unpacks the
+    same packs as the registry (byte-identical, and they carry the libraries
+    they were built with).
+    """
+    if not packs:
+        return
+    versions = sorted(set(packs.values()))
+    if len(versions) != 1:
+        raise ScaError(
+            "the coding-standards packs must share one version (one release asset "
+            f"carries them all), got {', '.join(versions)}"
+        )
+    url = CODING_STANDARDS_ASSET_URL.format(version=versions[0])
+    asset_name = Path(urllib.parse.urlparse(url).path).name or "packs.zip"
+    expected = expected_sha256(url, asset_name, None)
+    logging.info(
+        "Installing %s from %s (no registry access)", ", ".join(sorted(packs)), url
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        asset = Path(tmp) / asset_name
+        download(url, asset)
+        actual = sha256_of(asset)
+        if actual != expected:
+            raise ScaError(
+                f"{asset_name}: sha256 {actual} does not match the expected "
+                f"{expected} (from the release's checksums.txt)"
+            )
+        try:
+            archive = zipfile.ZipFile(asset)
+        except zipfile.BadZipFile as exc:
+            raise ScaError(f"{url} is not a zip archive: {exc}") from exc
+        with archive:
+            for name, version in sorted(packs.items()):
+                status, path = install_pack(archive, name, version, cache_dir)
+                logging.info("%s %s@%s -> %s", status, name, version, path)
+
+
+def _install_missing_released_packs(
+    ref: str, pinned: Mapping[str, str] | None, cache_dir: Path
+) -> None:
+    """Fallback for a failed download: unpack the pinned packs from the asset."""
+    name, _, version = ref.partition("@")
+    wanted = pinned if pinned is not None else {name: version}
+    missing = {
+        pack: pinned_version
+        for pack, pinned_version in wanted.items()
+        if is_released_pack(pack)
+        and not has_pack(_pack_dir(cache_dir, pack, pinned_version), pinned_version)
+    }
+    install_released_packs(missing, cache_dir)
+
+
 def ensure_packs(
     codeql: Path,
     refs: Sequence[PackRef],
@@ -231,12 +436,16 @@ def ensure_packs(
     distribution: Path,
     local_packs: Mapping[str, tuple[str | None, Path]],
     listed_external: Iterable[str] = (),
+    pinned: Mapping[str, str] | None = None,
 ) -> list[ResolvedPack]:
     """Make every referenced pack available at its pinned version; fail otherwise.
 
     Besides the pinned version, every path referenced by *refs* (suites, queries)
     must exist in the pack. An incomplete or corrupt cached pack is removed and
-    downloaded again once; bundled and local packs are never modified.
+    downloaded again once; bundled and local packs are never modified. When the
+    download fails for a coding-standards pack, the pinned packs (``pinned``:
+    name -> version, from ``packs.toml``) are installed from the release asset
+    instead, which needs no registry and works with every pinned CLI.
     """
     check_cache_shadowing(
         cache_dir,
@@ -296,13 +505,27 @@ def ensure_packs(
             shutil.rmtree(cached)
         if problems:
             logging.info("Downloading CodeQL pack %s into %s", ref_text, cache_dir)
-            cache_dir.mkdir(parents=True, exist_ok=True)
-            run_cmd([str(codeql), "pack", "download", f"--dir={cache_dir}", ref_text])
+            try:
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                run_cmd(
+                    [str(codeql), "pack", "download", f"--dir={cache_dir}", ref_text]
+                )
+            except ScaError as exc:
+                if not is_released_pack(name):
+                    raise
+                logging.warning(
+                    "`codeql pack download %s` failed (%s); installing the "
+                    "pinned coding-standards packs from the release asset "
+                    "instead - the CLI cannot read the registry copy",
+                    ref_text,
+                    exc,
+                )
+                _install_missing_released_packs(ref_text, pinned, cache_dir)
             origin = "downloaded"
             problems = _pack_problems(cached, version, wanted)
             if problems:
                 raise ScaError(
-                    f"pack {ref_text} was downloaded into {cached} but is unusable: "
+                    f"pack {ref_text} was fetched into {cached} but is unusable: "
                     f"{'; '.join(problems)}"
                 )
         resolved.append(ResolvedPack(name, version, origin, cached))

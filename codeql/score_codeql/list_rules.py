@@ -136,6 +136,7 @@ def run(args: argparse.Namespace) -> int:
             distribution=info.distribution,
             local_packs=local_packs,
             listed_external=pins.packs,
+            pinned=pins.packs,
         )
     }
     additional = pk.additional_packs_value(cache_dir, local_dirs)

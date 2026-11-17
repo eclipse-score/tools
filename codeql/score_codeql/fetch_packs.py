@@ -23,20 +23,16 @@ The CodeQL registry is never contacted, so the cache can be built once (release
 job, image build) and then consumed offline - also by a CLI that cannot read the
 registry copy of the packs. The asset is byte-identical to what the registry
 serves, and the packs are self-contained (they carry the libraries they were
-built with).
+built with). The asset helpers live in `packs`, because `ensure_packs` falls back
+to the same release asset when `codeql pack download` fails.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import logging
-import re
-import shutil
-import tarfile
 import tempfile
 import urllib.parse
-import urllib.request
 import zipfile
 from collections.abc import Sequence
 from pathlib import Path
@@ -53,62 +49,16 @@ from score_codeql.logging_utils import setup_logging
 CLI_PACKS = ("codeql/cpp-all", "codeql/cpp-queries")
 
 ASSET_NAME = "coding-standards-codeql-packs.zip"
-CHECKSUMS_NAME = "checksums.txt"
-_TIMEOUT = 120
+CHECKSUMS_NAME = pk.CHECKSUMS_NAME
 
-_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
-
-
-def sha256_of(path: Path) -> str:
-    """Hex sha256 of the file at *path*."""
-    digest = hashlib.sha256()
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def parse_checksums(text: str) -> dict[str, str]:
-    """``{file name: sha256}`` from a ``sha256sum``-style file."""
-    sums: dict[str, str] = {}
-    for line in text.splitlines():
-        fields = line.split()
-        if len(fields) == 2 and _SHA256_RE.match(fields[0].lower()):
-            sums[fields[1].lstrip("*")] = fields[0].lower()
-    return sums
-
-
-def download(url: str, target: Path) -> None:
-    """Download *url* to *target* (no credentials; the asset is public)."""
-    logging.info("Downloading %s", url)
-    try:
-        with urllib.request.urlopen(url, timeout=_TIMEOUT) as response:
-            with target.open("wb") as fh:
-                shutil.copyfileobj(response, fh)
-    except OSError as exc:
-        raise ScaError(f"cannot download {url}: {exc}") from exc
-
-
-def checksums_url(asset_url: str) -> str:
-    """``checksums.txt`` published next to the asset."""
-    return urllib.parse.urljoin(asset_url, CHECKSUMS_NAME)
-
-
-def expected_sha256(asset_url: str, asset_name: str, sha256: str | None) -> str:
-    """Pinned checksum of the asset, from ``--sha256`` or the release's checksums."""
-    if sha256:
-        return sha256.lower()
-    url = checksums_url(asset_url)
-    with tempfile.TemporaryDirectory() as tmp:
-        path = Path(tmp) / CHECKSUMS_NAME
-        download(url, path)
-        try:
-            sums = parse_checksums(path.read_text(encoding="utf-8"))
-        except OSError as exc:
-            raise ScaError(f"cannot read {url}: {exc}") from exc
-    if asset_name not in sums:
-        raise ScaError(f"{url} has no sha256 for {asset_name}")
-    return sums[asset_name]
+# The asset handling lives in `packs`, because `sca` falls back to the release
+# asset when `codeql pack download` cannot fetch a pinned pack. Re-exported here
+# so this entry point stays the documented tool for building a pack cache.
+download = pk.download
+sha256_of = pk.sha256_of
+parse_checksums = pk.parse_checksums
+expected_sha256 = pk.expected_sha256
+install_pack = pk.install_pack
 
 
 def released_packs(pins: cfg.Pins) -> dict[str, str]:
@@ -130,76 +80,6 @@ def released_packs(pins: cfg.Pins) -> dict[str, str]:
             f"carries them all), packs.toml pins {', '.join(versions)}"
         )
     return released
-
-
-def asset_member(archive: zipfile.ZipFile, pack: str) -> zipfile.ZipInfo:
-    """The ``<pack>.tgz`` member of the asset that holds *pack*."""
-    wanted = f"{pack.rsplit('/', 1)[-1]}.tgz"
-    matches = [
-        info for info in archive.infolist() if Path(info.filename).name == wanted
-    ]
-    if len(matches) != 1:
-        raise ScaError(
-            f"the release asset must contain exactly one {wanted}, it contains "
-            f"{len(matches)}"
-        )
-    return matches[0]
-
-
-def _normalize_modes(root: Path) -> None:
-    """Readable directories (0755) and files (0644) below *root*.
-
-    The tarballs in the release asset are built on a CI runner and may carry
-    restrictive modes; the cache is read by the user (or CI job) that runs the
-    analysis, so make it readable regardless.
-    """
-    for path in (root, *root.rglob("*")):
-        if path.is_symlink():
-            continue
-        path.chmod(0o755 if path.is_dir() else 0o644)
-
-
-def install_pack(
-    archive: zipfile.ZipFile, pack: str, version: str, cache_dir: Path
-) -> tuple[str, Path]:
-    """Unpack *pack* into the cache; ``("present"|"installed", pack directory)``."""
-    target = cache_dir / pack / version
-    if pk.has_pack(target, version):
-        pk.remove_other_versions(cache_dir, pack, version)
-        return "present", target
-    member = asset_member(archive, pack)
-    try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        # Unpack next to the target and rename, so an interrupted run never
-        # leaves a half-written pack that would later look usable.
-        staging = Path(tempfile.mkdtemp(prefix=f".{version}.", dir=target.parent))
-    except OSError as exc:
-        raise ScaError(
-            f"cannot write the pack cache {cache_dir}: {exc} (use a writable "
-            "--cache-dir or $SCORE_CODEQL_PACK_CACHE)"
-        ) from exc
-    try:
-        try:
-            with (
-                archive.open(member) as raw,
-                tarfile.open(fileobj=raw, mode="r:gz") as tar,
-            ):
-                tar.extractall(staging, filter="data")
-        except (tarfile.TarError, zipfile.BadZipFile, OSError) as exc:
-            raise ScaError(f"cannot unpack {member.filename}: {exc}") from exc
-        name, found = pk.read_qlpack(staging)
-        if (name, found) != (pack, version):
-            raise ScaError(
-                f"{member.filename} contains {name}@{found}, expected {pack}@{version}"
-            )
-        _normalize_modes(staging)
-        if target.exists():
-            shutil.rmtree(target)
-        staging.rename(target)
-    finally:
-        shutil.rmtree(staging, ignore_errors=True)
-    pk.remove_other_versions(cache_dir, pack, version)
-    return "installed", target
 
 
 def obtain_asset(url: str, zip_path: str | None, asset_name: str, tmp: Path) -> Path:

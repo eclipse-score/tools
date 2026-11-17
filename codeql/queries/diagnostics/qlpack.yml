@@ -16,4 +16,4 @@ version: 1.0.0
 description: Diagnostic queries used by the SCA compiler identity gate.
 library: false
 dependencies:
-  codeql/cpp-all: 12.4.0
+  codeql/cpp-all: 6.1.4

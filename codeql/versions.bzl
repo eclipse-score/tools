@@ -25,25 +25,24 @@ the same URLs and checksums inline. When bumping a pin, update all of:
 `codeql/tests` fails when they disagree.
 """
 
-CODEQL_CLI_VERSION = "2.27.4"
-# The C/C++-only bundle exists since 2.27.1 (165 MB instead of 550 MB). It ships
-# cpp-queries, cpp-all and their libraries, which is all this tooling uses.
-# GitHub publishes no .checksum.txt for the per-language assets, so the sha256
-# was computed from the release asset itself (Bazel still verifies every
-# download against it).
-CODEQL_BUNDLE_URL = "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.27.4/codeql-bundle-cpp-linux64.tar.zst"
-CODEQL_BUNDLE_SHA256 = "eea5a76ed6778892278a387c4362fef8d03e5a9c3795f5d5022d496fccfd5388"
+CODEQL_CLI_VERSION = "2.23.9"
+# There is no C/C++-only bundle before 2.27.1, so the full linux64 bundle is
+# used (about 550 MB, downloaded once and cached by Bazel). It ships
+# cpp-queries, cpp-all and their libraries, which is all this tooling uses. The
+# sha256 is the one published in the release's `.checksum.txt`.
+CODEQL_BUNDLE_URL = "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.23.9/codeql-bundle-linux64.tar.zst"
+CODEQL_BUNDLE_SHA256 = "551d66e0298a4498050417cd1324e07ac2a39d58dad73e4641cfdf03677cb245"
 
-CODEQL_CPP_QUERIES_VERSION = "1.10.0"
-CODEQL_CPP_ALL_VERSION = "12.4.0"
-# Coding standards 2.63.0 (2026-11-16) is built against cpp-all 6.1.4 and ships
-# those libraries inside its packs (`.codeql/libraries/`), so it does not
-# require the CLI's cpp-all version to match. Its release notes still name CLI
-# 2.23.9, but that is only `buildMetadata.cliVersion` (the version the packs
-# were built with): the packs are published with OCI descriptors
-# (`config.digest`), which older CLIs cannot parse (2.23.9 fails with
-# `UnrecognizedPropertyException ... "digest"`), so downloading them needs
-# CLI >= 2.26.3.
+CODEQL_CPP_QUERIES_VERSION = "1.5.8"
+CODEQL_CPP_ALL_VERSION = "6.1.4"
+# Coding standards 2.63.0 (2026-11-16) is supported with CLI 2.23.9 and is built
+# against cpp-all 6.1.4 - exactly the library of the 2.23.9 bundle - and ships
+# those libraries inside its packs (`.codeql/libraries/`). The registry copy is
+# published with OCI descriptors (`config.digest`), which 2.23.9 cannot parse
+# (`UnrecognizedPropertyException ... "digest"`); only CLI >= 2.26.3 can
+# download it. The packs are therefore installed from the release asset
+# (`fetch_packs`, and the automatic fallback in `packs.ensure_packs`) instead of
+# from the registry.
 CODING_STANDARDS_VERSION = "2.63.0"
 # Release asset with the same packs as the registry copy (byte-identical), used
 # by `bazel run //codeql:fetch_packs` to build a pack cache without the registry.

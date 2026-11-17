@@ -71,6 +71,13 @@ def test_release_asset_matches_the_pinned_coding_standards_version(
     assert version == pins.packs["codeql/cert-cpp-coding-standards"]
     assert f"/v{version}/" in bzl["CODING_STANDARDS_PACKS_URL"]
     assert re.fullmatch(r"[0-9a-f]{64}", bzl["CODING_STANDARDS_PACKS_SHA256"])
+    # The runtime fallback in `packs` builds the same URL from the pinned version.
+    from score_codeql import packs as pk
+
+    assert (
+        pk.CODING_STANDARDS_ASSET_URL.format(version=version)
+        == bzl["CODING_STANDARDS_PACKS_URL"]
+    )
 
 
 def test_readme_documents_the_offline_pack_cache() -> None:

@@ -11,7 +11,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
+import hashlib
 import json
+import tarfile
+import zipfile
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -139,6 +143,88 @@ def test_failed_download_is_fatal_and_verified(
             fake_codeql, [_ref("a/b@1.0.0:x")], cache_dir=tmp_path / "c",
             distribution=tmp_path / "dist", local_packs={},
         )  # fmt: skip
+
+
+def _release_asset(root: Path, version: str, packs: Mapping[str, str]) -> Path:
+    """A minimal coding-standards release asset (zip of ``<pack>.tgz``) + checksums."""
+    release = root / f"v{version}"
+    release.mkdir(parents=True)
+    asset = release / "coding-standards-codeql-packs.zip"
+    with zipfile.ZipFile(asset, "w") as archive:
+        for name in packs:
+            short = name.rsplit("/", 1)[-1]
+            content = root / "content" / short
+            (content / "codeql-suites").mkdir(parents=True)
+            (content / "qlpack.yml").write_text(
+                f"name: {name}\nversion: {packs[name]}\n", encoding="utf-8"
+            )
+            (content / "codeql-suites" / "pack.qls").write_text("", encoding="utf-8")
+            tgz = root / f"{short}.tgz"
+            with tarfile.open(tgz, "w:gz") as tar:
+                for path in sorted(content.rglob("*")):
+                    tar.add(path, arcname=str(path.relative_to(content)))
+            archive.write(tgz, arcname=f"{short}.tgz")
+    digest = hashlib.sha256(asset.read_bytes()).hexdigest()
+    (release / "checksums.txt").write_text(
+        f"{digest}  {asset.name}\n", encoding="utf-8"
+    )
+    return asset
+
+
+def test_failed_download_falls_back_to_the_release_asset(
+    fake_codeql: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLI 2.23.9 cannot read the v2.63.0 registry copy; the asset is used instead."""
+    monkeypatch.setenv("FAKE_CODEQL_FAIL", "pack download")
+    monkeypatch.setattr(
+        pk,
+        "CODING_STANDARDS_ASSET_URL",
+        tmp_path.as_uri() + "/v{version}/coding-standards-codeql-packs.zip",
+    )
+    packs = {"codeql/cert-cpp-coding-standards": "2.62.0"}
+    _release_asset(tmp_path, "2.62.0", packs)
+    cache = tmp_path / "cache"
+
+    resolved = pk.ensure_packs(
+        fake_codeql,
+        [_ref("codeql/cert-cpp-coding-standards@2.62.0:qlpack.yml")],
+        cache_dir=cache,
+        distribution=tmp_path / "dist",
+        local_packs={},
+        pinned=packs,
+    )
+
+    assert [p.origin for p in resolved] == ["downloaded"]
+    installed = cache / "codeql/cert-cpp-coding-standards/2.62.0"
+    assert resolved[0].path == installed
+    assert (installed / "qlpack.yml").is_file()
+    assert (installed / "codeql-suites" / "pack.qls").is_file()
+
+
+def test_release_asset_fallback_verifies_the_checksum(
+    fake_codeql: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("FAKE_CODEQL_FAIL", "pack download")
+    monkeypatch.setattr(
+        pk,
+        "CODING_STANDARDS_ASSET_URL",
+        tmp_path.as_uri() + "/v{version}/coding-standards-codeql-packs.zip",
+    )
+    packs = {"codeql/cert-c-coding-standards": "2.62.0"}
+    asset = _release_asset(tmp_path, "2.62.0", packs)
+    (asset.parent / "checksums.txt").write_text(
+        f"{'0' * 64}  {asset.name}\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ScaError, match="does not match the expected"):
+        pk.ensure_packs(
+            fake_codeql,
+            [_ref("codeql/cert-c-coding-standards@2.62.0:qlpack.yml")],
+            cache_dir=tmp_path / "cache",
+            distribution=tmp_path / "dist",
+            local_packs={},
+            pinned=packs,
+        )
 
 
 def test_download_that_does_not_produce_the_pack_is_detected(tmp_path: Path) -> None:

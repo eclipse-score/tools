@@ -33,11 +33,11 @@ PACKS = (
 
 PACKS_TOML = f"""\
 [codeql_cli]
-version = "2.27.4"
+version = "2.23.9"
 
 [packs]
-"codeql/cpp-queries" = "1.10.0"
-"codeql/cpp-all" = "12.4.0"
+"codeql/cpp-queries" = "1.5.8"
+"codeql/cpp-all" = "6.1.4"
 "codeql/cert-cpp-coding-standards" = "{VERSION}"
 "codeql/cert-c-coding-standards" = "{VERSION}"
 "codeql/misra-cpp-coding-standards" = "{VERSION}"
