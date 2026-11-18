@@ -1,0 +1,146 @@
+<!-- ----------------------------------------------------------------------------
+  Copyright (c) 2026 Contributors to the Eclipse Foundation
+
+  See the NOTICE file(s) distributed with this work for additional
+  information regarding copyright ownership.
+
+  This program and the accompanying materials are made available under the
+  terms of the Apache License Version 2.0 which is available at
+  https://www.apache.org/licenses/LICENSE-2.0
+
+  SPDX-License-Identifier: Apache-2.0
+----------------------------------------------------------------------------- -->
+
+# Coverage Report
+
+Merge the LCOV reports of several test suites and show, as a pull request
+comment, how coverage changed against the base branch. No external service,
+no GitHub App: everything runs in your own workflows.
+
+Reads LCOV only, so it works for every language whose coverage tool writes
+LCOV (coverage.py `coverage lcov`, `bazel coverage`, llvm-cov, gcov/lcov).
+Zero non-stdlib Python dependencies.
+
+## What a pull request gets
+
+- Lines and branches per test suite and combined, with the change (Δ)
+  against the latest run on the base branch.
+- Collapsed: files whose coverage changed (biggest drop first), per package,
+  and files no test runs at all.
+- One comment, updated on every push.
+
+Coverage informs; it does not gate. Nothing here fails a build because
+coverage went down.
+
+## CLI
+
+```bash
+uvx --from "git+https://github.com/eclipse-score/tools#subdirectory=coverage_report" \
+    score-coverage-report "Unit tests=coverage-unit.lcov" "Scenarios=out/docs-*.lcov" \
+    --json coverage.json --markdown summary.md --compare-with main/coverage.json
+```
+
+Each positional argument is one suite, `LABEL=PATH`. `PATH` is an LCOV file,
+a directory (searched recursively for `*.lcov` and `*.info`) or a glob; all
+reports of a suite are merged. A suite without reports shows as "no data",
+never as 0%.
+
+| Option | Effect |
+| --- | --- |
+| `--json FILE` | Write the numbers. Store this on the base branch; pull requests compare against it. |
+| `--markdown FILE` | Write the summary. |
+| `--compare-with FILE` | JSON of the base branch; adds the Δ columns. Missing or unreadable: a note, not an error. |
+| `--lcov FILE` | Write all reports concatenated, e.g. for `genhtml`. |
+| `--title`, `--note`, `--base-name` | Heading, extra lines below the totals (repeatable), name of the base branch. |
+| `--package-depth N` | Group files by at most `N` leading directories (default: full directory). |
+| `--commit SHA` | Commit the reports belong to (default: `git rev-parse HEAD`). |
+
+A file counts in every suite's denominator, even if only one suite lists it.
+So make one suite list every source file, e.g. coverage.py with `source` set:
+files no test imports then show at 0%.
+
+With Bazel: `bazel run @score_tools//coverage_report:score-coverage-report -- ...`.
+
+## GitHub Actions
+
+Two composite actions. `report` runs in your test workflow; `comment` runs in
+a separate `workflow_run` workflow, because pull requests from forks only get
+a read-only token.
+
+### 1. In the test workflow
+
+Upload the LCOV files of each test job as artifacts, then add one job:
+
+```yaml
+coverage_report:
+  needs: [unit_tests, scenario_tests]
+  if: ${{ !cancelled() }}
+  # Coverage informs, it does not gate.
+  continue-on-error: true
+  runs-on: ubuntu-24.04
+  permissions:
+    contents: read
+    actions: read # find the base branch's report
+  steps:
+    - uses: actions/download-artifact@v8
+      with:
+        pattern: coverage-lcov-*
+        path: lcov
+    - uses: eclipse-score/tools/coverage_report/actions/report@main
+      with:
+        title: Python coverage
+        suites: |
+          Unit tests=lcov/coverage-lcov-unit
+          Scenarios=lcov/coverage-lcov-scenarios-*
+```
+
+The workflow must also run on pushes to the base branch: those runs upload
+the numbers pull requests compare against (`coverage-report-base` artifact).
+
+| Input | Default | |
+| --- | --- | --- |
+| `suites` | – | One `LABEL=PATH` per line, as on the CLI. |
+| `title` | `Coverage` | Heading. |
+| `notes` | – | Lines below the totals. |
+| `package-depth` | – | As `--package-depth`. |
+| `base-branch` | default branch | Branch whose pushes store the comparison numbers. |
+| `artifact-name` | `coverage-report` | Must match the `comment` action's. |
+
+The summary also goes to the job summary of every run.
+
+### 2. The comment workflow
+
+```yaml
+name: Coverage Comment
+on:
+  workflow_run:
+    workflows: ["PR Checks"] # the workflow that runs the report action
+    types: [completed]
+permissions:
+  contents: read
+jobs:
+  comment:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      github.event.workflow_run.conclusion != 'cancelled'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read # download the report
+      pull-requests: write # create or update the comment
+    steps:
+      - uses: eclipse-score/tools/coverage_report/actions/comment@main
+```
+
+GitHub runs `workflow_run` workflows from the default branch only: the
+comment appears once this file is merged.
+
+The action never checks out or runs pull request code. It only posts the
+uploaded Markdown, and only on the pull request whose repository, branch and
+commit match the triggering run.
+
+## Limits
+
+- One coverage comment per pull request: a second `report` would replace the
+  first one's comment.
+- The comparison needs a base branch run whose artifact has not expired
+  (90 days by default). Without one, the summary says so.

@@ -1,0 +1,140 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+# Merges LCOV reports and, on pull requests, compares them with the latest run
+# on the base branch. Writes the summary to the job summary and uploads it, so
+# ../comment can post it on the pull request.
+#
+# Base branch pushes upload under "<artifact-name>-base": that is the artifact
+# pull requests compare against. Needs `actions: read` to find it.
+name: Coverage report
+description: Merge LCOV reports and compare them with the base branch
+
+inputs:
+  suites:
+    description: >-
+      One test suite per line, as LABEL=PATH. PATH is an LCOV file, a directory
+      searched for *.lcov / *.info, or a glob. A suite without reports shows as
+      "no data".
+    required: true
+  title:
+    description: Heading of the summary.
+    default: Coverage
+  notes:
+    description: Lines of text shown below the totals, one per line.
+    default: ""
+  package-depth:
+    description: Group files by at most this many leading directories; empty groups by full directory.
+    default: ""
+  base-branch:
+    description: Branch whose pushes store the numbers pull requests compare against.
+    default: ${{ github.event.repository.default_branch }}
+  artifact-name:
+    description: Name of the uploaded report; base branch pushes add "-base".
+    default: coverage-report
+  github-token:
+    description: Token to find the base branch's report.
+    default: ${{ github.token }}
+
+outputs:
+  markdown:
+    description: Path of the Markdown summary.
+    value: ${{ steps.report.outputs.markdown }}
+
+runs:
+  using: composite
+  steps:
+    # Pull requests compare against the base branch's numbers, which that
+    # branch's own runs upload; this saves measuring the base a second time.
+    # Both steps may fail (API errors, an expired artifact): the summary then
+    # notes that there is nothing to compare with.
+    - name: Find coverage report of the base branch
+      id: base
+      if: github.event_name == 'pull_request'
+      continue-on-error: true
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        ARTIFACT: ${{ inputs.artifact-name }}-base
+      # Newest first. The name alone is no proof: a pull request can change
+      # the workflow and upload under it, and a fork's branch can have the
+      # base branch's name. Only this repository's own runs count.
+      run: |
+        run_id=$(gh api "repos/$REPO/actions/artifacts?name=$ARTIFACT&per_page=100" --jq "
+          [.artifacts[]
+           | select(.expired | not)
+           | select(.workflow_run.head_branch == env.BASE_BRANCH)
+           | select(.workflow_run.head_repository_id == .workflow_run.repository_id)
+          ][0].workflow_run.id // empty")
+        echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+    - name: Download coverage report of the base branch
+      if: steps.base.outputs.run_id
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: ${{ inputs.artifact-name }}-base
+        path: ${{ runner.temp }}/coverage-report-base
+        run-id: ${{ steps.base.outputs.run_id }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Merge coverage
+      id: report
+      shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}/../../..
+        OUT: ${{ runner.temp }}/coverage-report
+        SUITES: ${{ inputs.suites }}
+        NOTES: ${{ inputs.notes }}
+        TITLE: ${{ inputs.title }}
+        PACKAGE_DEPTH: ${{ inputs.package-depth }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        BASE_JSON: ${{ runner.temp }}/coverage-report-base/coverage.json
+        COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        IS_PR: ${{ github.event_name == 'pull_request' }}
+      run: |
+        args=()
+        while IFS= read -r line; do
+          [[ -n "${line// }" ]] && args+=("$line")
+        done <<< "$SUITES"
+        while IFS= read -r line; do
+          [[ -n "${line// }" ]] && args+=(--note "$line")
+        done <<< "$NOTES"
+        [[ -n "$PACKAGE_DEPTH" ]] && args+=(--package-depth "$PACKAGE_DEPTH")
+        [[ "$IS_PR" == true ]] && args+=(--compare-with "$BASE_JSON")
+        python3 -m coverage_report "${args[@]}" \
+          --title "$TITLE" --base-name "$BASE_BRANCH" --commit "$COMMIT" \
+          --json "$OUT/coverage.json" --markdown "$OUT/summary.md" --lcov "$OUT/coverage.lcov"
+        cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+        echo "markdown=$OUT/summary.md" >> "$GITHUB_OUTPUT"
+
+    # ../comment cannot take the number from its workflow_run event: that list
+    # of pull requests is empty for forks.
+    - name: Store pull request number
+      if: github.event_name == 'pull_request'
+      shell: bash
+      env:
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        OUT: ${{ runner.temp }}/coverage-report
+      run: echo "$PR_NUMBER" > "$OUT/pr_number"
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: >-
+          ${{ inputs.artifact-name }}${{ github.event_name == 'push'
+          && github.ref == format('refs/heads/{0}', inputs.base-branch)
+          && '-base' || '' }}
+        path: ${{ runner.temp }}/coverage-report
