@@ -25,7 +25,7 @@ import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 
-from .lcov import find_reports, load_suite
+from .lcov import load_suite
 from .markdown import render
 from .summary import load_reference, summarize
 
@@ -55,12 +55,17 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--json", help="write the numbers to this file")
     parser.add_argument("--markdown", help="write the Markdown summary to this file")
-    parser.add_argument("--lcov", help="write all reports, concatenated, to this file")
     parser.add_argument(
         "--compare-with",
         metavar="JSON",
         help="numbers of the base branch, written by --json; adds Δ columns. "
         "A missing or unreadable file is noted in the summary, not an error.",
+    )
+    parser.add_argument(
+        "--base-commit",
+        metavar="SHA",
+        help="commit the comparison is meant against, e.g. the merge base. If "
+        "--compare-with holds another commit's numbers, the summary says so.",
     )
     parser.add_argument("--title", default="Coverage", help="heading of the summary")
     parser.add_argument(
@@ -74,7 +79,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--package-depth",
-        type=int,
+        type=_positive_int,
         help="group files by at most this many leading directories "
         "(default: by their full directory)",
     )
@@ -84,8 +89,20 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or more, not {number}")
+    return number
+
+
 def main(argv: Sequence[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    parser = _parser()
+    args = parser.parse_args(argv)
+    if args.compare_with and not args.markdown:
+        parser.error(
+            "--compare-with only changes the --markdown output; add --markdown"
+        )
 
     # `bazel run` starts in the runfiles tree; paths on the command line are
     # meant relative to where the user called it.
@@ -99,11 +116,6 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f"warning: no LCOV data in {paths[label]}; reporting '{label}' as no data"
             )
 
-    if args.lcov:
-        # genhtml and similar tools merge the records of a file themselves.
-        reports = [p for path in paths.values() for p in find_reports(path)]
-        _write(args.lcov, "".join(p.read_text(encoding="utf-8") for p in reports))
-
     summary = summarize(
         suites, args.commit or _head_commit(), package_depth=args.package_depth
     )
@@ -113,6 +125,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         reference, note = None, None
         if args.compare_with:
             reference, note = load_reference(Path(args.compare_with))
+        if reference and args.base_commit and reference.commit != args.base_commit:
+            note = (
+                f"No coverage of {args.base_name} at `{args.base_commit[:8]}`, "
+                f"where this branch started; Δ also contains what changed on "
+                f"{args.base_name} up to `{reference.commit[:8]}`."
+            )
         notes = [*args.note, *([note] if note else [])]
         text = render(
             summary, reference, title=args.title, notes=notes, base_name=args.base_name

@@ -56,7 +56,7 @@ def test_every_suite_counts_every_file_of_the_combined_report() -> None:
 
 
 def test_suites_are_summarized_apart_and_combined() -> None:
-    branch = Branch(1, 0, "jump to line 2")
+    branch = Branch(1, "0", "jump to line 2")
     unit = {
         "src/a.py": FileCoverage(lines={1: True, 2: False}, branches={branch: True}),
         # Listed by the unit test run though no test imports it.

@@ -32,10 +32,10 @@ def workdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return tmp_path
 
 
-def test_suites_are_written_as_json_lcov_and_markdown(workdir: Path) -> None:
+def test_suites_are_written_as_json_and_markdown(workdir: Path) -> None:
     exit_code = main(
         ["Unit=unit.lcov", "Docs=docs", "Other=missing"]
-        + ["--commit", "abc", "--json", "out/c.json", "--lcov", "out/c.lcov"]
+        + ["--commit", "abc", "--json", "out/c.json"]
         + ["--markdown", "out/c.md", "--title", "Python coverage"]
     )
 
@@ -49,7 +49,6 @@ def test_suites_are_written_as_json_lcov_and_markdown(workdir: Path) -> None:
         "Other": None,
     }
     assert summary["combined"] == {"lines": [2, 3], "branches": [0, 0]}
-    assert "SF:unused.py" in (workdir / "out" / "c.lcov").read_text()
     assert "### Python coverage" in (workdir / "out" / "c.md").read_text()
 
 
@@ -68,9 +67,39 @@ def test_a_pull_request_is_compared_with_the_base_json(workdir: Path) -> None:
     assert "Measured: everything." in text
 
 
+def test_base_numbers_of_another_commit_get_a_note(workdir: Path) -> None:
+    main(["Unit=unit.lcov", "--commit", "newer000", "--json", "main.json"])
+    compare = ["Unit=unit.lcov", "--markdown", "pr.md", "--compare-with", "main.json"]
+
+    main([*compare, "--base-commit", "base0000"])
+    assert (
+        "No coverage of main at `base0000`, where this branch started; Δ also "
+        "contains what changed on main up to `newer000`."
+    ) in (workdir / "pr.md").read_text()
+
+    main([*compare, "--base-commit", "newer000"])
+    assert "where this branch started" not in (workdir / "pr.md").read_text()
+
+
 def test_a_missing_base_json_is_a_note_not_an_error(workdir: Path) -> None:
     exit_code = main(["unit.lcov", "--markdown", "pr.md", "--compare-with", "nope"])
     assert exit_code == 0
     text = (workdir / "pr.md").read_text()
     assert "| unit.lcov | 33.3% (1/3) | – |" in text
     assert "No coverage of the base branch available to compare with." in text
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["unit.lcov", "--package-depth", "0"],
+        ["unit.lcov", "--package-depth", "-1"],
+        ["unit.lcov", "--json", "c.json", "--compare-with", "main.json"],
+    ],
+)
+def test_options_that_would_be_ignored_are_errors(
+    workdir: Path, args: list[str]
+) -> None:
+    with pytest.raises(SystemExit) as exc:
+        main(args)
+    assert exc.value.code == 2

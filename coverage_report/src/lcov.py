@@ -30,18 +30,19 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 # File name patterns of LCOV reports inside a directory given as input.
-LCOV_PATTERNS = ("*.lcov", "*.info", "lcov*.dat")
+LCOV_PATTERNS = ("*.lcov", "*.info")
 
 
 @dataclass(frozen=True)
 class Branch:
     """One branch of a source file.
 
-    ``BRDA:2,0,jump to line 3,1`` is ``Branch(line=2, block=0, name="jump to line 3")``.
+    ``BRDA:2,0,jump to line 3,1`` is ``Branch(line=2, block="0", name="jump to line 3")``.
+    The block is text, not a number: LCOV 2 names exception branches "e0".
     """
 
     line: int
-    block: int
+    block: str
     name: str
 
 
@@ -101,7 +102,7 @@ def parse_lcov(
             # from both ends.
             lineno, block, rest = line[5:].split(",", 2)
             name, taken = rest.rsplit(",", 1)
-            current.mark_branch(Branch(int(lineno), int(block), name), _ran(taken))
+            current.mark_branch(Branch(int(lineno), block, name), _ran(taken))
         elif line == "end_of_record":
             current = None
     return files

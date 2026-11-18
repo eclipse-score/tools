@@ -63,13 +63,19 @@ def test_inputs_become_cli_arguments(tmp_path: Path) -> None:
         str(out / "coverage.json"),
         "--markdown",
         str(out / "summary.md"),
-        "--lcov",
-        str(out / "coverage.lcov"),
     ]
 
 
 def test_only_pull_requests_compare_with_the_base(tmp_path: Path) -> None:
-    assert "--compare-with" not in cli_args(action_env(tmp_path))
+    args = cli_args(action_env(tmp_path, MERGE_BASE="base0000"))
+    assert "--compare-with" not in args
+    assert "--base-commit" not in args
+
+
+def test_the_merge_base_is_passed_on_if_known(tmp_path: Path) -> None:
+    args = cli_args(action_env(tmp_path, IS_PR="true", MERGE_BASE="base0000"))
+    assert args[args.index("--base-commit") + 1] == "base0000"
+    assert "--base-commit" not in cli_args(action_env(tmp_path, IS_PR="true"))
 
 
 def test_a_base_run_then_a_pull_request_run(
@@ -86,13 +92,17 @@ def test_a_base_run_then_a_pull_request_run(
     (tmp_path / "unit.lcov").write_text("SF:a.py\nDA:1,1\nDA:2,1\nend_of_record\n")
     (tmp_path / "step_summary").write_text("")
 
-    assert main(action_env(tmp_path, IS_PR="true", COMMIT="pr000000")) == 0
+    assert not (tmp_path / "out" / "pr_number").exists()
+
+    pr_env = action_env(tmp_path, IS_PR="true", COMMIT="pr000000", PR_NUMBER="42")
+    assert main(pr_env) == 0
 
     summary = (tmp_path / "out" / "summary.md").read_text()
     assert "| Unit tests | 100.0% (2/2) | +50.0% | – | – |" in summary
     assert "| Docs | no data | – | no data | – |" in summary
     assert "against main at `base0000`." in summary
     assert (tmp_path / "step_summary").read_text() == summary
+    assert (tmp_path / "out" / "pr_number").read_text() == "42"
     assert (
         (tmp_path / "github_output")
         .read_text()

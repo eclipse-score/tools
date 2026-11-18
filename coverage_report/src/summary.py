@@ -17,6 +17,7 @@ it back to show what changed.
 """
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Self
@@ -46,7 +47,8 @@ class TotalCoverage:
     branches_total: int
 
     @classmethod
-    def of(cls, files: list[FileCoverage]) -> Self:
+    def of(cls, files: Iterable[FileCoverage]) -> Self:
+        files = list(files)
         lines = [ran for f in files for ran in f.lines.values()]
         branches = [ran for f in files for ran in f.branches.values()]
         return cls(sum(lines), len(lines), sum(branches), len(branches))
@@ -54,10 +56,6 @@ class TotalCoverage:
     @property
     def lines_percent(self) -> float | None:
         return percent(self.lines_hit, self.lines_total)
-
-    @property
-    def branches_percent(self) -> float | None:
-        return percent(self.branches_hit, self.branches_total)
 
     def to_json(self) -> dict[str, list[int]]:
         return {
@@ -184,10 +182,10 @@ def summarize(
     return Summary(
         commit=commit,
         suites={
-            label: TotalCoverage.of(list(run_by(s, combined).values())) if s else None
+            label: TotalCoverage.of(run_by(s, combined).values()) if s else None
             for label, s in suites.items()
         },
-        combined=TotalCoverage.of(list(combined.values())),
+        combined=TotalCoverage.of(combined.values()),
         packages={name: TotalCoverage.of(fs) for name, fs in sorted(packages.items())},
         files={path: TotalCoverage.of([file]) for path, file in files.items()},
     )

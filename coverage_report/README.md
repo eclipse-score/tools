@@ -24,7 +24,9 @@ Zero non-stdlib Python dependencies.
 ## What a pull request gets
 
 - Lines and branches per test suite and combined, with the change (Δ)
-  against the latest run on the base branch.
+  against the base branch at the commit the pull request started from (its
+  merge base). If that run is missing, against the newest base run, and the
+  comment says so.
 - Collapsed: files whose coverage changed (biggest drop first), per package,
   and files no test runs at all.
 - One comment, updated on every push.
@@ -50,16 +52,50 @@ never as 0%.
 | `--json FILE` | Write the numbers. Store this on the base branch; pull requests compare against it. |
 | `--markdown FILE` | Write the summary. |
 | `--compare-with FILE` | JSON of the base branch; adds the Δ columns. Missing or unreadable: a note, not an error. |
-| `--lcov FILE` | Write all reports concatenated, e.g. for `genhtml`. |
+| `--base-commit SHA` | Commit the comparison is meant against (the merge base). A JSON of another commit gets a note. |
 | `--title`, `--note`, `--base-name` | Heading, extra lines below the totals (repeatable), name of the base branch. |
 | `--package-depth N` | Group files by at most `N` leading directories (default: full directory). |
 | `--commit SHA` | Commit the reports belong to (default: `git rev-parse HEAD`). |
 
-A file counts in every suite's denominator, even if only one suite lists it.
-So make one suite list every source file, e.g. coverage.py with `source` set:
-files no test imports then show at 0%.
+A file counts in every suite's denominator, even if only one suite lists it;
+see [Producing the reports](#producing-the-reports-run-tests-however-you-need).
 
 With Bazel: `bazel run @score_tools//coverage_report:score-coverage-report -- ...`.
+
+## Producing the reports: run tests however you need
+
+The tool never runs tests. Each test run, started any way you like, writes
+LCOV; each run becomes one suite. Runs can be in different jobs, use different
+commands, or measure code in subprocesses, as long as they end in LCOV files.
+
+Example: docs-as-code measures its Python code in two very different runs.
+
+| Suite | How it runs | Becomes LCOV with |
+| --- | --- | --- |
+| Unit tests | `coverage run -m pytest src tools ...` | `coverage combine && coverage lcov -o coverage-unit.lcov` |
+| docs.bzl scenarios | pytest starts Bazel, Bazel starts Sphinx; each Sphinx process records coverage through `COVERAGE_PROCESS_START` | `coverage combine && coverage lcov -o coverage-docs-bzl-<suite>.lcov` (one per matrix job) |
+
+Each job uploads its LCOV file as an artifact (`coverage-lcov-unit`,
+`coverage-lcov-docs-bzl-cached`, `coverage-lcov-docs-bzl-runtime`), and the
+report gets two suites; the glob merges both docs.bzl jobs into one suite:
+
+```text
+Unit tests=coverage-lcov/coverage-lcov-unit
+docs.bzl scenarios=coverage-lcov/coverage-lcov-docs-bzl-*
+```
+
+Other producers work the same: `bazel coverage --combined_report=lcov`
+(`bazel-out/_coverage/_coverage_report.dat`, pass the file path), llvm-cov
+`export -format=lcov`, or `lcov --capture`.
+
+Two things to get right:
+
+- **Same paths.** Suites are merged by the `SF:` path. All runs must write
+  the same path for the same file (e.g. repository-relative `src/app.py`);
+  otherwise one file counts twice.
+- **One suite lists every file.** Files no run lists are invisible. Let one
+  run list all source files, e.g. coverage.py with `source` set, so files no
+  test imports show up at 0% in every suite.
 
 ## GitHub Actions
 
@@ -144,3 +180,7 @@ commit match the triggering run.
   first one's comment.
 - The comparison needs a base branch run whose artifact has not expired
   (90 days by default). Without one, the summary says so.
+- If the merge base's run has not finished yet (or never ran, e.g. a skipped
+  push), the pull request compares with the newest base run instead; the
+  comment says so and names the commit it used. Push again later to get the
+  exact comparison.

@@ -39,8 +39,8 @@ def test_a_line_or_branch_counts_as_run_if_any_record_ran_it() -> None:
         "a.py": FileCoverage(
             lines={1: True, 2: True},
             branches={
-                Branch(2, 0, "jump to line 3"): True,
-                Branch(2, 0, "jump to line 4"): False,
+                Branch(2, "0", "jump to line 3"): True,
+                Branch(2, "0", "jump to line 4"): False,
             },
         )
     }
@@ -48,7 +48,15 @@ def test_a_line_or_branch_counts_as_run_if_any_record_ran_it() -> None:
 
 def test_branch_names_may_contain_commas() -> None:
     merged = parse_lcov(lcov("a.py", "BRDA:5,1,exit from f(a, b),1"))
-    assert merged["a.py"].branches == {Branch(5, 1, "exit from f(a, b)"): True}
+    assert merged["a.py"].branches == {Branch(5, "1", "exit from f(a, b)"): True}
+
+
+def test_exception_branches_of_lcov_2_are_read() -> None:
+    merged = parse_lcov(lcov("a.cpp", "BRDA:7,e0,1,1", "BRDA:7,e0,2,-"))
+    assert merged["a.cpp"].branches == {
+        Branch(7, "e0", "1"): True,
+        Branch(7, "e0", "2"): False,
+    }
 
 
 def test_lines_outside_a_record_and_totals_are_ignored() -> None:

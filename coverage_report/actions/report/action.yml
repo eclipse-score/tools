@@ -56,29 +56,22 @@ runs:
   steps:
     # Pull requests compare against the base branch's numbers, which that
     # branch's own runs upload; this saves measuring the base a second time.
-    # Both steps may fail (API errors, an expired artifact): the summary then
-    # notes that there is nothing to compare with.
+    # Picks the run of the merge base, else the newest; see
+    # coverage_report/src/find_base.py. Without one, or if the download fails
+    # (an expired artifact), the summary notes there is nothing to compare with.
     - name: Find coverage report of the base branch
       id: base
       if: github.event_name == 'pull_request'
       continue-on-error: true
       shell: bash
       env:
+        PYTHONPATH: ${{ github.action_path }}/../../..
         GH_TOKEN: ${{ inputs.github-token }}
         REPO: ${{ github.repository }}
         BASE_BRANCH: ${{ inputs.base-branch }}
         ARTIFACT: ${{ inputs.artifact-name }}-base
-      # Newest first. The name alone is no proof: a pull request can change
-      # the workflow and upload under it, and a fork's branch can have the
-      # base branch's name. Only this repository's own runs count.
-      run: |
-        run_id=$(gh api "repos/$REPO/actions/artifacts?name=$ARTIFACT&per_page=100" --jq "
-          [.artifacts[]
-           | select(.expired | not)
-           | select(.workflow_run.head_branch == env.BASE_BRANCH)
-           | select(.workflow_run.head_repository_id == .workflow_run.repository_id)
-          ][0].workflow_run.id // empty")
-        echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      run: python3 -m coverage_report.src.find_base
 
     - name: Download coverage report of the base branch
       if: steps.base.outputs.run_id
@@ -107,17 +100,9 @@ runs:
         BASE_JSON: ${{ runner.temp }}/coverage-report-base/coverage.json
         COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         IS_PR: ${{ github.event_name == 'pull_request' }}
-      run: python3 -m coverage_report.src.github_action
-
-    # ../comment cannot take the number from its workflow_run event: that list
-    # of pull requests is empty for forks.
-    - name: Store pull request number
-      if: github.event_name == 'pull_request'
-      shell: bash
-      env:
         PR_NUMBER: ${{ github.event.pull_request.number }}
-        OUT: ${{ runner.temp }}/coverage-report
-      run: echo "$PR_NUMBER" > "$OUT/pr_number"
+        MERGE_BASE: ${{ steps.base.outputs.merge_base }}
+      run: python3 -m coverage_report.src.github_action
 
     - name: Upload coverage report
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
