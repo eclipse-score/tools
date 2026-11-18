@@ -1,0 +1,126 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+# Merges LCOV reports and, on pull requests, compares them with the base
+# branch's run at the merge base (see coverage_report/src/find_base.py). Writes the summary to the job summary and uploads it, so
+# ../comment can post it on the pull request.
+#
+# Base branch pushes upload under "<artifact-name>-base": that is the artifact
+# pull requests compare against. Needs `actions: read` to find it.
+name: Coverage report
+description: Merge LCOV reports and compare them with the base branch
+
+inputs:
+  suites:
+    description: >-
+      One test suite per line, as LABEL=PATH. PATH is an LCOV file, a directory
+      searched for *.lcov / *.info, or a glob. A suite without reports shows as
+      "no data".
+    required: true
+  title:
+    description: Heading of the summary.
+    default: Coverage
+  notes:
+    description: Lines of text shown below the totals, one per line.
+    default: ""
+  package-depth:
+    description: Group files by at most this many leading directories; empty groups by full directory.
+    default: ""
+  base-branch:
+    description: Branch whose pushes store the numbers pull requests compare against.
+    default: ${{ github.event.repository.default_branch }}
+  artifact-name:
+    description: Name of the uploaded report; base branch pushes add "-base".
+    default: coverage-report
+  github-token:
+    description: Token to find the base branch's report.
+    default: ${{ github.token }}
+
+outputs:
+  markdown:
+    description: Path of the Markdown summary.
+    value: ${{ steps.report.outputs.markdown }}
+
+runs:
+  using: composite
+  steps:
+    # Supported: Python 3.12 to 3.14 (tested on 3.12 and 3.14); the caller's
+    # python3 may be older. Takes the newest one in that range. Leaves the
+    # caller's PATH alone and only gives the interpreter's path.
+    - name: Set up Python
+      id: python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: ">=3.12 <3.15"
+        update-environment: false
+
+    # Pull requests compare against the base branch's numbers, which that
+    # branch's own runs upload; this saves measuring the base a second time.
+    # Picks the run of the merge base, else the newest; see
+    # coverage_report/src/find_base.py. Without one, or if the download fails
+    # (an expired artifact), the summary notes there is nothing to compare with.
+    - name: Find coverage report of the base branch
+      id: base
+      if: github.event_name == 'pull_request'
+      continue-on-error: true
+      shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}/../../..
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPO: ${{ github.repository }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        ARTIFACT: ${{ inputs.artifact-name }}-base
+        HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        PYTHON: ${{ steps.python.outputs.python-path }}
+      run: '"$PYTHON" -m coverage_report.src.find_base'
+
+    - name: Download coverage report of the base branch
+      if: steps.base.outputs.run_id
+      continue-on-error: true
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      with:
+        name: ${{ inputs.artifact-name }}-base
+        path: ${{ runner.temp }}/coverage-report-base
+        run-id: ${{ steps.base.outputs.run_id }}
+        github-token: ${{ inputs.github-token }}
+
+    # Merging, comparing and rendering happen in Python; see
+    # coverage_report/src/github_action.py for how the inputs become CLI
+    # arguments.
+    - name: Build coverage report
+      id: report
+      shell: bash
+      env:
+        PYTHONPATH: ${{ github.action_path }}/../../..
+        OUT: ${{ runner.temp }}/coverage-report
+        SUITES: ${{ inputs.suites }}
+        NOTES: ${{ inputs.notes }}
+        TITLE: ${{ inputs.title }}
+        PACKAGE_DEPTH: ${{ inputs.package-depth }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        BASE_JSON: ${{ runner.temp }}/coverage-report-base/coverage.json
+        COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        IS_PR: ${{ github.event_name == 'pull_request' }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        MERGE_BASE: ${{ steps.base.outputs.merge_base }}
+        PYTHON: ${{ steps.python.outputs.python-path }}
+      run: '"$PYTHON" -m coverage_report.src.github_action'
+
+    - name: Upload coverage report
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: >-
+          ${{ inputs.artifact-name }}${{ github.event_name == 'push'
+          && github.ref == format('refs/heads/{0}', inputs.base-branch)
+          && '-base' || '' }}
+        path: ${{ runner.temp }}/coverage-report
