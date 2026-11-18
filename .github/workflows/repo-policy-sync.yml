@@ -165,28 +165,23 @@ jobs:
           disk-cache-save: "false"
           external-cache-restore: "false"
           external-cache-save: "false"
-          # Commands run with a restricted environment, without the extra state
-          # needed by profiling and cache-hit reporting.
+          # Apply restores downloads without collecting profiling or cache-hit
+          # reports.
           enable-profiling: "false"
           report-cache-hits: "false"
           report-test-cache-hits: "false"
-      - name: Configure isolated Bazel caches
+      - name: Configure Bazel caches
         run: |
-          # Commands and hooks get fresh homes without personal Bazel settings
-          # or token environment variables. Pre-commit separately receives Git
-          # URL rewrites, which can contain credentials for dependency downloads.
-          # Import the shared Bazel cache settings into each temporary home.
-          # Keep unpacked dependencies for this job so later policies reuse them.
-          policy_bazelrc="$RUNNER_TEMP/repo-policy-sync.bazelrc"
+          # Commands and hooks share the runner's HOME and authentication.
+          # Keep unpacked dependencies for this job and use the shared download
+          # caches for every target repository, including with Bazel 8, which
+          # does not read the BAZELRC environment variable.
           {
-            printf 'startup --output_user_root="%s"\n' "$RUNNER_TEMP/repo-policy-sync-bazel"
+            printf '\nstartup --output_user_root="%s"\n' "$RUNNER_TEMP/repo-policy-sync-bazel"
             printf 'import "%s"\n' "$RUNNER_TEMP/setup-bazel-cache.bazelrc"
-          } > "$policy_bazelrc"
-          {
-            printf 'REPO_POLICY_SYNC_BAZELRC=%s\n' "$policy_bazelrc"
-            # Bazelisk downloads Bazel itself; the seed job saves this directory.
-            printf 'BAZELISK_HOME=%s\n' "$HOME/.cache/bazelisk"
-          } >> "$GITHUB_ENV"
+          } >> "$HOME/.bazelrc"
+          # Bazelisk downloads Bazel itself; the seed job saves this directory.
+          printf 'BAZELISK_HOME=%s\n' "$HOME/.cache/bazelisk" >> "$GITHUB_ENV"
       - name: Run policy sync in apply mode
         id: sync
         run: >-
