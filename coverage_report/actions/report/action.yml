@@ -11,8 +11,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
-# Merges LCOV reports and, on pull requests, compares them with the latest run
-# on the base branch. Writes the summary to the job summary and uploads it, so
+# Merges LCOV reports and, on pull requests, compares them with the base
+# branch's run at the merge base (see coverage_report/src/find_base.py). Writes the summary to the job summary and uploads it, so
 # ../comment can post it on the pull request.
 #
 # Base branch pushes upload under "<artifact-name>-base": that is the artifact
@@ -54,6 +54,16 @@ outputs:
 runs:
   using: composite
   steps:
+    # Supported: Python 3.12 to 3.14 (tested on 3.12 and 3.14); the caller's
+    # python3 may be older. Takes the newest one in that range. Leaves the
+    # caller's PATH alone and only gives the interpreter's path.
+    - name: Set up Python
+      id: python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: ">=3.12 <3.15"
+        update-environment: false
+
     # Pull requests compare against the base branch's numbers, which that
     # branch's own runs upload; this saves measuring the base a second time.
     # Picks the run of the merge base, else the newest; see
@@ -71,7 +81,8 @@ runs:
         BASE_BRANCH: ${{ inputs.base-branch }}
         ARTIFACT: ${{ inputs.artifact-name }}-base
         HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-      run: python3 -m coverage_report.src.find_base
+        PYTHON: ${{ steps.python.outputs.python-path }}
+      run: '"$PYTHON" -m coverage_report.src.find_base'
 
     - name: Download coverage report of the base branch
       if: steps.base.outputs.run_id
@@ -102,7 +113,8 @@ runs:
         IS_PR: ${{ github.event_name == 'pull_request' }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         MERGE_BASE: ${{ steps.base.outputs.merge_base }}
-      run: python3 -m coverage_report.src.github_action
+        PYTHON: ${{ steps.python.outputs.python-path }}
+      run: '"$PYTHON" -m coverage_report.src.github_action'
 
     - name: Upload coverage report
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

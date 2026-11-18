@@ -119,12 +119,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     summary = summarize(
         suites, args.commit or _head_commit(), package_depth=args.package_depth
     )
+    # Read the reference before writing --json: both may be the same file.
+    reference, note = None, None
+    if args.compare_with:
+        reference, note = load_reference(Path(args.compare_with))
     if args.json:
         _write(args.json, json.dumps(summary.to_json(), indent=2, sort_keys=True))
     if args.markdown:
-        reference, note = None, None
-        if args.compare_with:
-            reference, note = load_reference(Path(args.compare_with))
         if reference and args.base_commit and reference.commit != args.base_commit:
             note = (
                 f"No coverage of {args.base_name} at `{args.base_commit[:8]}`, "

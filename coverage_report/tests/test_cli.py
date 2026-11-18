@@ -81,6 +81,19 @@ def test_base_numbers_of_another_commit_get_a_note(workdir: Path) -> None:
     assert "where this branch started" not in (workdir / "pr.md").read_text()
 
 
+def test_the_base_json_is_read_before_json_overwrites_it(workdir: Path) -> None:
+    main(["Unit=unit.lcov", "--commit", "base0000", "--json", "main.json"])
+    (workdir / "unit.lcov").write_text("SF:a.py\nDA:1,1\nDA:2,1\nend_of_record\n")
+
+    main(
+        ["Unit=unit.lcov", "--commit", "head0000", "--json", "main.json"]
+        + ["--markdown", "pr.md", "--compare-with", "main.json"]
+    )
+
+    assert "| Unit | 100.0% (2/2) | +66.7% |" in (workdir / "pr.md").read_text()
+    assert json.loads((workdir / "main.json").read_text())["commit"] == "head0000"
+
+
 def test_a_missing_base_json_is_a_note_not_an_error(workdir: Path) -> None:
     exit_code = main(["unit.lcov", "--markdown", "pr.md", "--compare-with", "nope"])
     assert exit_code == 0

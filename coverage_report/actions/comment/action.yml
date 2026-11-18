@@ -28,6 +28,11 @@ inputs:
   github-token:
     description: Token to download the report and write the comment.
     default: ${{ github.token }}
+  comment-author:
+    description: >-
+      Login that writes the comment, to find its earlier one. Change it when
+      github-token is not the workflow's token.
+    default: github-actions[bot]
 
 runs:
   using: composite
@@ -78,7 +83,7 @@ runs:
       with:
         token: ${{ inputs.github-token }}
         issue-number: ${{ steps.pr.outputs.number }}
-        comment-author: github-actions[bot]
+        comment-author: ${{ inputs.comment-author }}
         # Must match COMMENT_MARKER in coverage_report/src/markdown.py.
         body-includes: <!-- score-coverage-report -->
 

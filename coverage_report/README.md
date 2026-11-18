@@ -19,7 +19,8 @@ no GitHub App: everything runs in your own workflows.
 
 Reads LCOV only, so it works for every language whose coverage tool writes
 LCOV (coverage.py `coverage lcov`, `bazel coverage`, llvm-cov, gcov/lcov).
-Zero non-stdlib Python dependencies.
+Python 3.12 to 3.14 (tested on 3.12 and 3.14), zero non-stdlib
+dependencies. The `report` action sets up its own Python in that range.
 
 ## What a pull request gets
 
@@ -88,7 +89,7 @@ Other producers work the same: `bazel coverage --combined_report=lcov`
 (`bazel-out/_coverage/_coverage_report.dat`, pass the file path), llvm-cov
 `export -format=lcov`, or `lcov --capture`.
 
-Two things to get right:
+Three things to get right:
 
 - **Same paths.** Suites are merged by the `SF:` path. All runs must write
   the same path for the same file (e.g. repository-relative `src/app.py`);
@@ -96,6 +97,12 @@ Two things to get right:
 - **One suite lists every file.** Files no run lists are invisible. Let one
   run list all source files, e.g. coverage.py with `source` set, so files no
   test imports show up at 0% in every suite.
+- **Test the pull request's head commit.** On `pull_request`,
+  `actions/checkout` checks out a merge of the pull request into the newest
+  base branch by default. The report compares with the merge base, so base
+  branch changes would show up as the pull request's. Check out the head in
+  every job that writes LCOV:
+  `ref: ${{ github.event.pull_request.head.sha }}`.
 
 ## GitHub Actions
 
@@ -166,6 +173,10 @@ jobs:
     steps:
       - uses: eclipse-score/tools/coverage_report/actions/comment@main
 ```
+
+With a `github-token` other than the workflow's own (a personal access token
+or an app token), set `comment-author` to the login that token posts as;
+otherwise each run adds a new comment instead of updating the old one.
 
 GitHub runs `workflow_run` workflows from the default branch only: the
 comment appears once this file is merged.

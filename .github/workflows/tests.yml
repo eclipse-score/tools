@@ -38,6 +38,10 @@ jobs:
           bazel test //...
       - name: Run Python tests
         run: uv run --locked pytest --ignore-glob='bazel-*'
+      # The step above uses .python-version (3.12); coverage_report also
+      # supports 3.14. --isolated leaves the project's .venv alone.
+      - name: Run coverage_report tests on Python 3.14
+        run: uv run --locked --isolated --python 3.14 pytest coverage_report
       - name: Run Ruff quality checks
         run: |
           uv run --locked ruff check .
