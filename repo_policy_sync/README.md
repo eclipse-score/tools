@@ -142,8 +142,8 @@ The seed repository is chosen in the workflow, not in the tool configuration.
 `setup-bazel-cache` uses the seed's lockfile for its automatic cache reset and
 save decisions. The apply job only restores caches, so its additional downloads
 cannot overwrite the seed. Build results and extracted dependencies are not
-persisted. A job-local `output_user_root` lets later policies and hook retries
-reuse each repository's extracted dependencies within the apply job.
+persisted. Bazel's normal output directories let later policies and hook
+retries reuse each repository's extracted dependencies within the apply job.
 
 A failed cache warm-up does not prevent apply from running; it can restore an
 older cache or download missing dependencies itself. The
