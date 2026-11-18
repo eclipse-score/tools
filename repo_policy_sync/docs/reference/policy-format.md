@@ -118,6 +118,13 @@ only if the policy changed that repository-relative path. This avoids
 regenerating derived files after unrelated policy changes. Forced follow-up
 commands still run when their conditional file exists.
 
+Follow-up commands use a temporary home directory and a reduced environment.
+The runner copies global Git `url.*.insteadOf` rewrites into an isolated Git
+configuration so commands and credential helpers can authenticate private
+dependency downloads. Token environment variables and other user settings are
+not inherited. These rewrites may contain credentials, so apply mode requires
+trusted target repositories.
+
 ## Conditions
 
 `when.file_exists` requires one repository-relative file to exist.

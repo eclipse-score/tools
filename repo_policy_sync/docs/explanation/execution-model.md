@@ -50,12 +50,12 @@ owns one deterministic branch and one pull request per repository.
    existing policy-owned pull request after verifying its branch head; plan
    mode leaves the pull request open.
 
-   Pre-commit runs use a credential-reduced environment and temporary home
-   directory. To keep authenticated nested Git fetches working, the runner
+   Follow-up commands and pre-commit runs use a reduced environment and
+   temporary home directory. To keep authenticated nested Git fetches working, the runner
    copies only global `url.*.insteadOf` rewrites into a temporary Git config;
    GitHub token variables and unrelated user configuration are not passed to
-   hooks. Hooks are still arbitrary repository code, so apply mode requires
-   trusted target repositories.
+   commands. Commands and hooks are arbitrary repository code, so apply mode
+   requires trusted target repositories.
 
 Checkout synchronization and each policy's repository processing run in
 parallel. Repositories remain isolated in separate checkouts; use

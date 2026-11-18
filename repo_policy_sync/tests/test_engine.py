@@ -13,6 +13,7 @@
 
 from pathlib import Path
 import subprocess
+import sys
 
 import pytest
 
@@ -261,6 +262,9 @@ def test_after_apply_regenerates_existing_conditional_file(
         assert env["GIT_CONFIG_NOSYSTEM"] == "1"
         assert "GH_TOKEN" not in env
 
+    monkeypatch.setattr(
+        "repo_policy_sync.src.engine._copy_global_git_url_rewrites", lambda home: None
+    )
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
 
     evaluation = evaluate_policy(fake_repo, policy)
@@ -272,6 +276,102 @@ def test_after_apply_regenerates_existing_conditional_file(
     ]
     assert applied == evaluation
     assert calls == [(("bazel", "mod", "deps"), fake_repo)]
+
+
+@pytest.mark.parametrize("with_rewrite", [True, False])
+def test_after_apply_carries_only_global_git_url_rewrites(
+    tmp_path: Path, monkeypatch, with_rewrite: bool
+) -> None:
+    """Real child processes can use private Git URLs without inheriting user settings."""
+
+    user_home = tmp_path / "user-home"
+    user_home.mkdir()
+    # Honor an explicitly selected global configuration as well as HOME.
+    global_config = tmp_path / "global.gitconfig"
+    global_config.write_text("[user]\n\tname = Test User\n[alias]\n\tcustom = status\n")
+    if with_rewrite:
+        subprocess.run(
+            [
+                "git",
+                "config",
+                "--file",
+                str(global_config),
+                "--add",
+                "url.https://x-access-token:dummy-token@github.com/.insteadOf",
+                "https://github.com/",
+            ],
+            check=True,
+        )
+    monkeypatch.setenv("HOME", str(user_home))
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(global_config))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GH_TOKEN", "dummy-token")
+    monkeypatch.setenv("GITHUB_TOKEN", "dummy-token")
+    monkeypatch.setenv("GH_CONFIG_DIR", str(user_home / ".gh"))
+    (tmp_path / "MODULE.bazel.lock").write_text("old lock\n")
+    # This child uses real Git to resolve a URL without making a network request.
+    # Reading global rewrites is also how a repository credential helper can
+    # recover an automation token for private registry HTTP downloads.
+    command = (
+        sys.executable,
+        "-c",
+        r"""
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+assert 'GH_TOKEN' not in os.environ
+assert 'GITHUB_TOKEN' not in os.environ
+assert Path(os.environ['HOME']) != Path(sys.argv[1])
+assert Path(os.environ['GH_CONFIG_DIR']) != Path(sys.argv[1]) / '.gh'
+assert os.environ['GIT_CONFIG_NOSYSTEM'] == '1'
+assert os.environ['GIT_TERMINAL_PROMPT'] == '0'
+for key in ('user.name', 'alias.custom'):
+    result = subprocess.run(['git', 'config', '--global', '--get', key], capture_output=True)
+    assert result.returncode == 1
+result = subprocess.run(
+    ['git', 'ls-remote', '--get-url', 'https://github.com/example/private.git'],
+    check=True, capture_output=True, text=True,
+)
+assert result.stdout.strip() == sys.argv[2]
+rewrites = subprocess.run(
+    ['git', 'config', '--global', '--get-regexp', r'^url\..*\.insteadof$'],
+    capture_output=True, text=True,
+)
+if 'x-access-token' in sys.argv[2]:
+    assert rewrites.returncode == 0
+    assert 'dummy-token' in rewrites.stdout
+    assert Path(os.environ['GIT_CONFIG_GLOBAL']).parent == Path(os.environ['HOME'])
+else:
+    assert rewrites.returncode == 1
+    assert 'GIT_CONFIG_GLOBAL' not in os.environ
+Path('MODULE.bazel.lock').write_text('new lock\n')
+""",
+        str(user_home),
+        (
+            "https://x-access-token:dummy-token@github.com/example/private.git"
+            if with_rewrite
+            else "https://github.com/example/private.git"
+        ),
+    )
+    policy = Policy(
+        id="example",
+        title="Example",
+        description=None,
+        bazel_condition=None,
+        ensure=(EnsureLine(Path(".bazelversion"), "8.6.0", ()),),
+        after_apply=(
+            AfterApplyCommand(
+                command, Path("MODULE.bazel.lock"), "Regenerate the lock file."
+            ),
+        ),
+    )
+
+    applied = apply_policy(tmp_path, policy)
+
+    assert (tmp_path / "MODULE.bazel.lock").read_text() == "new lock\n"
+    assert Path("MODULE.bazel.lock") in {change.path for change in applied.changes}
 
 
 def test_force_after_apply_runs_for_an_already_compliant_policy(
@@ -301,6 +401,9 @@ def test_force_after_apply_runs_for_an_already_compliant_policy(
         assert env["GIT_CONFIG_NOSYSTEM"] == "1"
         lock_file.write_text("new lock\n")
 
+    monkeypatch.setattr(
+        "repo_policy_sync.src.engine._copy_global_git_url_rewrites", lambda home: None
+    )
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
 
     applied = apply_policy(fake_repo, policy, force_after_apply=True)
@@ -334,6 +437,9 @@ def test_after_apply_failure_redacts_credentials(fake_repo: Path, monkeypatch) -
             output="password=another-secret\n",
         )
 
+    monkeypatch.setattr(
+        "repo_policy_sync.src.engine._copy_global_git_url_rewrites", lambda home: None
+    )
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
 
     with pytest.raises(RepoPolicySyncError) as error:
@@ -367,6 +473,9 @@ def test_after_apply_failure_without_output_has_a_fallback_message(
     def run(*_, **__):
         raise subprocess.CalledProcessError(1, ["bazel", "mod", "deps"])
 
+    monkeypatch.setattr(
+        "repo_policy_sync.src.engine._copy_global_git_url_rewrites", lambda home: None
+    )
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
 
     with pytest.raises(RepoPolicySyncError, match=r"command failed \(exit status 1\)"):

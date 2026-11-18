@@ -65,11 +65,12 @@ def _copy_global_git_url_rewrites(home: Path) -> Path | None:
     """Copy global Git URL rewrites into an isolated configuration file.
 
     Apply workflows commonly authenticate private dependencies by configuring
-    a token-bearing `url.*.insteadOf` rule globally. Pre-commit gets a fresh
-    home directory and system configuration is disabled, so those rules would
-    otherwise disappear before a hook starts Bazel or another nested Git
-    client. Only URL rewrites are copied: user identity, aliases, credential
-    helpers, and unrelated Git configuration remain unavailable to hooks.
+    a token-bearing `url.*.insteadOf` rule globally. Follow-up commands and
+    pre-commit hooks get fresh home directories with system configuration
+    disabled, so those rules would otherwise disappear before Bazel or another
+    nested Git client starts. Only URL rewrites are copied: user identity,
+    aliases, credential helpers, and unrelated Git configuration remain
+    unavailable to these commands.
     """
 
     rewrites = _read_global_git_url_rewrites()
@@ -88,7 +89,7 @@ def _copy_global_git_url_rewrites(home: Path) -> Path | None:
             detail = result.stderr.strip() or result.stdout.strip()
             detail = redact_sensitive_text(detail)
             raise CommandError(
-                "could not prepare Git URL rewrites for pre-commit"
+                "could not prepare Git URL rewrites for policy commands"
                 + (f": {detail}" if detail else "")
             )
     return config
@@ -111,8 +112,8 @@ def _read_global_git_url_rewrites() -> tuple[tuple[str, str], ...]:
             text=True,
         )
     except OSError:
-        # The regular pre-commit command will report a missing Git executable
-        # in the usual way. A missing executable must not turn this optional
+        # Commands that need Git will report a missing executable in the usual
+        # way. A missing executable must not turn this optional
         # credential hand-off into a less useful error.
         return ()
 

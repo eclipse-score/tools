@@ -73,6 +73,9 @@ def test_follow_up_commands_and_hooks_share_only_explicit_cache_configuration(
     monkeypatch.setattr(
         "repo_policy_sync.src.github._copy_global_git_url_rewrites", lambda home: None
     )
+    monkeypatch.setattr(
+        "repo_policy_sync.src.engine._copy_global_git_url_rewrites", lambda home: None
+    )
 
     _run_after_apply_command(checkout, ("bazel", "mod", "deps"))
     assert GitHubCli().run_pre_commit(checkout=checkout)

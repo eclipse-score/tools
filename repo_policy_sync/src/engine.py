@@ -31,7 +31,7 @@ from .bazel import (
 )
 from .cache import configure_bazel_cache
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
-from .github import GitHubResolver
+from .github import GitHubResolver, _copy_global_git_url_rewrites
 from .models import Change, EnsureOperation, Evaluation, Policy
 from .operations import apply as apply_operation
 from .operations import describe_changes, resolve_operation
@@ -159,7 +159,8 @@ def apply_policy(
 def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
     # Policy commands execute repository-controlled code. Keep only the basic
     # process environment and replace user configuration with temporary paths so
-    # credentials and host-specific settings are not inherited accidentally.
+    # token variables and host-specific settings are not inherited accidentally.
+    # Explicitly copy only Git URL rewrites for authenticated dependency fetches.
     environment = {
         key: value
         for key, value in os.environ.items()
@@ -170,6 +171,7 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
             prefix="repo-policy-sync-after-apply-"
         ) as home:
             configure_bazel_cache(Path(home), environment)
+            git_config = _copy_global_git_url_rewrites(Path(home))
             environment.update(
                 {
                     "HOME": home,
@@ -179,6 +181,8 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
                     "GIT_TERMINAL_PROMPT": "0",
                 }
             )
+            if git_config is not None:
+                environment["GIT_CONFIG_GLOBAL"] = str(git_config)
             subprocess.run(
                 command,
                 cwd=root,
