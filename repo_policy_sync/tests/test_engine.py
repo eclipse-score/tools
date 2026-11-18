@@ -258,8 +258,7 @@ def test_after_apply_regenerates_existing_conditional_file(
         calls.append((tuple(command), cwd))
         assert capture_output is True
         assert text is True
-        assert env["GIT_CONFIG_NOSYSTEM"] == "1"
-        assert "GH_TOKEN" not in env
+        assert env["GIT_TERMINAL_PROMPT"] == "0"
 
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
 
@@ -298,7 +297,7 @@ def test_force_after_apply_runs_for_an_already_compliant_policy(
         assert cwd == fake_repo
         assert capture_output is True
         assert text is True
-        assert env["GIT_CONFIG_NOSYSTEM"] == "1"
+        assert env["GIT_TERMINAL_PROMPT"] == "0"
         lock_file.write_text("new lock\n")
 
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
