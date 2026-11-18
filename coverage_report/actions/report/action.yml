@@ -90,7 +90,10 @@ runs:
         run-id: ${{ steps.base.outputs.run_id }}
         github-token: ${{ inputs.github-token }}
 
-    - name: Merge coverage
+    # Merging, comparing and rendering happen in Python; see
+    # coverage_report/src/github_action.py for how the inputs become CLI
+    # arguments.
+    - name: Build coverage report
       id: report
       shell: bash
       env:
@@ -104,21 +107,7 @@ runs:
         BASE_JSON: ${{ runner.temp }}/coverage-report-base/coverage.json
         COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         IS_PR: ${{ github.event_name == 'pull_request' }}
-      run: |
-        args=()
-        while IFS= read -r line; do
-          [[ -n "${line// }" ]] && args+=("$line")
-        done <<< "$SUITES"
-        while IFS= read -r line; do
-          [[ -n "${line// }" ]] && args+=(--note "$line")
-        done <<< "$NOTES"
-        [[ -n "$PACKAGE_DEPTH" ]] && args+=(--package-depth "$PACKAGE_DEPTH")
-        [[ "$IS_PR" == true ]] && args+=(--compare-with "$BASE_JSON")
-        python3 -m coverage_report "${args[@]}" \
-          --title "$TITLE" --base-name "$BASE_BRANCH" --commit "$COMMIT" \
-          --json "$OUT/coverage.json" --markdown "$OUT/summary.md" --lcov "$OUT/coverage.lcov"
-        cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
-        echo "markdown=$OUT/summary.md" >> "$GITHUB_OUTPUT"
+      run: python3 -m coverage_report.src.github_action
 
     # ../comment cannot take the number from its workflow_run event: that list
     # of pull requests is empty for forks.
