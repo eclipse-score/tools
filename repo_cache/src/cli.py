@@ -75,6 +75,14 @@ def create_parser() -> argparse.ArgumentParser:
         "--include-archived", action="store_true", help="Include archived repositories."
     )
     sync_command.add_argument(
+        "--history",
+        action="store_true",
+        help=(
+            "Fetch the full commit history of all branches and tags instead of "
+            "a shallow checkout. Checkouts that already have history keep it."
+        ),
+    )
+    sync_command.add_argument(
         "--workers",
         type=int,
         default=None,
@@ -135,6 +143,7 @@ def _run_sync(args: argparse.Namespace) -> int:
         cache_dir=cache_dir,
         repos=tuple(args.repo or ()),
         include_archived=args.include_archived,
+        history=args.history,
         workers=workers,
         progress=None if args.quiet else _write_progress,
     )

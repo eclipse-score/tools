@@ -96,6 +96,23 @@ def test_sync_succeeds_with_zero_exit_code(monkeypatch, tmp_path: Path) -> None:
     assert exit_code == 0
 
 
+def test_sync_requests_history_only_with_the_flag(monkeypatch, tmp_path: Path) -> None:
+    report = SyncReport(org="acme", cache_dir=tmp_path, outcomes=())
+    requested: list[bool] = []
+
+    def fake_sync_org(*, history: bool, **_: object) -> SyncReport:
+        requested.append(history)
+        return report
+
+    monkeypatch.setattr(cli_module, "sync_org", fake_sync_org)
+    arguments = ["sync", "--org", "acme", "--cache-dir", str(tmp_path), "--quiet"]
+
+    cli_module.main(arguments)
+    cli_module.main([*arguments, "--history"])
+
+    assert requested == [False, True]
+
+
 def test_sync_reports_empty_repositories_without_a_failure(
     monkeypatch, tmp_path: Path, capsys
 ) -> None:

@@ -166,6 +166,8 @@ def test_sync_default_branch_handles_a_cached_fetch_failure(
             return "https://github.com/owner/repository\n"
         if command[-3:] == ["remote", "get-url", "origin"]:
             return "git@github.com:owner/repository.git\n"
+        if command[-1] == "--is-shallow-repository":
+            return "true\n"
         if command[3:4] == ["fetch"]:
             raise CommandError("git fetch failed")
         if command[:2] == ["gh", "api"]:
