@@ -64,6 +64,7 @@ def sync_org(
     cache_dir: Path,
     repos: Sequence[str] = (),
     include_archived: bool = False,
+    history: bool = False,
     workers: int = DEFAULT_SYNC_WORKERS,
     max_selected_repositories: int | None = None,
     progress: Callable[[str], None] | None = None,
@@ -79,6 +80,10 @@ def sync_org(
     abort the rest.
     Empty repositories are reported in `SyncReport.empty_repositories` instead
     of being treated as failures.
+
+    Checkouts are shallow unless ``history`` is set, which gives each one the
+    full commit history of all branches and tags. A checkout that already has
+    history keeps it when synced without ``history``.
 
     ``max_selected_repositories`` limits the number of repositories selected
     after exact and pattern matching. The limit is checked before any checkout
@@ -176,6 +181,7 @@ def sync_org(
                     repository=f"{org}/{repository.name}",
                     branch=repository.default_branch,
                     destination=cache_dir / org / repository.name,
+                    history=history,
                 ): repository
                 for repository in repositories_with_branches
             }
