@@ -36,6 +36,7 @@ uvx --from "git+https://github.com/eclipse-score/score_tools#subdirectory=repo_c
 ```bash
 score-repo-cache list --org eclipse-score
 score-repo-cache sync --org eclipse-score --repo score --repo 'score_*'
+score-repo-cache sync --org eclipse-score --repo baselibs --history
 ```
 
 `sync` clones each selected repository's default branch into
@@ -58,6 +59,28 @@ for outcome in report.failures:
     print(outcome.repository.name, outcome.error)
 for outcome in report.empty_repositories:
     print(outcome.repository.name, "is empty")
+```
+
+By default a checkout holds only the latest commit of the default branch.
+Pass `history=True` (CLI: `--history`) when a tool needs commit history, for
+example to count commits between a release tag and the default branch:
+
+- The checkout does everything a default one does, and additionally knows
+  every commit, branch, and tag.
+- It is still lazy: file contents of older commits are downloaded only when a
+  command reads them.
+- Once a checkout has history, it keeps it. Later syncs without `history`
+  refresh the full history instead of dropping it.
+- It is roughly 4x larger and slower to clone, so request it only when needed.
+
+```python
+report = sync_org(
+    org="eclipse-score",
+    cache_dir=default_cache_directory(),
+    repos=("baselibs",),
+    history=True,
+)
+# git -C <checkout> rev-list --count --left-right v0.1.0...HEAD
 ```
 
 ## Bazel

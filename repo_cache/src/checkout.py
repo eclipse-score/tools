@@ -23,26 +23,41 @@ from .command import run_command
 from .errors import CommandError, EmptyRepositoryError
 
 _DEFAULT_BRANCH_REF = "refs/repo-cache/default"
+_HISTORY_FILTER = "--filter=blob:none"
+_HISTORY_REFSPECS = ("+refs/heads/*:refs/remotes/origin/*", "+refs/tags/*:refs/tags/*")
 
 
-def sync_default_branch(*, repository: str, branch: str, destination: Path) -> None:
-    """Clone once, then refresh a disposable cached checkout on later runs."""
+def sync_default_branch(
+    *, repository: str, branch: str, destination: Path, history: bool = False
+) -> None:
+    """Clone once, then refresh a disposable cached checkout on later runs.
+
+    The checkout is shallow unless ``history`` is set. With ``history`` it
+    becomes a blobless clone holding every commit, tag, and tree of all
+    branches and tags, so history queries such as ``git rev-list`` or
+    ``git log -- <path>`` stay local, while file contents of older commits are
+    fetched lazily. Because consumers share the cache, a checkout that has
+    history keeps it: later syncs refresh the full history even when they do
+    not ask for it.
+    """
 
     if (destination / ".git").is_dir():
         _verify_cached_remote(repository=repository, checkout=destination)
+        shallow = _is_shallow(destination)
+        if history or not shallow:
+            fetch = [
+                *(["--unshallow"] if shallow else []),
+                _HISTORY_FILTER,
+                "--prune",
+                "origin",
+                *_HISTORY_REFSPECS,
+            ]
+            fetched = f"refs/remotes/origin/{branch}"
+        else:
+            fetch = ["--depth", "1", "origin", branch]
+            fetched = "FETCH_HEAD"
         try:
-            run_command(
-                [
-                    "git",
-                    "-C",
-                    str(destination),
-                    "fetch",
-                    "--depth",
-                    "1",
-                    "origin",
-                    branch,
-                ]
-            )
+            run_command(["git", "-C", str(destination), "fetch", *fetch])
         except CommandError as exc:
             if _repository_is_empty(repository):
                 raise EmptyRepositoryError(
@@ -50,15 +65,7 @@ def sync_default_branch(*, repository: str, branch: str, destination: Path) -> N
                 ) from exc
             raise
         run_command(
-            [
-                "git",
-                "-C",
-                str(destination),
-                "checkout",
-                "--detach",
-                "--force",
-                "FETCH_HEAD",
-            ]
+            ["git", "-C", str(destination), "checkout", "--detach", "--force", fetched]
         )
         run_command(["git", "-C", str(destination), "clean", "-fdx"])
         run_command(
@@ -81,8 +88,7 @@ def sync_default_branch(*, repository: str, branch: str, destination: Path) -> N
             repository,
             str(destination),
             "--",
-            "--depth",
-            "1",
+            *([_HISTORY_FILTER] if history else ["--depth", "1"]),
             "--branch",
             branch,
         ]
@@ -90,6 +96,13 @@ def sync_default_branch(*, repository: str, branch: str, destination: Path) -> N
     run_command(
         ["git", "-C", str(destination), "update-ref", _DEFAULT_BRANCH_REF, "HEAD"]
     )
+
+
+def _is_shallow(checkout: Path) -> bool:
+    output = run_command(
+        ["git", "-C", str(checkout), "rev-parse", "--is-shallow-repository"]
+    )
+    return output.strip() == "true"
 
 
 def _repository_is_empty(repository: str) -> bool:

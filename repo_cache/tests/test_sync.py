@@ -33,7 +33,7 @@ def test_sync_org_syncs_every_active_repository(monkeypatch, tmp_path: Path) -> 
     monkeypatch.setattr(
         sync_module,
         "sync_default_branch",
-        lambda *, repository, branch, destination: synced.append(repository),
+        lambda *, repository, **_: synced.append(repository),
     )
 
     report = sync_org(org="acme", cache_dir=tmp_path)
@@ -41,6 +41,25 @@ def test_sync_org_syncs_every_active_repository(monkeypatch, tmp_path: Path) -> 
     assert synced == ["acme/alpha", "acme/beta"]
     assert [outcome.repository.name for outcome in report.outcomes] == ["alpha", "beta"]
     assert report.failures == ()
+
+
+@pytest.mark.parametrize("history", [False, True])
+def test_sync_org_passes_the_history_choice_to_every_checkout(
+    monkeypatch, tmp_path: Path, history: bool
+) -> None:
+    _stub_listing(
+        monkeypatch, (Repository("alpha", "main"), Repository("beta", "main"))
+    )
+    requested: list[bool] = []
+    monkeypatch.setattr(
+        sync_module,
+        "sync_default_branch",
+        lambda *, history, **_: requested.append(history),
+    )
+
+    sync_org(org="acme", cache_dir=tmp_path, history=history)
+
+    assert requested == [history, history]
 
 
 def test_sync_org_excludes_archived_repositories_by_default(
@@ -102,7 +121,7 @@ def test_sync_org_reports_empty_checkout_without_marking_it_as_a_failure(
     repositories = (Repository("empty", "main"), Repository("fine", "main"))
     _stub_listing(monkeypatch, repositories)
 
-    def fake_sync(*, repository: str, branch: str, destination: Path) -> None:
+    def fake_sync(*, repository: str, **_: object) -> None:
         if repository.endswith("empty"):
             raise EmptyRepositoryError("repository has no Git references")
 
@@ -122,7 +141,7 @@ def test_sync_org_records_a_sync_failure_without_aborting_others(
     repositories = (Repository("broken", "main"), Repository("fine", "main"))
     _stub_listing(monkeypatch, repositories)
 
-    def fake_sync(*, repository: str, branch: str, destination: Path) -> None:
+    def fake_sync(*, repository: str, **_: object) -> None:
         if repository.endswith("broken"):
             raise RepoCacheError("checkout failed")
 
@@ -159,7 +178,7 @@ def test_sync_org_expands_repository_patterns_before_checkout(
     monkeypatch.setattr(
         sync_module,
         "sync_default_branch",
-        lambda *, repository, branch, destination: synced.append(repository),
+        lambda *, repository, **_: synced.append(repository),
     )
 
     report = sync_org(org="acme", cache_dir=tmp_path, repos=("score_*",))
@@ -184,7 +203,7 @@ def test_sync_org_supports_fnmatch_character_classes_in_repository_patterns(
     monkeypatch.setattr(
         sync_module,
         "sync_default_branch",
-        lambda *, repository, branch, destination: synced.append(repository),
+        lambda *, repository, **_: synced.append(repository),
     )
 
     sync_org(org="acme", cache_dir=tmp_path, repos=("vsps_[ab]",))
@@ -224,7 +243,7 @@ def test_sync_org_checks_the_selection_limit_before_checkout(
     monkeypatch.setattr(
         sync_module,
         "sync_default_branch",
-        lambda *, repository, branch, destination: synced.append(repository),
+        lambda *, repository, **_: synced.append(repository),
     )
 
     with pytest.raises(
