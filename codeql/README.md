@@ -66,6 +66,7 @@ of the traced build, e.g. a wrapper that adds startup options).
 | `targets` | Bazel target patterns to build and analyse. |
 | `build_configs` | `--config` values of the traced build. |
 | `bazel_args` | Further flags of the traced build. |
+| `exclude_testonly` | Build only rule targets that are not `testonly` (tests, mocks, test helpers). |
 | `pack` | Pre-compiled coding-standards pack, currently `misra-cpp`. |
 | `suite` | Suite inside the pack, default `codeql-suites/misra-cpp-default.qls`. |
 | `coding_standards_config` | Workspace-relative `coding-standards.yml` whose guideline recategorizations are applied to the SARIF. |

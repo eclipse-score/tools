@@ -32,6 +32,7 @@ def codeql_analysis(
         targets,
         build_configs = [],
         bazel_args = [],
+        exclude_testonly = False,
         pack = "misra-cpp",
         suite = "codeql-suites/misra-cpp-default.qls",
         coding_standards_config = None,
@@ -51,6 +52,8 @@ def codeql_analysis(
         build_configs: Bazel `--config` values of the traced build, e.g. a config
             selecting a toolchain whose compiler CodeQL can trace.
         bazel_args: Further flags for the traced build.
+        exclude_testonly: Build only the rule targets of `targets` that are not
+            `testonly` (tests, mocks, test helpers), resolved with `bazel query`.
         pack: Pre-compiled coding-standards pack; currently only "misra-cpp".
         suite: Query suite inside the pack.
         coding_standards_config: Workspace-relative path of the
@@ -84,6 +87,8 @@ def codeql_analysis(
     ]
     if coding_standards_config:
         args.append("--coding-standards-config={}".format(coding_standards_config))
+    if exclude_testonly:
+        args.append("--exclude-testonly")
     args += ["--target={}".format(target) for target in targets]
     args += ["--build-config={}".format(config) for config in build_configs]
     args += ["--bazel-arg={}".format(arg) for arg in bazel_args]

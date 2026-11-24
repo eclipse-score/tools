@@ -58,6 +58,12 @@ def test_traced_build_bypasses_caches_and_forwards_tracer_environment():
     ]
 
 
+def test_production_query_drops_testonly_and_excluded_targets():
+    query = codeql_analysis.production_query(["//a/...", "//b:x", "-//a/gen/..."])
+    selected = "kind(rule, (//a/... + //b:x) - //a/gen/...)"
+    assert query == f"{selected} except attr(testonly, 1, {selected})"
+
+
 def test_tracer_variables_are_prepended_to_existing_ones():
     env = codeql_analysis.merged_environment(
         {"LD_PRELOAD": "/own.so", "PATH": "/bin"}, {"LD_PRELOAD": "/trace.so"}

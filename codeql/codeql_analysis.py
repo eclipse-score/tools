@@ -109,7 +109,34 @@ def bazel_build_command(
     ]
 
 
+def production_query(targets: list[str]) -> str:
+    """Query for the rule targets of `targets` (negative patterns honoured) that are not testonly."""
+    positive = " + ".join(t for t in targets if not t.startswith("-"))
+    negative = "".join(f" - {t[1:]}" for t in targets if t.startswith("-"))
+    selected = f"kind(rule, ({positive}){negative})"
+    return f"{selected} except attr(testonly, 1, {selected})"
+
+
+def production_targets(bazel: str, workspace: Path, targets: list[str]) -> list[str]:
+    result = subprocess.run(
+        [bazel, "query", production_query(targets), "--output=label"],
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    labels = result.stdout.split()
+    if not labels:
+        raise RuntimeError(f"No non-testonly targets in {targets}")
+    return labels
+
+
 def create_database(args: argparse.Namespace, workspace: Path, database: Path) -> None:
+    targets = (
+        production_targets(args.bazel, workspace, args.target)
+        if args.exclude_testonly
+        else args.target
+    )
     subprocess.run(
         [
             args.codeql,
@@ -143,7 +170,7 @@ def create_database(args: argparse.Namespace, workspace: Path, database: Path) -
     seed = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
     command = bazel_build_command(
         args.bazel,
-        args.target,
+        targets,
         args.build_config,
         args.bazel_arg,
         tracer_env,
@@ -350,6 +377,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="append",
         default=[],
         help="Bazel --config of the traced build",
+    )
+    parser.add_argument(
+        "--exclude-testonly",
+        action="store_true",
+        help="Build only rule targets that are not testonly (tests, mocks, test helpers)",
     )
     parser.add_argument(
         "--bazel-arg",
