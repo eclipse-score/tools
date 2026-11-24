@@ -53,7 +53,7 @@ def codeql_analysis(
         build_configs: Bazel `--config` values of the traced build, e.g. a config
             selecting a toolchain whose compiler CodeQL can trace.
         bazel_args: Further flags for the traced build.
-        exclude_testonly: Build only the rule targets of `targets` that are not
+        exclude_testonly: Build only the C/C++ (`cc_*`) targets of `targets` that are not
             `testonly` (tests, mocks, test helpers), resolved with `bazel query`.
         keep_going: Build with `--keep_going` and analyse what was built even
             if some targets fail; the database integrity report shows the result.

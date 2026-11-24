@@ -110,12 +110,11 @@ def bazel_build_command(
 
 
 def production_query(targets: list[str]) -> str:
-    """Query for the rule targets of `targets` (negative patterns honoured) that are not testonly."""
+    """Query for the C/C++ rule targets of `targets` (negative patterns honoured) that are not testonly."""
     positive = " + ".join(t for t in targets if not t.startswith("-"))
     negative = "".join(f" - {t[1:]}" for t in targets if t.startswith("-"))
-    selected = f"kind(rule, ({positive}){negative})"
-    # test_suite targets pull in their tests when built.
-    return f"{selected} except attr(testonly, 1, {selected}) except kind(test_suite, {selected})"
+    selected = f'kind("^cc_", ({positive}){negative})'
+    return f"{selected} except attr(testonly, 1, {selected})"
 
 
 def production_targets(bazel: str, workspace: Path, targets: list[str]) -> list[str]:
@@ -228,6 +227,9 @@ def recategorize_sarif(args: argparse.Namespace, config: Path, sarif: Path) -> N
     """Apply the guideline recategorizations of `config` to the SARIF in place."""
     if not config.is_file():
         raise RuntimeError(f"Coding standards config not found: {config}")
+    # The recategorization script fails on configs that only contain deviations.
+    if "guideline-recategorizations" not in config.read_text(encoding="utf-8"):
+        return
     recategorized = sarif.with_name(sarif.name + ".recategorized")
     subprocess.run(
         [
