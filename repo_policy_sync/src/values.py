@@ -18,6 +18,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from .bazel import parse_bazel_version
 from .errors import PolicyError, RepoPolicySyncError
 from .models import DockerfileImageVersionSource, ValueBinding
 from .operations._validation import (
@@ -27,7 +28,6 @@ from .operations._validation import (
     validate_repository_path,
 )
 
-_NUMERIC_VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 _VALUE_NAME = re.compile(r"[a-z][a-z0-9_]*\Z")
 
 
@@ -129,9 +129,4 @@ def _dockerfile_image_tags(
 
 
 def _is_version_tag(tag: str) -> bool:
-    return tag.startswith("v") and _parse_version(tag[1:]) is not None
-
-
-def _parse_version(value: str) -> tuple[int, int, int] | None:
-    match = _NUMERIC_VERSION.fullmatch(value)
-    return tuple(int(component) for component in match.groups()) if match else None
+    return tag.startswith("v") and parse_bazel_version(tag[1:]) is not None
