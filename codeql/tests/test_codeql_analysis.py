@@ -32,6 +32,7 @@ codeql_analysis = _load_module()
 
 def test_traced_build_bypasses_caches_and_forwards_tracer_environment():
     command = codeql_analysis.bazel_build_command(
+        bazel="/w/bin/bazel",
         targets=["//score/...", "-//score/mock/..."],
         build_configs=["codeql", "qnx"],
         bazel_args=["--keep_going"],
@@ -39,7 +40,7 @@ def test_traced_build_bypasses_caches_and_forwards_tracer_environment():
         database=Path("/tmp/db"),
         seed="42",
     )
-    assert command[:2] == ["bazel", "build"]
+    assert command[:2] == ["/w/bin/bazel", "build"]
     assert "--nouse_action_cache" in command and "--disk_cache=" in command
     assert "--action_env=CODEQL_SEED_FORCE_RECOMPILE=42" in command
     assert "--sandbox_writable_path=/tmp/db" in command

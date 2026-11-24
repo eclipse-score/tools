@@ -85,6 +85,7 @@ def merged_environment(
 
 
 def bazel_build_command(
+    bazel: str,
     targets: list[str],
     build_configs: list[str],
     bazel_args: list[str],
@@ -94,7 +95,7 @@ def bazel_build_command(
 ) -> list[str]:
     """The traced `bazel build`; every tracer variable is forwarded into the actions."""
     return [
-        "bazel",
+        bazel,
         "build",
         *CACHE_BYPASS_FLAGS,
         "--stamp",
@@ -141,7 +142,13 @@ def create_database(args: argparse.Namespace, workspace: Path, database: Path) -
 
     seed = datetime.datetime.now().strftime("%Y%m%d%H%M%S%f")
     command = bazel_build_command(
-        args.target, args.build_config, args.bazel_arg, tracer_env, database, seed
+        args.bazel,
+        args.target,
+        args.build_config,
+        args.bazel_arg,
+        tracer_env,
+        database,
+        seed,
     )
     subprocess.run(command, env=env, cwd=workspace, check=True)
 
@@ -285,9 +292,9 @@ def remap_artifact_indices(value: object, artifact_index: dict[int, int]) -> Non
             remap_artifact_indices(child, artifact_index)
 
 
-def bazel_output_path(workspace: Path) -> Path:
+def bazel_output_path(bazel: str, workspace: Path) -> Path:
     result = subprocess.run(
-        ["bazel", "info", "output_path"],
+        [bazel, "info", "output_path"],
         cwd=workspace,
         capture_output=True,
         text=True,
@@ -351,6 +358,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Extra flag for the traced build",
     )
     parser.add_argument(
+        "--bazel",
+        default="bazel",
+        help="Bazel executable of the traced build (e.g. a wrapper adding startup options)",
+    )
+    parser.add_argument(
         "--output-dir",
         help="Directory for SARIF and reports (default: bazel info output_path)",
     )
@@ -377,7 +389,9 @@ def main(argv: list[str] | None = None) -> int:
     workspace = Path(os.environ.get("BUILD_WORKSPACE_DIRECTORY") or Path.cwd())
     cwd = Path(os.environ.get("BUILD_WORKING_DIRECTORY") or Path.cwd())
     output_dir = (
-        cwd / args.output_dir if args.output_dir else bazel_output_path(workspace)
+        cwd / args.output_dir
+        if args.output_dir
+        else bazel_output_path(args.bazel, workspace)
     )
     output_dir.mkdir(parents=True, exist_ok=True)
 

@@ -57,8 +57,9 @@ bazel run //:codeql -- --build-config=qnx --output-prefix=codeql-qnx
 
 Arguments after `--` are appended to the ones of the macro: `--target`,
 `--build-config` and `--bazel-arg` add to the configured lists, `--output-dir`
-(default: `bazel info output_path`), `--output-prefix` and `--database` (keep the
-database instead of using a temporary directory).
+(default: `bazel info output_path`), `--output-prefix`, `--database` (keep the
+database instead of using a temporary directory) and `--bazel` (Bazel executable
+of the traced build, e.g. a wrapper that adds startup options).
 
 | Attribute | Meaning |
 | --- | --- |
