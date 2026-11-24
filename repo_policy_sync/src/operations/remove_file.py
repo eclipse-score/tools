@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, RemoveFile, EnsureOperation
 from ._validation import (
     expect_keys,
@@ -44,7 +45,7 @@ class RemoveFileOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, RemoveFile)
         path = root / operation.path
@@ -63,7 +64,7 @@ class RemoveFileOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, RemoveFile)
         path = root / operation.path

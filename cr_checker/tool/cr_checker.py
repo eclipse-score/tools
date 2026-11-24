@@ -23,8 +23,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
+from typing import override
 
 BYTES_TO_READ = 4 * 1024
 
@@ -72,6 +74,7 @@ class ColoredFormatter(logging.Formatter):
                         formats the record as per the superclass `Formatter`.
     """
 
+    @override
     def format(self, record: logging.LogRecord) -> str:
         log_color = LOGGER_COLORS.get(record.levelname, "")
         record.levelname = f"{log_color}{record.levelname}:{COLORS['ENDC']}"
@@ -287,7 +290,9 @@ def detect_shebang_offset(path: str | Path, encoding: str) -> int:
     return 0
 
 
-def load_text_from_file(path, header_length: int, encoding: str | None, offset: int):
+def load_text_from_file(
+    path: str | Path, header_length: int, encoding: str | None, offset: int
+):
     """
     Reads the first portion of a file, up to `header_length` characters
     plus an additional offset if provided.
@@ -313,7 +318,9 @@ def load_text_from_file(path, header_length: int, encoding: str | None, offset: 
         return content[offset:] if offset else content
 
 
-def load_text_from_file_with_mmap(path, header_length: int, encoding: str, offset: int):
+def load_text_from_file_with_mmap(
+    path: str | Path, header_length: int, encoding: str, offset: int
+):
     """
     Maps the file and reads only the first `header_length` bytes plus
     an additional offset if provided.
@@ -346,7 +353,9 @@ def load_text_from_file_with_mmap(path, header_length: int, encoding: str, offse
             return fmap[:length].decode(encoding)[offset:]
 
 
-def has_copyright(path, template: str, use_mmap: bool, encoding: str, offset: int):
+def has_copyright(
+    path: str | Path, template: str, use_mmap: bool, encoding: str, offset: int
+):
     """
     Checks if the specified copyright text is present in the beginning of a file.
 
@@ -411,7 +420,9 @@ def has_any_copyright(path: str | Path, use_mmap: bool, encoding: str, offset: i
     )
 
 
-def has_duplicate_copyright(path, template, use_mmap: bool, encoding: str, offset: int):
+def has_duplicate_copyright(
+    path: str | Path, template: str, use_mmap: bool, encoding: str, offset: int
+):
     """
     Checks if more than one copyright notice is present in the file header.
 
@@ -561,7 +572,9 @@ def has_replaceable_block_tail(comment_lines: list[str], spdx_index: int) -> boo
     )
 
 
-def find_existing_header(path, encoding: str | None, offset: int, max_lines: int):
+def find_existing_header(
+    path: str | Path, encoding: str | None, offset: int, max_lines: int
+):
     """Locate a contiguous, safely replaceable copyright comment at the file top.
 
     ``offset`` preserves leading characters such as a shebang. SPDX must occur
@@ -651,7 +664,12 @@ def find_existing_header(path, encoding: str | None, offset: int, max_lines: int
 
 
 def fix_wrong_copyright(
-    path, template, encoding, offset: int, *, max_header_lines: int | None = None
+    path: str | Path,
+    template: str,
+    encoding: str,
+    offset: int,
+    *,
+    max_header_lines: int | None = None,
 ) -> bool:
     """
     Replaces an existing header that does not match the template with the
@@ -740,7 +758,9 @@ def remove_old_header(file_path: str | Path, encoding: str | None, num_of_chars:
     shutil.move(temp_file.name, file_path)
 
 
-def fix_copyright(path, copyright_text: str, encoding: str, offset: int) -> bool:
+def fix_copyright(
+    path: str | Path, copyright_text: str, encoding: str, offset: int
+) -> bool:
     """
     Inserts a copyright header into the specified file, ensuring that existing
     content is preserved according to the provided offset.
@@ -783,8 +803,8 @@ def fix_copyright(path, copyright_text: str, encoding: str, offset: int) -> bool
 
 def process_files(
     *,
-    files,
-    templates,
+    files: Iterable[str | Path],
+    templates: Mapping[str, str | Sequence[str]],
     fix: bool,
     exclusion: set[str] | None = None,
     use_mmap: bool = False,

@@ -31,7 +31,9 @@ def test_gh_command_failures_are_actionable(monkeypatch: pytest.MonkeyPatch) -> 
         run_command(["gh", "auth", "status"])
 
 
-def test_gh_command_failures_redact_credentials(monkeypatch) -> None:
+def test_gh_command_failures_redact_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     token = "ghp_secret_value_12345"
 
     def run(*_: object, **__: object) -> None:

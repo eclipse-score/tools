@@ -69,7 +69,9 @@ def _valid_template() -> str:
         ),
     ],
 )
-def test_recreate_requires_an_explicit_single_target(argv, message, capsys) -> None:
+def test_recreate_requires_an_explicit_single_target(
+    argv: tuple[str, ...], message: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     with pytest.raises(SystemExit) as exit_code:
         cli.main(argv)
 
@@ -77,7 +79,9 @@ def test_recreate_requires_an_explicit_single_target(argv, message, capsys) -> N
     assert message in capsys.readouterr().err
 
 
-def test_default_output_is_a_table(monkeypatch, capsys) -> None:
+def test_default_output_is_a_table(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     report = RunReport(
         summary=RunSummary(
             repositories=1,
@@ -368,7 +372,9 @@ def test_bundled_policies_do_not_require_a_local_policy_directory(
     assert all(path.parent.name != "minimum-bazel-version" for path in loaded_paths)
 
 
-def test_local_policies_can_be_excluded_by_name(monkeypatch, tmp_path: Path) -> None:
+def test_local_policies_can_be_excluded_by_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.chdir(tmp_path)
     local_policy = tmp_path / "policies" / "local-policy" / "policy.yml"
     local_policy.parent.mkdir(parents=True)

@@ -13,11 +13,13 @@
 
 from pathlib import Path
 
+import pytest
+
 from repo_cache.src.cache import default_cache_directory
 
 
 def test_default_cache_directory_uses_generic_xdg_location(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))

@@ -28,6 +28,7 @@ from ..bazel import (
     starlark_call_ranges,
 )
 from ..errors import PolicyError, RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureBazelDependency, EnsureOperation, ValueReference
 from ._validation import (
     expect_keys,
@@ -77,7 +78,7 @@ class EnsureBazelDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependency)
         dependency = _module_dependency(root, operation)
@@ -98,7 +99,7 @@ class EnsureBazelDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, EnsureBazelDependency)
         if _module_dependency(root, operation) is not None:

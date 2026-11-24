@@ -20,6 +20,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 from textwrap import dedent
+from types import ModuleType
 
 
 LOGGER = logging.getLogger(__name__)
@@ -77,7 +78,9 @@ def test_detect_shebang_offset_counts_trailing_newlines(tmp_path: Path):
         "rst",
     ]
 )
-def prepare_test_with_header(request, tmp_path: Path) -> tuple[Path, str, str]:
+def prepare_test_with_header(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> tuple[Path, str, str]:
     extension = request.param
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
@@ -108,7 +111,9 @@ def prepare_test_with_header(request, tmp_path: Path) -> tuple[Path, str, str]:
         "rst",
     ]
 )
-def prepare_test_no_header(request, tmp_path: Path) -> tuple[Path, str, str, Path]:
+def prepare_test_no_header(
+    request: pytest.FixtureRequest, tmp_path: Path
+) -> tuple[Path, str, str, Path]:
     extension = request.param
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
@@ -119,7 +124,7 @@ def prepare_test_no_header(request, tmp_path: Path) -> tuple[Path, str, str, Pat
     return test_file, extension, header_template, tmp_path
 
 
-def test_process_files_detects_header(prepare_test_with_header):
+def test_process_files_detects_header(prepare_test_with_header: tuple[Path, str, str]):
     cr_checker = load_cr_checker_module()
     test_file, extension, header_template = prepare_test_with_header
 
@@ -134,7 +139,9 @@ def test_process_files_detects_header(prepare_test_with_header):
     assert results["no_copyright"] == 0
 
 
-def test_process_files_detects_missing_header(prepare_test_no_header):
+def test_process_files_detects_missing_header(
+    prepare_test_no_header: tuple[Path, str, str, Path],
+):
     cr_checker = load_cr_checker_module()
     test_file, extension, header_template, tmp_path = prepare_test_no_header
 
@@ -149,7 +156,9 @@ def test_process_files_detects_missing_header(prepare_test_no_header):
     assert results["no_copyright"] == 1
 
 
-def test_process_files_inserts_missing_header(prepare_test_no_header):
+def test_process_files_inserts_missing_header(
+    prepare_test_no_header: tuple[Path, str, str, Path],
+):
     cr_checker = load_cr_checker_module()
     test_file, extension, header_template, tmp_path = prepare_test_no_header
 
@@ -167,7 +176,9 @@ def test_process_files_inserts_missing_header(prepare_test_no_header):
     assert test_file.read_text(encoding="utf-8").startswith(expected_header)
 
 
-def test_process_files_skips_exclusion_with_missing_header(prepare_test_no_header):
+def test_process_files_skips_exclusion_with_missing_header(
+    prepare_test_no_header: tuple[Path, str, str, Path],
+):
     cr_checker = load_cr_checker_module()
     test_file, extension, header_template, tmp_path = prepare_test_no_header
 
@@ -489,7 +500,9 @@ def test_exclusion_file_respected_in_nested_directory(tmp_path: Path):
 # test that a glob entry in the exclusion file is expanded recursively:
 # `.claude/**/*` covers direct children as well as arbitrarily nested files,
 # and a literal entry in the same file keeps working alongside it
-def test_exclusion_file_expands_glob_pattern(tmp_path, monkeypatch):
+def test_exclusion_file_expands_glob_pattern(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     cr_checker = load_cr_checker_module()
     header_template = load_template("py")
 
@@ -548,7 +561,9 @@ def test_exclusion_file_expands_glob_pattern(tmp_path, monkeypatch):
 
 
 # test the pathway where a glob pattern does not match anything
-def test_exclusion_file_glob_without_match_is_invalid(tmp_path, monkeypatch, caplog):
+def test_exclusion_file_glob_without_match_is_invalid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+):
     cr_checker = load_cr_checker_module()
 
     workspace_dir = tmp_path / "workspace"
@@ -581,7 +596,9 @@ def test_exclusion_file_glob_without_match_is_invalid(tmp_path, monkeypatch, cap
 # is still resolved correctly when the process's cwd is not the workspace root, which
 # is what happens under `bazel run`/`bazel test` (BUILD_WORKSPACE_DIRECTORY is set to
 # the workspace root while the cwd is the execroot/runfiles directory)
-def test_exclusion_file_respected_under_bazel_run_cwd(tmp_path, monkeypatch):
+def test_exclusion_file_respected_under_bazel_run_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     cr_checker = load_cr_checker_module()
     header_template = load_template("py")
 
@@ -623,7 +640,9 @@ def test_exclusion_file_respected_under_bazel_run_cwd(tmp_path, monkeypatch):
     assert test_file.read_text(encoding="utf-8") == original_content
 
 
-def find_header(tmp_path, name, content, template_ext=None):
+def find_header(
+    tmp_path: Path, name: str, content: str, template_ext: str | None = None
+):
     cr_checker = load_cr_checker_module()
     path = tmp_path / name
     path.write_text(content, encoding="utf-8")
@@ -706,7 +725,7 @@ def wrong_wording_header(extension: str) -> str:
     )
 
 
-def run_main(cr_checker, monkeypatch, *args):
+def run_main(cr_checker: ModuleType, monkeypatch: pytest.MonkeyPatch, *args: str):
     # main() calls configure_logging, which clears all root logger handlers
     # (including pytest's caplog handler), so it is disabled here
     monkeypatch.setattr(cr_checker, "configure_logging", lambda *a, **k: None)
@@ -735,7 +754,9 @@ def test_process_files_counts_wrong_copyright(tmp_path: Path, extension: str):
     assert test_file.read_text(encoding="utf-8") == content
 
 
-def test_process_files_logs_wrong_copyright_as_error(tmp_path, caplog):
+def test_process_files_logs_wrong_copyright_as_error(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     test_file.write_text(MIT_HEADER + "x = 1\n", encoding="utf-8")
@@ -796,7 +817,9 @@ def test_process_files_fix_keeps_different_license(tmp_path: Path):
 
 # regression test for #25 / #70: wrong header used to exit 0
 @pytest.mark.parametrize("fix_args", [[], ["--fix"]])
-def test_main_returns_1_for_wrong_copyright(tmp_path, monkeypatch, fix_args):
+def test_main_returns_1_for_wrong_copyright(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fix_args: list[str]
+):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     content = MIT_HEADER + "x = 1\n"
@@ -806,7 +829,9 @@ def test_main_returns_1_for_wrong_copyright(tmp_path, monkeypatch, fix_args):
     assert test_file.read_text(encoding="utf-8") == content
 
 
-def test_main_returns_0_for_correct_copyright(tmp_path, monkeypatch):
+def test_main_returns_0_for_correct_copyright(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     test_file.write_text(
@@ -880,7 +905,9 @@ def test_process_files_fix_keeps_year_range(tmp_path: Path):
     )
 
 
-def test_main_fix_wrong_copyright_then_passes(tmp_path, monkeypatch):
+def test_main_fix_wrong_copyright_then_passes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     test_file.write_text(wrong_wording_header("py") + "x = 1\n", encoding="utf-8")
@@ -1091,7 +1118,11 @@ def test_fix_preserves_content_outside_the_copyright_comment(
     ("extension", "opening", "closing"), [("cpp", "/*", "*/"), ("md", "<!--", "-->")]
 )
 def test_complete_short_comments_can_still_be_repaired(
-    tmp_path, monkeypatch, extension, opening, closing
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    extension: str,
+    opening: str,
+    closing: str,
 ):
     """A fully closed short header can be normalized while its years and following text survive."""
     cr_checker = load_cr_checker_module()
@@ -1160,7 +1191,11 @@ def block_comment_header(request: pytest.FixtureRequest):
 @pytest.mark.parametrize("year", ["2024", "2021-2024"])
 @pytest.mark.parametrize("separator", ["", "\n"])
 def test_block_comment_repair_preserves_year_and_following_content(
-    tmp_path, monkeypatch, block_comment_header, year, separator
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block_comment_header: tuple[str, str, str, str],
+    year: str,
+    separator: str,
 ):
     """Repair consumes the whole comment, preserving years and all following text."""
     extension, header_template, _, document = block_comment_header
@@ -1194,7 +1229,10 @@ def test_block_comment_repair_preserves_year_and_following_content(
     ],
 )
 def test_block_comment_repair_refuses_unsafe_headers(
-    tmp_path, monkeypatch, block_comment_header, unsafe_case
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    block_comment_header: tuple[str, str, str, str],
+    unsafe_case: str,
 ):
     """An incompatible license or ambiguous comment boundary must leave the file intact."""
     extension, header_template, closing, document = block_comment_header
@@ -1230,7 +1268,13 @@ def test_block_comment_repair_refuses_unsafe_headers(
     "placement", ["separate-line", "before-delimiter", "after-delimiter"]
 )
 def test_block_comment_repair_preserves_text_between_spdx_and_closing_delimiter(
-    tmp_path, monkeypatch, extension, opening, closing, border, placement
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    extension: str,
+    opening: str,
+    closing: str,
+    border: str,
+    placement: str,
 ):
     """Text after SPDX is not header decoration, even within the bounded search window."""
     if placement == "before-delimiter":
@@ -1264,7 +1308,12 @@ def test_block_comment_repair_preserves_text_between_spdx_and_closing_delimiter(
     "extra", [" user content", " AND MIT", " SPDX-License-Identifier: MIT"]
 )
 def test_block_comment_repair_refuses_extra_text_on_spdx_line(
-    tmp_path, extension, opening, closing, same_line, extra
+    tmp_path: Path,
+    extension: str,
+    opening: str,
+    closing: str,
+    same_line: bool,
+    extra: str,
 ):
     """The SPDX identifier must end the header text, regardless of delimiter placement."""
     cr_checker = load_cr_checker_module()
@@ -1294,7 +1343,13 @@ def test_block_comment_repair_refuses_extra_text_on_spdx_line(
 @pytest.mark.parametrize("max_lines", [2, 3])
 @pytest.mark.parametrize("final_newline", ["", "\n"])
 def test_block_comment_search_limit_applies_to_spdx_not_closing_lines(
-    tmp_path, extension, opening, closing, ending, max_lines, final_newline
+    tmp_path: Path,
+    extension: str,
+    opening: str,
+    closing: str,
+    ending: str,
+    max_lines: int,
+    final_newline: str,
 ):
     """SPDX at the search limit can still be followed by a border and closing line."""
     cr_checker = load_cr_checker_module()
@@ -1330,7 +1385,7 @@ def test_block_comment_search_limit_applies_to_spdx_not_closing_lines(
     ["two-borders", "blank-line", "missing-identifier", "early-close", "unclosed"],
 )
 def test_block_comment_repair_requires_a_complete_header_and_only_one_border(
-    tmp_path, extension, opening, closing, unsafe_case
+    tmp_path: Path, extension: str, opening: str, closing: str, unsafe_case: str
 ):
     """A larger read window must not broaden the permitted header contents."""
     cr_checker = load_cr_checker_module()

@@ -14,13 +14,17 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from repo_cache.src import cli as cli_module
 from repo_cache.src.errors import RepoCacheError
 from repo_cache.src.models import Repository
 from repo_cache.src.sync import SyncOutcome, SyncReport
 
 
-def test_list_prints_active_repositories(monkeypatch, capsys) -> None:
+def test_list_prints_active_repositories(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setattr(
         cli_module,
         "list_repositories",
@@ -39,7 +43,7 @@ def test_list_prints_active_repositories(monkeypatch, capsys) -> None:
 
 
 def test_list_json_includes_archived_repositories_when_requested(
-    monkeypatch, capsys
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
         cli_module,
@@ -59,7 +63,7 @@ def test_list_json_includes_archived_repositories_when_requested(
 
 
 def test_sync_reports_failures_with_a_nonzero_exit_code(
-    monkeypatch, tmp_path: Path, capsys
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repository = Repository("broken", "main")
     report = SyncReport(
@@ -80,7 +84,9 @@ def test_sync_reports_failures_with_a_nonzero_exit_code(
     assert "broken: checkout failed" in captured.err
 
 
-def test_sync_succeeds_with_zero_exit_code(monkeypatch, tmp_path: Path) -> None:
+def test_sync_succeeds_with_zero_exit_code(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     repository = Repository("alpha", "main")
     report = SyncReport(
         org="acme",
@@ -96,7 +102,9 @@ def test_sync_succeeds_with_zero_exit_code(monkeypatch, tmp_path: Path) -> None:
     assert exit_code == 0
 
 
-def test_sync_requests_history_only_with_the_flag(monkeypatch, tmp_path: Path) -> None:
+def test_sync_requests_history_only_with_the_flag(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     report = SyncReport(org="acme", cache_dir=tmp_path, outcomes=())
     requested: list[bool] = []
 
@@ -114,7 +122,7 @@ def test_sync_requests_history_only_with_the_flag(monkeypatch, tmp_path: Path) -
 
 
 def test_sync_reports_empty_repositories_without_a_failure(
-    monkeypatch, tmp_path: Path, capsys
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     repository = Repository("empty", "main")
     report = SyncReport(
@@ -135,7 +143,7 @@ def test_sync_reports_empty_repositories_without_a_failure(
 
 
 def test_main_reports_repo_cache_errors_without_a_traceback(
-    monkeypatch, capsys
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     def raise_error(*, org: str) -> None:
         raise RepoCacheError("authentication failed")

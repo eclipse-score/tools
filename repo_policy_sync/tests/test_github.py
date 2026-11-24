@@ -55,7 +55,9 @@ def _custom_pull_request_template() -> str:
     )
 
 
-def test_commit_stages_deleted_policy_files(monkeypatch, tmp_path: Path) -> None:
+def test_commit_stages_deleted_policy_files(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     commands: list[list[str]] = []
 
     def record(command: list[str]) -> str:
@@ -197,7 +199,9 @@ def test_commit_runs_pre_commit_after_staging_when_repository_configures_it(
     ]
 
 
-def test_pre_commit_failure_stops_commit_and_push(monkeypatch, tmp_path: Path) -> None:
+def test_pre_commit_failure_stops_commit_and_push(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     (tmp_path / ".gitignore").write_text("\n")
     commands: list[tuple[list[str], Path | None]] = []
@@ -367,7 +371,9 @@ def test_gh_command_failures_are_actionable(monkeypatch: pytest.MonkeyPatch) -> 
         GitHubCli._run(["gh", "auth", "status"])
 
 
-def test_gh_command_failures_redact_credentials(monkeypatch) -> None:
+def test_gh_command_failures_redact_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     token = "ghp_secret_value_12345"
 
     def run(*_: object, **__: object) -> None:
@@ -413,7 +419,9 @@ def test_missing_gh_command_is_actionable(monkeypatch: pytest.MonkeyPatch) -> No
         GitHubCli._run(["gh", "auth", "status"])
 
 
-def test_create_pull_request_creates_missing_automation_labels(monkeypatch) -> None:
+def test_create_pull_request_creates_missing_automation_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
 
     def run(command: list[str]) -> str:
@@ -474,7 +482,9 @@ def test_create_pull_request_creates_missing_automation_labels(monkeypatch) -> N
     ]
 
 
-def test_create_pull_request_keeps_existing_automation_labels(monkeypatch) -> None:
+def test_create_pull_request_keeps_existing_automation_labels(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
 
     def run(command: list[str]) -> str:
@@ -571,7 +581,9 @@ def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
         )
 
 
-def test_create_pull_request_can_create_a_draft(monkeypatch) -> None:
+def test_create_pull_request_can_create_a_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
 
     def run(command: list[str]) -> str:
@@ -644,7 +656,9 @@ def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
     assert "<!-- repo-policy-sync-generation: abc1234-dirty -->" in body
 
 
-def test_tool_revision_reports_a_clean_short_commit_hash(monkeypatch) -> None:
+def test_tool_revision_reports_a_clean_short_commit_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         assert kwargs["capture_output"] is True
         assert kwargs["text"] is True
@@ -676,7 +690,9 @@ def test_tool_revision_marks_a_dirty_checkout(monkeypatch: pytest.MonkeyPatch) -
     assert _tool_revision() == "abc1234-dirty"
 
 
-def test_tool_revision_rejects_missing_git_metadata(monkeypatch) -> None:
+def test_tool_revision_rejects_missing_git_metadata(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def run(*_: object, **__: object) -> None:
         raise subprocess.CalledProcessError(
             128,
@@ -871,7 +887,9 @@ def test_close_pull_request_uses_gh(monkeypatch: pytest.MonkeyPatch) -> None:
     ]
 
 
-def test_dirty_pull_request_is_marked_draft_and_commented(monkeypatch) -> None:
+def test_dirty_pull_request_is_marked_draft_and_commented(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr(
         GitHubCli, "_run", staticmethod(lambda command: commands.append(command) or "")
@@ -1058,7 +1076,9 @@ def test_policy_pull_request_without_head_marker_is_not_safe_to_reuse(
     assert pull_request.mergeable == "CONFLICTING"
 
 
-def test_policy_pull_request_generation_marker_is_parsed(monkeypatch) -> None:
+def test_policy_pull_request_generation_marker_is_parsed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     policy = Policy("example", "Example", None, None, ())
     branch = policy_branches(policy)[0]
 
@@ -1094,7 +1114,9 @@ def test_policy_pull_request_generation_marker_is_parsed(monkeypatch) -> None:
     assert pull_request.generation_revision == "test-revision"
 
 
-def test_pre_existing_user_pull_request_is_not_reused(monkeypatch) -> None:
+def test_pre_existing_user_pull_request_is_not_reused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     policy = Policy("example", "Example", None, None, ())
     branch = policy_branches(policy)[0]
 
@@ -1121,7 +1143,9 @@ def test_pre_existing_user_pull_request_is_not_reused(monkeypatch) -> None:
         )
 
 
-def test_unlabeled_pull_request_on_expected_branch_is_not_reused(monkeypatch) -> None:
+def test_unlabeled_pull_request_on_expected_branch_is_not_reused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A PR the `--label` lookup cannot see must still block branch reuse.
 
     This covers both a maintainer's own PR opened directly on the expected
@@ -1264,7 +1288,9 @@ def test_policy_pull_request_status_includes_latest_merged_pull_request(
     assert status.closed.url.endswith("/4")
 
 
-def test_multiple_policy_pull_requests_fail_instead_of_choosing(monkeypatch) -> None:
+def test_multiple_policy_pull_requests_fail_instead_of_choosing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     policy = Policy("current", "Example", None, None, ())
     branch = policy_branches(policy)[0]
     body = (

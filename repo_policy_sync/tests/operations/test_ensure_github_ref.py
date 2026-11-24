@@ -22,6 +22,7 @@ from repo_policy_sync.src.github import GitHubCli
 from repo_policy_sync.src.models import (
     EnsureExactGitHubRef,
     EnsureMinimalGitHubRef,
+    EnsureOperation,
     Policy,
 )
 from repo_policy_sync.src.policy import load_policy
@@ -37,11 +38,13 @@ MINIMUM_SHA = "b" * 40
 NEW_SHA = "c" * 40
 
 
-def _policy(operations) -> Policy:
+def _policy(operations: tuple[EnsureOperation, ...]) -> Policy:
     return Policy("example", "Update GitHub Actions", None, None, operations)
 
 
-def _mock_gh_api(monkeypatch, *, statuses: dict[str, str] | None = None):
+def _mock_gh_api(
+    monkeypatch: pytest.MonkeyPatch, *, statuses: dict[str, str] | None = None
+):
     calls: list[list[str]] = []
     statuses = statuses or {}
 

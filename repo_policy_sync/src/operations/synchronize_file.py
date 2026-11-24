@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import PolicyError, RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureOperation, SynchronizeFile
 from ._validation import (
     expect_keys,
@@ -67,7 +68,7 @@ class SynchronizeFileOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path
@@ -86,7 +87,7 @@ class SynchronizeFileOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, SynchronizeFile)
         path = root / operation.path

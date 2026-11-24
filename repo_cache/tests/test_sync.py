@@ -21,12 +21,16 @@ from repo_cache.src.models import Repository
 from repo_cache.src.sync import SyncOutcome, sync_org
 
 
-def _stub_listing(monkeypatch, repositories: tuple[Repository, ...]) -> None:
+def _stub_listing(
+    monkeypatch: pytest.MonkeyPatch, repositories: tuple[Repository, ...]
+) -> None:
     monkeypatch.setattr(sync_module, "ensure_authenticated", lambda: None)
     monkeypatch.setattr(sync_module, "list_repositories", lambda *, org: repositories)
 
 
-def test_sync_org_syncs_every_active_repository(monkeypatch, tmp_path: Path) -> None:
+def test_sync_org_syncs_every_active_repository(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     repositories = (Repository("alpha", "main"), Repository("beta", "main"))
     _stub_listing(monkeypatch, repositories)
     synced: list[str] = []
@@ -287,7 +291,9 @@ def test_sync_org_rejects_fewer_than_one_worker(tmp_path: Path) -> None:
         sync_org(org="acme", cache_dir=tmp_path, workers=0)
 
 
-def test_sync_org_reports_progress(monkeypatch, tmp_path: Path) -> None:
+def test_sync_org_reports_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _stub_listing(monkeypatch, (Repository("alpha", "main"),))
     monkeypatch.setattr(sync_module, "sync_default_branch", lambda **_: None)
     messages: list[str] = []

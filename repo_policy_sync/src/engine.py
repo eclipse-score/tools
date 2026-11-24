@@ -30,7 +30,7 @@ from .bazel import (
 )
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .github import GitHubResolver
-from .models import Change, EnsureOperation, Evaluation, Policy
+from .models import AfterApplyCommand, Change, EnsureOperation, Evaluation, Policy
 from .operations import apply as apply_operation
 from .operations import describe_changes, resolve_operation
 from .operations._validation import validate_repository_path
@@ -168,7 +168,11 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
 
 
 def _should_run_after_apply(
-    root: Path, command, changed_paths: set[Path], *, force: bool = False
+    root: Path,
+    command: AfterApplyCommand,
+    changed_paths: set[Path],
+    *,
+    force: bool = False,
 ) -> bool:
     path = root / command.when_file_exists
     validate_repository_path(root, path)

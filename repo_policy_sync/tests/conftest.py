@@ -14,12 +14,13 @@
 from pathlib import Path
 
 import pytest
+from pyfakefs.fake_filesystem import FakeFilesystem
 
 from repo_policy_sync.src.policy import BUNDLED_POLICY_DIRECTORY
 
 
 @pytest.fixture
-def fake_repo(fs) -> Path:
+def fake_repo(fs: FakeFilesystem) -> Path:
     """Return an isolated fake checkout with access to bundled policies."""
 
     fs.add_real_directory(BUNDLED_POLICY_DIRECTORY)
