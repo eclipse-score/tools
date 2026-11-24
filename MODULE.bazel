@@ -58,3 +58,52 @@ pip.parse(
     requirements_lock = "//score_pytest:requirements_py314.txt",
 )
 use_repo(pip, "score_pytest_pip")
+
+# CODEQL
+bazel_dep(name = "platforms", version = "1.1.0")
+
+pip.parse(
+    envsubst = ["PIP_INDEX_URL"],
+    extra_pip_args = ["--index-url=${PIP_INDEX_URL:-https://pypi.org/simple/}"],
+    hub_name = "score_tools_codeql_pip",
+    python_version = DEFAULT_PYTHON_VERSION,
+    requirements_lock = "//codeql/third_party:requirements_lock.txt",
+)
+pip.parse(
+    envsubst = ["PIP_INDEX_URL"],
+    extra_pip_args = ["--index-url=${PIP_INDEX_URL:-https://pypi.org/simple/}"],
+    hub_name = "score_tools_codeql_pip",
+    python_version = ADDITIONAL_PYTHON_VERSION,
+    requirements_lock = "//codeql/third_party:requirements_lock.txt",
+)
+use_repo(pip, "score_tools_codeql_pip")
+
+http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+
+codeql_release_pack = use_repo_rule("//codeql/third_party:codeql_release_pack.bzl", "codeql_release_pack")
+
+# Bundle, coding-standards sources and compiled pack must stay compatible: the
+# coding-standards release notes name the supported CodeQL CLI version.
+CODEQL_CODING_STANDARDS_VERSION = "2.63.0"
+
+http_archive(
+    name = "codeql_bundle",
+    build_file = "//codeql/third_party:codeql_bundle.BUILD",
+    sha256 = "0e3045fecbc325ebca368fc5536b04dc4f9b0cebf83bc412e4c8a78bc0a9fc43",
+    url = "https://github.com/github/codeql-action/releases/download/codeql-bundle-v2.23.9/codeql-bundle-linux64.tar.gz",
+)
+
+http_archive(
+    name = "codeql_coding_standards",
+    build_file = "//codeql/third_party:codeql_coding_standards.BUILD",
+    sha256 = "e45361023f305bd4065526dd430c2619f7f190fda9a324dafbfb070e8c3c146b",
+    strip_prefix = "codeql-coding-standards-{}".format(CODEQL_CODING_STANDARDS_VERSION),
+    url = "https://github.com/github/codeql-coding-standards/archive/refs/tags/v{}.tar.gz".format(CODEQL_CODING_STANDARDS_VERSION),
+)
+
+codeql_release_pack(
+    name = "codeql_misra_cpp_pack",
+    pack_tarball = "misra-cpp-coding-standards.tgz",
+    sha256 = "897f8bfb5a13683ad611fcdd07e4cd2cd96ab3973253c439ea6fc8882b32c8cc",
+    urls = ["https://github.com/github/codeql-coding-standards/releases/download/v{}/coding-standards-codeql-packs.zip".format(CODEQL_CODING_STANDARDS_VERSION)],
+)
