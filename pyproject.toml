@@ -19,6 +19,7 @@ package = false
 dev = [
     "cr-checker",
     "pyfakefs>=6.1.6",
+    "pyrefly==1.5.0",
     "pytest>=9.1.1",
     "repo-cache",
     "repo-policy-sync",
@@ -39,3 +40,14 @@ norecursedirs = [
     "bazel-*",   # Bazel output folders
     "score_pytest/tests/integration_tests",  # needs Bazel, see its MODULE.bazel
 ]
+
+[tool.pyrefly]
+# Enable more type checks incrementally as existing findings are resolved.
+preset = "basic"
+# Bazel provides the Python import paths for these integration tests.
+project-excludes = ["score_pytest/tests/integration_tests/**"]
+
+[tool.pyrefly.errors]
+bad-assignment = "error"
+bad-return = "error"
+not-callable = "error"
