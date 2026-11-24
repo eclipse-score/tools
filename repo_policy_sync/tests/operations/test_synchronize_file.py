@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
+from collections.abc import Callable
 from pathlib import Path
 import stat
 
@@ -18,7 +19,7 @@ import pytest
 
 from repo_policy_sync.src.engine import apply_policy, evaluate_policy
 from repo_policy_sync.src.errors import PolicyError, RepoPolicySyncError
-from repo_policy_sync.src.models import Policy, SynchronizeFile
+from repo_policy_sync.src.models import Change, EnsureOperation, Policy, SynchronizeFile
 from repo_policy_sync.src.operations import apply, describe_changes
 from repo_policy_sync.src.policy import load_policy
 
@@ -200,7 +201,7 @@ def test_synchronize_file_revalidates_source_after_loading_before_changing_targe
     monkeypatch: pytest.MonkeyPatch,
     problem: str,
     message: str,
-    execute,
+    execute: Callable[[Path, EnsureOperation], tuple[Change, ...] | None],
 ) -> None:
     policy = load_policy(source_policy_path)
     target = fake_repo / ".devcontainer/run-tool"

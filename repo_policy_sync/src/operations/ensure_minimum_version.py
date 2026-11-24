@@ -18,6 +18,7 @@ from typing import Any
 
 from ..bazel import BazelVersion, parse_bazel_version
 from ..errors import PolicyError, RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureMinimumVersion, EnsureOperation
 from ._validation import (
     expect_keys,
@@ -51,7 +52,7 @@ class EnsureMinimumVersionOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureMinimumVersion)
         path = root / operation.path
@@ -73,7 +74,7 @@ class EnsureMinimumVersionOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, EnsureMinimumVersion)
         path = root / operation.path

@@ -47,7 +47,7 @@ def origin(tmp_path: Path) -> tuple[Path, Path]:
 
 
 @pytest.fixture
-def local_gh(monkeypatch, origin: tuple[Path, Path]) -> None:
+def local_gh(monkeypatch: pytest.MonkeyPatch, origin: tuple[Path, Path]) -> None:
     """Serve `gh` lookups from the local origin; run every `git` command for real."""
 
     remote, _ = origin

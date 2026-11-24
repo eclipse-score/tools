@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import shutil
 import threading
+from collections.abc import Callable
 from pathlib import Path
+from typing import override
 
 import pytest
 
@@ -30,6 +32,7 @@ from repo_policy_sync.src.github import (
 )
 from repo_policy_sync.src.models import (
     BazelCondition,
+    Change,
     EnsureLine,
     FileExistsCondition,
     RemoveFile,
@@ -46,7 +49,7 @@ class FakeRepositoryClient:
         self.repositories = repositories
         self.cloned: list[str] = []
 
-    def find_open_pull_request(self, **_: object) -> None:
+    def find_open_pull_request(self, **_: object) -> PullRequest | None:
         return None
 
     def switch_to_policy_branch(self, **_: object) -> None:
@@ -79,11 +82,11 @@ def _install_fake_sync(
         *,
         org: str,
         cache_dir: Path,
-        repos=(),
+        repos: tuple[str, ...] = (),
         include_archived: bool = False,
         workers: int = 1,
         max_selected_repositories: int | None = None,
-        progress=None,
+        progress: Callable[[str], None] | None = None,
     ) -> SyncReport:
         report_progress = progress or (lambda _: None)
         active = tuple(
@@ -177,7 +180,7 @@ class RoundTripClient:
         repository: str,
         branch: str,
         policy: Policy,
-        changes: tuple,
+        changes: tuple[Change, ...],
         head_oid: str,
         tool_revision: str,
         **_: object,
@@ -245,6 +248,7 @@ class CompliantRunClient(FakeRepositoryClient):
         )
         self.closed = False
 
+    @override
     def find_open_pull_request(self, **_: object) -> PullRequest:
         return self.pull_request
 
@@ -256,7 +260,7 @@ class CompliantRunClient(FakeRepositoryClient):
 
 
 def test_runner_clones_all_repositories(
-    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()

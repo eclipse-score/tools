@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureLine, EnsureOperation
 from ._validation import (
     expect_keys,
@@ -64,7 +65,7 @@ class EnsureLineOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureLine)
         path = root / operation.path
@@ -96,7 +97,7 @@ class EnsureLineOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, EnsureLine)
         path = root / operation.path

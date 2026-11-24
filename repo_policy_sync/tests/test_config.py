@@ -60,7 +60,7 @@ policy_workers = 3
 
 
 def test_load_config_without_a_default_file_is_empty(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.chdir(fake_repo)
 

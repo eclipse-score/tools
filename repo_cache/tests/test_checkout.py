@@ -20,7 +20,7 @@ from repo_cache.src.errors import CommandError, EmptyRepositoryError
 
 
 def test_cached_checkout_rejects_a_different_origin(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".git").mkdir()
     commands: list[list[str]] = []
@@ -44,7 +44,7 @@ def test_cached_checkout_rejects_a_different_origin(
 
 
 def test_sync_default_branch_clones_a_missing_checkout(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     destination = tmp_path / "checkout"
     commands: list[list[str]] = []
@@ -93,7 +93,7 @@ def test_sync_default_branch_clones_a_missing_checkout(
 
 
 def test_sync_default_branch_reports_an_empty_repository(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     destination = tmp_path / "checkout"
     commands: list[list[str]] = []
@@ -123,7 +123,7 @@ def test_sync_default_branch_reports_an_empty_repository(
 
 
 def test_sync_default_branch_preserves_a_non_empty_repository_failure(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     destination = tmp_path / "checkout"
 
@@ -150,7 +150,7 @@ def test_sync_default_branch_preserves_a_non_empty_repository_failure(
     ],
 )
 def test_sync_default_branch_handles_a_cached_fetch_failure(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
     refs_count: str,
     expected_exception: type[Exception],
@@ -185,7 +185,7 @@ def test_sync_default_branch_handles_a_cached_fetch_failure(
 
 
 def test_restore_synced_default_branch_never_fetches(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
 

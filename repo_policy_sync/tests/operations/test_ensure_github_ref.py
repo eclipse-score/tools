@@ -22,6 +22,7 @@ from repo_policy_sync.src.github import GitHubCli
 from repo_policy_sync.src.models import (
     EnsureExactGitHubRef,
     EnsureMinimalGitHubRef,
+    EnsureOperation,
     Policy,
 )
 from repo_policy_sync.src.policy import load_policy
@@ -37,11 +38,13 @@ MINIMUM_SHA = "b" * 40
 NEW_SHA = "c" * 40
 
 
-def _policy(operations) -> Policy:
+def _policy(operations: tuple[EnsureOperation, ...]) -> Policy:
     return Policy("example", "Update GitHub Actions", None, None, operations)
 
 
-def _mock_gh_api(monkeypatch, *, statuses: dict[str, str] | None = None):
+def _mock_gh_api(
+    monkeypatch: pytest.MonkeyPatch, *, statuses: dict[str, str] | None = None
+):
     calls: list[list[str]] = []
     statuses = statuses or {}
 
@@ -120,12 +123,12 @@ def test_ensure_exact_updates_tags_branches_and_shas(fake_repo: Path, ref: str) 
 
 
 def test_ensure_exact_does_not_call_github_for_a_matching_action(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflow = fake_repo / ".github/workflows/ci.yml"
     workflow.parent.mkdir(parents=True)
     workflow.write_text(f"jobs:\n  build:\n    uses: {CHECKOUT}@v4\n")
-    calls = []
+    calls: list[list[str]] = []
     monkeypatch.setattr(
         GitHubCli,
         "_run",
@@ -241,7 +244,7 @@ def test_action_ref_ignores_uses_text_inside_run_scalar(fake_repo: Path) -> None
 )
 def test_ensure_minimal_updates_only_older_semver_tags(
     fake_repo: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
     current: str,
     expected: str,
 ) -> None:
@@ -262,7 +265,7 @@ def test_ensure_minimal_updates_only_older_semver_tags(
 
 
 def test_ensure_minimal_is_idempotent_after_updating_a_tag(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflow = fake_repo / ".github/workflows/ci.yml"
     workflow.parent.mkdir(parents=True)
@@ -280,7 +283,7 @@ def test_ensure_minimal_is_idempotent_after_updating_a_tag(
     (("behind", True), ("identical", False), ("ahead", False)),
 )
 def test_ensure_minimal_compares_full_sha_pins(
-    fake_repo: Path, monkeypatch, status: str, changed: bool
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch, status: str, changed: bool
 ) -> None:
     workflow = fake_repo / ".github/workflows/ci.yml"
     workflow.parent.mkdir(parents=True)
@@ -297,7 +300,7 @@ def test_ensure_minimal_compares_full_sha_pins(
 
 
 def test_ensure_minimal_keeps_tagged_newer_sha_without_comparing_histories(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A newer tagged release remains valid when release histories diverge."""
 
@@ -315,7 +318,7 @@ def test_ensure_minimal_keeps_tagged_newer_sha_without_comparing_histories(
 
 
 def test_ensure_minimal_rejects_diverged_sha_histories(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflow = fake_repo / ".github/workflows/ci.yml"
     workflow.parent.mkdir(parents=True)
@@ -330,7 +333,7 @@ def test_ensure_minimal_rejects_diverged_sha_histories(
 
 
 def test_ensure_minimal_updates_nested_action_and_reusable_workflow_sha_pins(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflows = fake_repo / ".github/workflows"
     nested = workflows / "nested"
@@ -359,7 +362,7 @@ def test_ensure_minimal_updates_nested_action_and_reusable_workflow_sha_pins(
 
 
 def test_one_policy_can_update_multiple_actions_and_workflow_files(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflows = fake_repo / ".github/workflows"
     nested = workflows / "nested"
@@ -392,7 +395,7 @@ def test_one_policy_can_update_multiple_actions_and_workflow_files(
 
 
 def test_minimal_leaves_branches_and_missing_matches_without_remote_calls(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflow = fake_repo / ".github/workflows/ci.yml"
     workflow.parent.mkdir(parents=True)
@@ -400,7 +403,7 @@ def test_minimal_leaves_branches_and_missing_matches_without_remote_calls(
         "# uses: actions/setup-python@v1\n"
         f"jobs:\n  build:\n    uses: {SETUP_PYTHON}@main\n"
     )
-    calls = []
+    calls: list[list[str]] = []
     monkeypatch.setattr(
         GitHubCli,
         "_run",

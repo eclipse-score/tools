@@ -69,7 +69,9 @@ def _valid_template() -> str:
         ),
     ],
 )
-def test_recreate_requires_an_explicit_single_target(argv, message, capsys) -> None:
+def test_recreate_requires_an_explicit_single_target(
+    argv: tuple[str, ...], message: str, capsys: pytest.CaptureFixture[str]
+) -> None:
     with pytest.raises(SystemExit) as exit_code:
         cli.main(argv)
 
@@ -77,7 +79,9 @@ def test_recreate_requires_an_explicit_single_target(argv, message, capsys) -> N
     assert message in capsys.readouterr().err
 
 
-def test_default_output_is_a_table(monkeypatch, capsys) -> None:
+def test_default_output_is_a_table(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     report = RunReport(
         summary=RunSummary(
             repositories=1,
@@ -119,12 +123,12 @@ def test_default_output_is_a_table(monkeypatch, capsys) -> None:
 
 
 def test_cli_template_override_is_loaded_and_passed_to_runner(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     template = _valid_template()
     template_path = tmp_path / "custom-pull-request.md"
     template_path.write_text(template, encoding="utf-8")
-    observed = {}
+    observed: dict[str, object] = {}
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli, "load_policies", lambda _: ())
     monkeypatch.setattr(
@@ -151,10 +155,10 @@ def test_cli_template_override_is_loaded_and_passed_to_runner(
 
 
 def test_all_reports_can_be_written_from_one_run(
-    monkeypatch, tmp_path: Path, capsys
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     report = _empty_report()
-    observed = {}
+    observed: dict[str, object] = {}
     monkeypatch.setattr(cli, "load_policies", lambda _: ())
     monkeypatch.setattr(
         cli,
@@ -189,10 +193,10 @@ def test_all_reports_can_be_written_from_one_run(
 
 
 def test_json_report_requests_pull_request_status(
-    monkeypatch, tmp_path: Path, capsys
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     report = _empty_report()
-    observed = {}
+    observed: dict[str, object] = {}
     monkeypatch.setattr(cli, "load_policies", lambda _: ())
     monkeypatch.setattr(
         cli,
@@ -222,9 +226,9 @@ def test_json_report_requests_pull_request_status(
 
 
 def test_plan_requests_pull_request_status_for_terminal_report(
-    monkeypatch, capsys
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    observed = {}
+    observed: dict[str, object] = {}
     monkeypatch.setattr(cli, "load_policies", lambda _: ())
     monkeypatch.setattr(
         cli,
@@ -239,12 +243,12 @@ def test_plan_requests_pull_request_status_for_terminal_report(
 
 
 def test_recreate_selects_only_the_requested_bundled_policy(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
     report = _empty_report()
-    loaded_paths = []
-    observed = {}
+    loaded_paths: list[Path] = []
+    observed: dict[str, object] = {}
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -278,7 +282,7 @@ def test_recreate_selects_only_the_requested_bundled_policy(
 
 
 def test_recreate_does_not_load_unrelated_local_policies(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
     policy_directory = tmp_path / "policies"
@@ -289,7 +293,7 @@ def test_recreate_does_not_load_unrelated_local_policies(
     unrelated.parent.mkdir()
     unrelated.write_text("this is invalid policy YAML: [\n")
     report = _empty_report()
-    loaded_paths = []
+    loaded_paths: list[Path] = []
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -318,11 +322,11 @@ def test_recreate_does_not_load_unrelated_local_policies(
 
 
 def test_bundled_policies_do_not_require_a_local_policy_directory(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
     report = _empty_report()
-    loaded_paths = []
+    loaded_paths: list[Path] = []
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -368,13 +372,15 @@ def test_bundled_policies_do_not_require_a_local_policy_directory(
     assert all(path.parent.name != "minimum-bazel-version" for path in loaded_paths)
 
 
-def test_local_policies_can_be_excluded_by_name(monkeypatch, tmp_path: Path) -> None:
+def test_local_policies_can_be_excluded_by_name(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.chdir(tmp_path)
     local_policy = tmp_path / "policies" / "local-policy" / "policy.yml"
     local_policy.parent.mkdir(parents=True)
     local_policy.write_text("not loaded here\n")
     report = _empty_report()
-    loaded_paths = []
+    loaded_paths: list[Path] = []
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -401,10 +407,10 @@ def test_local_policies_can_be_excluded_by_name(monkeypatch, tmp_path: Path) -> 
 
 
 def test_bundled_policy_selected_from_bundled_directory_is_not_loaded_twice(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     report = _empty_report()
-    loaded_paths = []
+    loaded_paths: list[Path] = []
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -434,11 +440,11 @@ def test_bundled_policy_selected_from_bundled_directory_is_not_loaded_twice(
 
 
 def test_policy_selection_loads_only_the_selected_bundled_policy(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.chdir(tmp_path)
     report = _empty_report()
-    loaded_paths = []
+    loaded_paths: list[Path] = []
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -464,7 +470,7 @@ def test_policy_selection_loads_only_the_selected_bundled_policy(
 
 
 def test_policy_selection_loads_only_the_selected_local_policy(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     policy_directory = tmp_path / "policies"
     selected = policy_directory / "selected" / "policy.yml"
@@ -481,7 +487,7 @@ ensure:
     unrelated.parent.mkdir()
     unrelated.write_text("this policy is not selected\n", encoding="utf-8")
     report = _empty_report()
-    loaded_paths = []
+    loaded_paths: list[Path] = []
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -507,7 +513,7 @@ ensure:
 
 
 def test_config_values_are_overridden_by_explicit_cli_values(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -525,8 +531,8 @@ policy_workers = 3
 """,
         encoding="utf-8",
     )
-    loaded_paths = []
-    observed = {}
+    loaded_paths: list[Path] = []
+    observed: dict[str, object] = {}
     monkeypatch.setattr(
         cli, "load_policies", lambda paths: loaded_paths.extend(paths) or ()
     )
@@ -573,7 +579,7 @@ policy_workers = 3
 
 
 def test_repository_patterns_are_forwarded_from_cli_and_toml(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     config_path = tmp_path / "config.toml"
     config_path.write_text(
@@ -583,7 +589,7 @@ repos = ["score*"]
 """,
         encoding="utf-8",
     )
-    observed = {}
+    observed: dict[str, object] = {}
     monkeypatch.setattr(cli, "load_policies", lambda _: ())
     monkeypatch.setattr(
         cli,
@@ -672,7 +678,7 @@ def test_policies_can_be_excluded_by_name() -> None:
     assert args.exclude_policy == ["minimum-bazel-version"]
 
 
-def test_help_groups_options_by_frequency(capsys) -> None:
+def test_help_groups_options_by_frequency(capsys: pytest.CaptureFixture[str]) -> None:
     with pytest.raises(SystemExit) as exit_code:
         cli.create_parser().parse_args(("--help",))
 
