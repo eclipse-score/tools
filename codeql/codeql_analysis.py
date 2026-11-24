@@ -114,7 +114,8 @@ def production_query(targets: list[str]) -> str:
     positive = " + ".join(t for t in targets if not t.startswith("-"))
     negative = "".join(f" - {t[1:]}" for t in targets if t.startswith("-"))
     selected = f"kind(rule, ({positive}){negative})"
-    return f"{selected} except attr(testonly, 1, {selected})"
+    # test_suite targets pull in their tests when built.
+    return f"{selected} except attr(testonly, 1, {selected}) except kind(test_suite, {selected})"
 
 
 def production_targets(bazel: str, workspace: Path, targets: list[str]) -> list[str]:
@@ -177,7 +178,16 @@ def create_database(args: argparse.Namespace, workspace: Path, database: Path) -
         database,
         seed,
     )
-    subprocess.run(command, env=env, cwd=workspace, check=True)
+    if args.keep_going:
+        command.insert(2, "--keep_going")
+    build = subprocess.run(command, env=env, cwd=workspace)
+    if build.returncode:
+        if not args.keep_going:
+            raise subprocess.CalledProcessError(build.returncode, command)
+        print(
+            f"WARNING: traced build exited with {build.returncode}; analysing what was built",
+            file=sys.stderr,
+        )
 
     subprocess.run(
         [args.codeql, "database", "finalize", "-j=0", "--", database], check=True
@@ -377,6 +387,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="append",
         default=[],
         help="Bazel --config of the traced build",
+    )
+    parser.add_argument(
+        "--keep-going",
+        action="store_true",
+        help="Build with --keep_going and analyse what was built even if targets fail",
     )
     parser.add_argument(
         "--exclude-testonly",
