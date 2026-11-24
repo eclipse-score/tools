@@ -42,12 +42,10 @@ norecursedirs = [
 ]
 
 [tool.pyrefly]
-# Enable more type checks incrementally as existing findings are resolved.
-preset = "basic"
+preset = "strict"
+# FIXME: Prune the baseline as type errors are fixed and remove it when empty.
+baseline = "pyrefly-baseline-FIXME.json"
+baseline-matching-mode = "column-ordered"
+baseline-format = "minimal"
 # Bazel provides the Python import paths for these integration tests.
 project-excludes = ["score_pytest/tests/integration_tests/**"]
-
-[tool.pyrefly.errors]
-bad-assignment = "error"
-bad-return = "error"
-not-callable = "error"

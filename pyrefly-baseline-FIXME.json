@@ -1,0 +1,2480 @@
+{
+  "min_severity": "error",
+  "errors": [
+    {
+      "column": 57,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 30,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 58,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-type-argument"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-type-argument"
+    },
+    {
+      "column": 39,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 47,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 47,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 60,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 53,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 57,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 59,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 64,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 52,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 49,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 64,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 43,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 46,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 65,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 78,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 65,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 17,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 27,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 33,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 42,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 59,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 69,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 59,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 63,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 66,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 67,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 54,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 14,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 40,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 66,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 71,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 47,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 57,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 54,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 64,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 52,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 52,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 68,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 47,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 57,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 53,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 63,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 67,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 47,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 57,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 37,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 14,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 14,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 38,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 39,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 50,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 50,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 39,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 57,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 65,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 44,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 44,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 52,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 63,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 15,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 44,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "missing-override-decorator"
+    },
+    {
+      "column": 22,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 23,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 43,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 27,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 33,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 25,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 31,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 46,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 41,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 66,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 25,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 23,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 29,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 39,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 49,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 29,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 65,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 24,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 35,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 39,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 27,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 34,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 32,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 47,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 26,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 32,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 42,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 50,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 11,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 21,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 31,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 42,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 23,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 34,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 44,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 25,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 41,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 51,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 21,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 10,
+      "path": "cr_checker/tool/cr_checker.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "repo_cache/src/sync.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_cache.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_checkout.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_checkout.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_checkout.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_checkout.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_checkout.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_checkout.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 42,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 18,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 34,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 58,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 44,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 58,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 51,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 34,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 58,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 18,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "repo_cache/tests/test_command.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 49,
+      "path": "repo_cache/tests/test_command.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_command.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 43,
+      "path": "repo_cache/tests/test_command.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 51,
+      "path": "repo_cache/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 56,
+      "path": "repo_cache/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 69,
+      "path": "repo_cache/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 14,
+      "path": "repo_cache/tests/test_history.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 69,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 49,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 30,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 70,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 70,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 36,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 70,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/src/cli.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 17,
+      "path": "repo_policy_sync/src/engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 31,
+      "path": "repo_policy_sync/src/operations/__init__.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_bazel_dependency.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_bazel_dependency.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_bazel_dependency_dev_dependency.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_bazel_dependency_dev_dependency.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_line.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_line.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_minimum_version.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/ensure_minimum_version.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/remove_file.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/remove_file.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/replace_regex.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/replace_regex.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/sync_managed_block.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/sync_managed_block.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/synchronize_file.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/src/operations/synchronize_file.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/src/reporting.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/src/reporting.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 27,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 26,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 43,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 39,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 15,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 36,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 61,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 36,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 35,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 39,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 35,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 27,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 23,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 26,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 25,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 60,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 14,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 14,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 8,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 63,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 27,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 31,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 23,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 26,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 15,
+      "path": "repo_policy_sync/tests/conftest.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 29,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 29,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/operations/test_synchronize_file.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 60,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 69,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 36,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 49,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 49,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-empty-container"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 43,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/test_config.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 25,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 37,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 53,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 59,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 25,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 37,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 53,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 59,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 67,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 19,
+      "path": "repo_policy_sync/tests/test_engine.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 21,
+      "path": "repo_policy_sync/tests/test_environment.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 28,
+      "path": "repo_policy_sync/tests/test_environment.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 37,
+      "path": "repo_policy_sync/tests/test_environment.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 42,
+      "path": "repo_policy_sync/tests/test_environment.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 51,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 45,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 49,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 43,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 64,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 63,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 49,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 58,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 24,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 47,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 24,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 53,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 17,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 37,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 59,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 48,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 29,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 58,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 66,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 5,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 65,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 12,
+      "path": "repo_policy_sync/tests/test_policy_and_metrics.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 60,
+      "path": "repo_policy_sync/tests/test_reporting.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 75,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-type-argument"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-override"
+    },
+    {
+      "column": 9,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "missing-override-decorator"
+    },
+    {
+      "column": 21,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-parameter"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 12,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 12,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 45,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 19,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 25,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 42,
+      "path": "score_pytest/tests/test_rules_are_working_correctly.py",
+      "name": "implicit-any-parameter"
+    }
+  ]
+}
