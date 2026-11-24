@@ -180,6 +180,9 @@ def create_database(args: argparse.Namespace, workspace: Path, database: Path) -
     )
     if args.keep_going:
         command.insert(2, "--keep_going")
+    if args.exclude_testonly:
+        # Query results are explicit labels; wildcards would skip incompatible targets silently.
+        command.insert(2, "--skip_incompatible_explicit_targets")
     build = subprocess.run(command, env=env, cwd=workspace)
     if build.returncode:
         if not args.keep_going:
