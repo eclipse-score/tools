@@ -2,29 +2,14 @@
   "min_severity": "error",
   "errors": [
     {
-      "column": 57,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 30,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
-      "column": 58,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-type-argument"
-    },
-    {
       "column": 28,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
-    },
-    {
-      "column": 56,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-type-argument"
     },
     {
       "column": 39,
@@ -43,71 +28,6 @@
     },
     {
       "column": 60,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 53,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 57,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 55,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 59,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 48,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 64,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 56,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 52,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 48,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 49,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 64,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 43,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 55,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
     },
@@ -167,56 +87,6 @@
       "name": "implicit-any-parameter"
     },
     {
-      "column": 59,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 69,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 45,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 59,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 5,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 63,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 66,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 67,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 54,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 48,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 14,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
@@ -242,32 +112,12 @@
       "name": "implicit-any-lambda"
     },
     {
-      "column": 47,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 57,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 54,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
       "column": 64,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 52,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 52,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
     },
@@ -297,26 +147,6 @@
       "name": "implicit-any-parameter"
     },
     {
-      "column": 53,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 63,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 67,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 45,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 47,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
@@ -327,84 +157,14 @@
       "name": "implicit-any-parameter"
     },
     {
-      "column": 5,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 15,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 28,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 5,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 15,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 28,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 37,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 14,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "bad-argument-type"
     },
     {
-      "column": 5,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 15,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 28,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 14,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "bad-argument-type"
-    },
-    {
-      "column": 5,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 15,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 28,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 38,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
     },
     {
       "column": 5,
@@ -428,11 +188,6 @@
     },
     {
       "column": 48,
-      "path": "cr_checker/tests/test_cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 26,
       "path": "cr_checker/tests/test_cr_checker.py",
       "name": "implicit-any-parameter"
     },
@@ -612,72 +367,12 @@
       "name": "missing-override-decorator"
     },
     {
-      "column": 22,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 26,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-empty-container"
-    },
-    {
-      "column": 23,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 43,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 27,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 33,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 25,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
-      "column": 31,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 46,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 56,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 35,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 41,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 56,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 66,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
@@ -687,122 +382,17 @@
       "name": "implicit-any-parameter"
     },
     {
-      "column": 25,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 35,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 45,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 55,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 23,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 29,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 39,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 49,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 29,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
       "column": 35,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 45,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 55,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 65,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 24,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 35,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 39,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 27,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 34,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 32,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 47,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
       "column": 26,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 32,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 42,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 50,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
@@ -822,92 +412,17 @@
       "name": "implicit-any-parameter"
     },
     {
-      "column": 31,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 42,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 22,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 28,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 23,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 34,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 44,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 19,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
-      "column": 25,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 41,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 51,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
       "column": 5,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },
     {
       "column": 5,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 5,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 5,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 5,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 21,
-      "path": "cr_checker/tool/cr_checker.py",
-      "name": "implicit-any-parameter"
-    },
-    {
-      "column": 10,
       "path": "cr_checker/tool/cr_checker.py",
       "name": "implicit-any-parameter"
     },

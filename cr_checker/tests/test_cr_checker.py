@@ -46,7 +46,7 @@ def load_template(extension: str) -> str:
 
 
 # test that offset matches the length of the shebang line including trailing newlines
-def test_detect_shebang_offset_counts_trailing_newlines(tmp_path):
+def test_detect_shebang_offset_counts_trailing_newlines(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     script = tmp_path / "script.py"
     script.write_text(
@@ -77,7 +77,7 @@ def test_detect_shebang_offset_counts_trailing_newlines(tmp_path):
         "rst",
     ]
 )
-def prepare_test_with_header(request, tmp_path: Path) -> tuple:
+def prepare_test_with_header(request, tmp_path: Path) -> tuple[Path, str, str]:
     extension = request.param
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
@@ -108,7 +108,7 @@ def prepare_test_with_header(request, tmp_path: Path) -> tuple:
         "rst",
     ]
 )
-def prepare_test_no_header(request, tmp_path: Path) -> tuple:
+def prepare_test_no_header(request, tmp_path: Path) -> tuple[Path, str, str, Path]:
     extension = request.param
     test_file = tmp_path / ("file." + extension)
     header_template = load_template(extension)
@@ -184,7 +184,7 @@ def test_process_files_skips_exclusion_with_missing_header(prepare_test_no_heade
 
 
 # test that process_files function validates a license header after the shebang line
-def test_process_files_accepts_header_after_shebang(tmp_path):
+def test_process_files_accepts_header_after_shebang(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     script = tmp_path / "script.py"
     header_template = load_template("py")
@@ -207,7 +207,7 @@ def test_process_files_accepts_header_after_shebang(tmp_path):
 
 
 # test that process_files function fixes a missing license header after the shebang line
-def test_process_files_fix_inserts_header_after_shebang(tmp_path):
+def test_process_files_fix_inserts_header_after_shebang(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     script = tmp_path / "script.py"
     script.write_text(
@@ -234,7 +234,7 @@ def test_process_files_fix_inserts_header_after_shebang(tmp_path):
 
 
 # test that process_files function validates a license header without the shebang line
-def test_process_files_accepts_header_without_shebang(tmp_path):
+def test_process_files_accepts_header_without_shebang(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     script = tmp_path / "script.py"
     header_template = load_template("py")
@@ -254,7 +254,7 @@ def test_process_files_accepts_header_without_shebang(tmp_path):
 
 
 # test that process_files function fixes a missing license header without the shebang
-def test_process_files_fix_inserts_header_without_shebang(tmp_path):
+def test_process_files_fix_inserts_header_without_shebang(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     script = tmp_path / "script.py"
     script.write_text("print('hi')\n", encoding="utf-8")
@@ -278,7 +278,7 @@ def test_process_files_fix_inserts_header_without_shebang(tmp_path):
 
 
 # test that border lines with different fill characters are accepted (flexible matching)
-def test_process_files_accepts_flexible_border(tmp_path):
+def test_process_files_accepts_flexible_border(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.cpp"
     current_year = datetime.now().year
@@ -313,7 +313,7 @@ def test_process_files_accepts_flexible_border(tmp_path):
 
 
 # test that a blank line after the header does not cause a check failure
-def test_process_files_accepts_header_with_trailing_blank_line(tmp_path):
+def test_process_files_accepts_header_with_trailing_blank_line(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
@@ -333,7 +333,7 @@ def test_process_files_accepts_header_with_trailing_blank_line(tmp_path):
 
 
 # test that fix_copyright inserts a blank line after the header
-def test_process_files_fix_inserts_trailing_blank_line(tmp_path):
+def test_process_files_fix_inserts_trailing_blank_line(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     test_file.write_text("some content\n", encoding="utf-8")
@@ -353,7 +353,7 @@ def test_process_files_fix_inserts_trailing_blank_line(tmp_path):
 
 
 # test that has_duplicate_copyright detects a header that appears twice
-def test_has_duplicate_copyright_detects_duplicate(tmp_path):
+def test_has_duplicate_copyright_detects_duplicate(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
@@ -369,7 +369,7 @@ def test_has_duplicate_copyright_detects_duplicate(tmp_path):
 
 
 # test that has_duplicate_copyright returns False for a single header
-def test_has_duplicate_copyright_single_header(tmp_path):
+def test_has_duplicate_copyright_single_header(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
@@ -385,7 +385,7 @@ def test_has_duplicate_copyright_single_header(tmp_path):
 
 
 # test that process_files counts duplicate headers separately from missing headers
-def test_process_files_detects_duplicate_header(tmp_path):
+def test_process_files_detects_duplicate_header(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
@@ -406,7 +406,7 @@ def test_process_files_detects_duplicate_header(tmp_path):
 
 
 # test that has_duplicate_copyright detects two headers with different year ranges
-def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
+def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header_template = load_template("py")
@@ -423,7 +423,7 @@ def test_has_duplicate_copyright_detects_different_year_ranges(tmp_path):
 
 # test that an exclusion.txt file sitting in the root directory is respected:
 # the listed file is neither flagged nor altered
-def test_exclusion_file_respected_at_root(tmp_path):
+def test_exclusion_file_respected_at_root(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     header_template = load_template("py")
 
@@ -454,7 +454,7 @@ def test_exclusion_file_respected_at_root(tmp_path):
 
 # test that an exclusion.txt file sitting in a deeply nested directory is respected:
 # the listed file is neither flagged nor altered
-def test_exclusion_file_respected_in_nested_directory(tmp_path):
+def test_exclusion_file_respected_in_nested_directory(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     header_template = load_template("py")
 
@@ -636,7 +636,7 @@ def find_header(tmp_path, name, content, template_ext=None):
 # wrong wording ("Apache License 2.0") in every template style is found in full,
 # including the closing border line, and the code after it is not included
 @pytest.mark.parametrize("ext", ["py", "cpp", "rs", "md", "rst", "puml", "BUILD"])
-def test_find_existing_header_finds_full_malformed_header(tmp_path, ext):
+def test_find_existing_header_finds_full_malformed_header(tmp_path: Path, ext: str):
     header = (
         load_template(ext)
         .format(year=2023)
@@ -647,7 +647,7 @@ def test_find_existing_header_finds_full_malformed_header(tmp_path, ext):
     assert result == (len(header), header)
 
 
-def test_find_existing_header_skips_shebang(tmp_path):
+def test_find_existing_header_skips_shebang(tmp_path: Path):
     header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
     result = find_header(
         tmp_path, "s.py", "#!/usr/bin/env python3\n" + header + "x = 1\n"
@@ -655,42 +655,42 @@ def test_find_existing_header_skips_shebang(tmp_path):
     assert result == (len(header), header)
 
 
-def test_find_existing_header_short_header_without_border(tmp_path):
+def test_find_existing_header_short_header_without_border(tmp_path: Path):
     header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
     assert find_header(tmp_path, "a.py", header + "x = 1\n") == (len(header), header)
 
 
 def test_find_existing_header_code_line_with_fill_chars_after_spdx_is_not_eaten(
-    tmp_path,
+    tmp_path: Path,
 ):
     header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
     result = find_header(tmp_path, "a.py", header + "print('=====')\n")
     assert result == (len(header), header)
 
 
-def test_find_existing_header_code_before_header_returns_none(tmp_path):
+def test_find_existing_header_code_before_header_returns_none(tmp_path: Path):
     content = "x = 1\n# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT\n"
     assert find_header(tmp_path, "a.py", content) is None
 
 
-def test_find_existing_header_spdx_beyond_max_lines_returns_none(tmp_path):
+def test_find_existing_header_spdx_beyond_max_lines_returns_none(tmp_path: Path):
     content = (
         "# Copyright (c) 2023 X\n" + "#\n" * 30 + "# SPDX-License-Identifier: MIT\n"
     )
     assert find_header(tmp_path, "a.py", content) is None
 
 
-def test_find_existing_header_spdx_without_copyright_returns_none(tmp_path):
+def test_find_existing_header_spdx_without_copyright_returns_none(tmp_path: Path):
     assert (
         find_header(tmp_path, "a.py", "# SPDX-License-Identifier: MIT\nx = 1\n") is None
     )
 
 
-def test_find_existing_header_no_header_returns_none(tmp_path):
+def test_find_existing_header_no_header_returns_none(tmp_path: Path):
     assert find_header(tmp_path, "a.py", "x = 1\n") is None
 
 
-def test_find_existing_header_header_only_file(tmp_path):
+def test_find_existing_header_header_only_file(tmp_path: Path):
     header = "# Copyright (c) 2023 X\n# SPDX-License-Identifier: MIT"
     assert find_header(tmp_path, "a.py", header) == (len(header), header)
 
@@ -715,7 +715,7 @@ def run_main(cr_checker, monkeypatch, *args):
 
 # a header with different wording is counted as wrong, not as missing or ok
 @pytest.mark.parametrize("extension", ["py", "cpp", "rs", "rst", "BUILD"])
-def test_process_files_counts_wrong_copyright(tmp_path, extension):
+def test_process_files_counts_wrong_copyright(tmp_path: Path, extension: str):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / ("BUILD" if extension == "BUILD" else f"file.{extension}")
     content = wrong_wording_header(extension) + "some content\n"
@@ -755,7 +755,7 @@ def test_process_files_logs_wrong_copyright_as_error(tmp_path, caplog):
     assert str(test_file) in errors[0].getMessage()
 
 
-def test_process_files_correct_header_is_not_wrong(tmp_path):
+def test_process_files_correct_header_is_not_wrong(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     test_file.write_text(
@@ -775,7 +775,7 @@ def test_process_files_correct_header_is_not_wrong(tmp_path):
 
 # a header with a different license (e.g. third-party MIT code) is never
 # replaced, also not with --fix
-def test_process_files_fix_keeps_different_license(tmp_path):
+def test_process_files_fix_keeps_different_license(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     content = MIT_HEADER + "x = 1\n"
@@ -819,7 +819,7 @@ def test_main_returns_0_for_correct_copyright(tmp_path, monkeypatch):
 # --fix replaces a wrong-format header with the same license by the template,
 # keeps the old year and leaves the rest of the file untouched
 @pytest.mark.parametrize("ext", ["py", "cpp", "rs", "md", "rst", "puml", "BUILD"])
-def test_process_files_fix_replaces_wrong_copyright(tmp_path, ext):
+def test_process_files_fix_replaces_wrong_copyright(tmp_path: Path, ext: str):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / ("BUILD" if ext == "BUILD" else f"file.{ext}")
     rest = "\nsome content\n"
@@ -840,7 +840,7 @@ def test_process_files_fix_replaces_wrong_copyright(tmp_path, ext):
     )
 
 
-def test_process_files_fix_replaces_wrong_copyright_after_shebang(tmp_path):
+def test_process_files_fix_replaces_wrong_copyright_after_shebang(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "script.py"
     shebang = "#!/usr/bin/env python3\n"
@@ -861,7 +861,7 @@ def test_process_files_fix_replaces_wrong_copyright_after_shebang(tmp_path):
     )
 
 
-def test_process_files_fix_keeps_year_range(tmp_path):
+def test_process_files_fix_keeps_year_range(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header = wrong_wording_header("py").replace("2023", "2021-2023")
@@ -893,7 +893,7 @@ def test_main_fix_wrong_copyright_then_passes(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("fix_args", [[], ["--fix"]], ids=["check", "fix"])
 def test_additional_templates_are_accepted_but_the_first_is_used_for_new_headers(
-    tmp_path, monkeypatch, fix_args
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fix_args: list[str]
 ):
     """A repository can keep older headers while choosing one format for new files."""
     cr_checker = load_cr_checker_module()
@@ -948,7 +948,7 @@ def test_additional_templates_are_accepted_but_the_first_is_used_for_new_headers
 @pytest.mark.parametrize("variant", [0, 1], ids=["preferred", "legacy"])
 @pytest.mark.parametrize("fix_args", [[], ["--fix"]], ids=["check", "fix"])
 def test_existing_rst_headers_pass_without_migration(
-    tmp_path, monkeypatch, variant, fix_args
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: int, fix_args: list[str]
 ):
     """RST with or without hash prefixes passes without changing its text or years."""
     cr_checker = load_cr_checker_module()
@@ -977,7 +977,7 @@ def test_existing_rst_headers_pass_without_migration(
     "existing_header", [None, 0, 1], ids=["missing", "wrong-preferred", "wrong-legacy"]
 )
 def test_new_and_repaired_rst_headers_use_the_preferred_format(
-    tmp_path, monkeypatch, existing_header
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, existing_header: int | None
 ):
     """--fix writes RST without hash prefixes and preserves the document after the header."""
     cr_checker = load_cr_checker_module()
@@ -1076,7 +1076,7 @@ def test_new_and_repaired_rst_headers_use_the_preferred_format(
     ],
 )
 def test_fix_preserves_content_outside_the_copyright_comment(
-    tmp_path, monkeypatch, filename, original
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, filename: str, original: str
 ):
     """A nearby SPDX line must never cause executable code or document text to be deleted."""
     cr_checker = load_cr_checker_module()
@@ -1115,7 +1115,7 @@ def test_complete_short_comments_can_still_be_repaired(
 
 
 @pytest.fixture(params=["md", "puml"])
-def block_comment_header(request):
+def block_comment_header(request: pytest.FixtureRequest):
     """Documentation headers whose closing delimiter is separate from the SPDX line."""
     extension = request.param
     if extension == "md":
