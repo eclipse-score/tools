@@ -79,7 +79,7 @@ def _install_fake_sync(
         *,
         org: str,
         cache_dir: Path,
-        repos=(),
+        repos: tuple[str, ...] = (),
         include_archived: bool = False,
         workers: int = 1,
         max_selected_repositories: int | None = None,
@@ -256,7 +256,7 @@ class CompliantRunClient(FakeRepositoryClient):
 
 
 def test_runner_clones_all_repositories(
-    tmp_path: Path, capsys, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()

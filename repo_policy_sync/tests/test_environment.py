@@ -25,7 +25,7 @@ from repo_policy_sync.src.github import GitHubCli
 
 @pytest.mark.parametrize("entry_point", ["follow_up", "pre_commit"])
 def test_repository_commands_inherit_authentication_and_tool_configuration(
-    tmp_path: Path, monkeypatch, entry_point: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, entry_point: str
 ) -> None:
     """Real child processes retain Git helpers, URL rewrites, tokens, and cache settings."""
 
@@ -103,7 +103,7 @@ assert 'password=dummy-token' in credentials.stdout
     else:
         # Replace only the pre-commit executable with a real child process;
         # the runner still builds the environment passed to repository hooks.
-        def run_pre_commit(args, *, cwd, env):
+        def run_pre_commit(args: list[str], *, cwd: Path, env: dict[str, str]):
             assert args == ["pre-commit", "run", "--all-files"]
             subprocess.run(command, cwd=cwd, env=env, check=True, capture_output=True)
             return ""

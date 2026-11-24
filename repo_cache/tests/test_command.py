@@ -19,7 +19,7 @@ from repo_cache.src.command import run_command
 from repo_cache.src.errors import CommandError, redact_sensitive_text
 
 
-def test_gh_command_failures_are_actionable(monkeypatch) -> None:
+def test_gh_command_failures_are_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
     def run(*_: object, **__: object) -> None:
         raise subprocess.CalledProcessError(
             1, ["gh", "auth", "status"], stderr="authentication failed\n"
@@ -51,7 +51,7 @@ def test_gh_command_failures_redact_credentials(monkeypatch) -> None:
 
 
 def test_redact_sensitive_text_covers_environment_and_url_credentials(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("GH_TOKEN", "environment-secret-value")
 
@@ -67,7 +67,7 @@ def test_redact_sensitive_text_covers_environment_and_url_credentials(
     assert redacted.count("[REDACTED]") == 3
 
 
-def test_missing_gh_command_is_actionable(monkeypatch) -> None:
+def test_missing_gh_command_is_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
     def run(*_: object, **__: object) -> None:
         raise FileNotFoundError
 

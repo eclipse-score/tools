@@ -97,7 +97,7 @@ def test_commit_stages_deleted_policy_files(monkeypatch, tmp_path: Path) -> None
 
 
 def test_commit_does_not_stage_policy_paths_without_changes(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
 
@@ -119,7 +119,7 @@ def test_commit_does_not_stage_policy_paths_without_changes(
 
 
 def test_has_changes_detects_untracked_policy_files(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
 
@@ -148,7 +148,7 @@ def test_has_changes_detects_untracked_policy_files(
 
 
 def test_commit_runs_pre_commit_after_staging_when_repository_configures_it(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     (tmp_path / ".gitignore").write_text("\n")
@@ -233,7 +233,7 @@ def test_pre_commit_failure_stops_commit_and_push(monkeypatch, tmp_path: Path) -
 
 
 def test_pre_commit_formatting_fix_is_rechecked_before_publishing(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     (tmp_path / ".gitignore").write_text("\n")
@@ -290,7 +290,7 @@ def test_pre_commit_formatting_fix_is_rechecked_before_publishing(
 
 
 def test_dirty_commit_keeps_pre_commit_failure_and_publishes_changes(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     (tmp_path / ".gitignore").write_text("\n")
@@ -334,7 +334,7 @@ def test_dirty_commit_keeps_pre_commit_failure_and_publishes_changes(
 
 
 def test_local_policy_branch_is_reused_after_a_failed_run(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
 
@@ -355,7 +355,7 @@ def test_local_policy_branch_is_reused_after_a_failed_run(
     ]
 
 
-def test_gh_command_failures_are_actionable(monkeypatch) -> None:
+def test_gh_command_failures_are_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
     def run(*_: object, **__: object) -> None:
         raise subprocess.CalledProcessError(
             1, ["gh", "auth", "status"], stderr="authentication failed\n"
@@ -387,7 +387,7 @@ def test_gh_command_failures_redact_credentials(monkeypatch) -> None:
 
 
 def test_redact_sensitive_text_covers_environment_and_url_credentials(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("GH_TOKEN", "environment-secret-value")
 
@@ -403,7 +403,7 @@ def test_redact_sensitive_text_covers_environment_and_url_credentials(
     assert redacted.count("[REDACTED]") == 3
 
 
-def test_missing_gh_command_is_actionable(monkeypatch) -> None:
+def test_missing_gh_command_is_actionable(monkeypatch: pytest.MonkeyPatch) -> None:
     def run(*_: object, **__: object) -> None:
         raise FileNotFoundError
 
@@ -515,7 +515,7 @@ def test_create_pull_request_keeps_existing_automation_labels(monkeypatch) -> No
 
 
 def test_create_pull_request_fails_when_tool_label_cannot_be_applied(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def run(command: list[str]) -> str:
         if command[:5] == [
@@ -645,7 +645,7 @@ def test_pull_request_template_explains_policy_trigger_and_changes() -> None:
 
 
 def test_tool_revision_reports_a_clean_short_commit_hash(monkeypatch) -> None:
-    def run(command, **kwargs):
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         assert kwargs["capture_output"] is True
         assert kwargs["text"] is True
         if command == ["git", "rev-parse", "--short", "HEAD"]:
@@ -661,8 +661,8 @@ def test_tool_revision_reports_a_clean_short_commit_hash(monkeypatch) -> None:
     assert _tool_revision() == "abc1234"
 
 
-def test_tool_revision_marks_a_dirty_checkout(monkeypatch) -> None:
-    def run(command, **kwargs):
+def test_tool_revision_marks_a_dirty_checkout(monkeypatch: pytest.MonkeyPatch) -> None:
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         if command == ["git", "rev-parse", "--short", "HEAD"]:
             return subprocess.CompletedProcess(
                 command, 0, stdout="abc1234\n", stderr=""
@@ -798,7 +798,7 @@ def test_value_policy_pull_request_explains_value_trigger() -> None:
 
 
 def test_existing_pull_request_is_updated_with_the_current_template(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     commands: list[list[str]] = []
 
@@ -847,7 +847,7 @@ def test_pull_request_template_includes_automation_failure() -> None:
     assert "bazel mod deps: command failed" in body
 
 
-def test_close_pull_request_uses_gh(monkeypatch) -> None:
+def test_close_pull_request_uses_gh(monkeypatch: pytest.MonkeyPatch) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr(
         GitHubCli, "_run", staticmethod(lambda command: commands.append(command) or "")
@@ -908,7 +908,7 @@ def test_dirty_pull_request_is_marked_draft_and_commented(monkeypatch) -> None:
 
 
 def test_recreate_policy_branch_starts_from_the_current_checkout(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
     monkeypatch.setattr(
@@ -925,7 +925,7 @@ def test_recreate_policy_branch_starts_from_the_current_checkout(
 
 
 def test_recreate_force_push_uses_the_verified_remote_head(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     commands: list[list[str]] = []
 
@@ -957,7 +957,7 @@ def test_recreate_force_push_uses_the_verified_remote_head(
 
 
 def test_recreate_force_push_runs_pre_commit_before_commit(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     (tmp_path / ".pre-commit-config.yaml").write_text("repos: []\n")
     (tmp_path / "MODULE.bazel.lock").write_text("lock\n")
@@ -1008,7 +1008,7 @@ def test_recreate_force_push_runs_pre_commit_before_commit(
 
 
 def test_verify_policy_branch_head_refuses_a_changed_branch(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setattr(
         GitHubCli,
@@ -1025,7 +1025,7 @@ def test_verify_policy_branch_head_refuses_a_changed_branch(
 
 
 def test_policy_pull_request_without_head_marker_is_not_safe_to_reuse(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     policy = Policy("example", "Example", None, None, ())
     branch = policy_branches(policy)[0]
@@ -1151,7 +1151,7 @@ def test_unlabeled_pull_request_on_expected_branch_is_not_reused(monkeypatch) ->
 
 
 def test_legacy_policy_pull_request_is_recognized_on_its_old_branch(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     policy = Policy(
         "current",
@@ -1196,7 +1196,7 @@ def test_legacy_policy_pull_request_is_recognized_on_its_old_branch(
 
 
 def test_policy_pull_request_status_includes_latest_merged_pull_request(
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     policy = Policy("example", "Example", None, None, ())
     branch = policy_branches(policy)[0]

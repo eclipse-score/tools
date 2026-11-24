@@ -67,7 +67,7 @@ def test_list_repositories_reads_all_paginated_results(monkeypatch) -> None:
     ],
 )
 def test_list_repositories_rejects_invalid_api_payloads(
-    monkeypatch, output: str, message: str
+    monkeypatch: pytest.MonkeyPatch, output: str, message: str
 ) -> None:
     monkeypatch.setattr("repo_cache.src.github.run_command", lambda _: output)
 

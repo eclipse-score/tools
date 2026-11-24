@@ -235,7 +235,7 @@ def test_bazel_condition_rejects_uncomparable_configured_versions(
 
 
 def test_after_apply_regenerates_existing_conditional_file(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (fake_repo / "MODULE.bazel.lock").write_text("old lock\n")
     policy = Policy(
@@ -274,7 +274,7 @@ def test_after_apply_regenerates_existing_conditional_file(
 
 
 def test_force_after_apply_runs_for_an_already_compliant_policy(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     lock_file = fake_repo / "MODULE.bazel.lock"
     lock_file.write_text("old lock\n")
@@ -325,7 +325,7 @@ def test_after_apply_failure_redacts_credentials(fake_repo: Path, monkeypatch) -
         ),
     )
 
-    def run(*_, **__):
+    def run(*_: object, **__: object) -> None:
         raise subprocess.CalledProcessError(
             1,
             ["bazel", "mod", "deps"],
@@ -345,7 +345,7 @@ def test_after_apply_failure_redacts_credentials(fake_repo: Path, monkeypatch) -
 
 
 def test_after_apply_failure_without_output_has_a_fallback_message(
-    fake_repo: Path, monkeypatch
+    fake_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     (fake_repo / "MODULE.bazel.lock").write_text("old lock\n")
     policy = Policy(
@@ -363,7 +363,7 @@ def test_after_apply_failure_without_output_has_a_fallback_message(
         ),
     )
 
-    def run(*_, **__):
+    def run(*_: object, **__: object) -> None:
         raise subprocess.CalledProcessError(1, ["bazel", "mod", "deps"])
 
     monkeypatch.setattr("repo_policy_sync.src.engine.subprocess.run", run)
