@@ -43,14 +43,14 @@
 - **-e**, **--extensions**: List of file extensions to filter, e.g., `-e py cpp`. This list replaces (rather than extends) the built-in default list.
 - **--encoding**: File encoding (default is utf-8).
 - **--exclusion-file**: Path to a file listing paths (one per line, relative to the repository root) to exclude from the check.
-- **--fix**: Add missing headers and repair invalid headers using the preferred template. Existing years and year ranges are preserved. Headers with a different license or that cannot be safely repaired are left unchanged and reported as errors.
+- **--fix**: Add missing headers and repair invalid headers using the preferred template. For a year range, keep the first year as the creation year. Headers with a different license or that cannot be safely repaired are left unchanged and reported as errors.
 - **inputs**: (Optional) Directories and/or files to check. Neither integration passes these explicitly for a full-repo check: `pre-commit` passes whichever files it decided to run against instead, and the Bazel macro never passes any, which makes the tool fall back to running `git ls-files --cached --other --exclude-standard` (resolved against `BUILD_WORKSPACE_DIRECTORY` if set, otherwise the current working directory) and checking everything that comes back.
 
 
 ### Template File Format
 
 The template file should be in INI format, with each section representing a file extension and a section specifying the copyright text.
-The copyright text can use format expressions to match the year and the author.
+The copyright text can use `{year}` to match a single four-digit creation year and `{author}` to match the author.
 
 An extension may occur in multiple sections. Its first template is the preferred
 format, used by `--fix` when adding a missing header or repairing a malformed one.
