@@ -1,0 +1,6 @@
+# Code complexity report of the QM safety profile.
+#
+# Looser thresholds (see lib/Thresholds.qll) plus the profile-independent
+# checks (goto statements, recursion).
+- queries: src/qm
+- queries: src/common

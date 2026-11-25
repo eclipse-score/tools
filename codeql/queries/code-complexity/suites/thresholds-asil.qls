@@ -1,0 +1,6 @@
+# Code complexity report of the ASIL safety profile.
+#
+# Stricter thresholds (see lib/Thresholds.qll) plus the profile-independent
+# checks (goto statements, recursion).
+- queries: src/asil
+- queries: src/common
