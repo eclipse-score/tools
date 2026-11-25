@@ -26,6 +26,7 @@ _SARIF_SCHEMA = Label("@codeql_coding_standards//:schemas/sarif-schema-2.1.0.jso
 _CODING_STANDARDS_SOURCES = Label("@codeql_coding_standards//:cpp/common/src/qlpack.yml")
 _SCRIPT = Label("//codeql:codeql_analysis.py")
 _DEFAULT_CODESCANNING_CONFIG = Label("//codeql:config.yaml")
+_PYYAML = Label("@score_tools_codeql_pip//pyyaml")
 _LINUX = Label("@platforms//os:linux")
 
 def codeql_analysis(
@@ -46,7 +47,8 @@ def codeql_analysis(
     The run traces `bazel build <targets>` in the calling workspace (no caches,
     so every compile and link action is seen by CodeQL), analyses the database
     with a pre-compiled codeql-coding-standards pack and writes
-    `<output-prefix>.sarif` plus the coding standards' compliance reports.
+    `<output-prefix>.sarif` plus the coding standards' compliance reports
+    (`analysis_reports/<output-prefix>/`).
 
     Args:
         name: Name of the runnable target.
@@ -64,8 +66,9 @@ def codeql_analysis(
             `coding-standards.yml` whose guideline recategorizations are applied
             to the SARIF. Deviations are picked up from every
             `coding-standards.yml` in the workspace regardless.
-        codescanning_config: Label of a CodeQL code scanning config (query
-            filters); defaults to excluding `exclude-from-incremental` queries.
+        codescanning_config: Label of a CodeQL code scanning config; its
+            `query-filters` are applied to the pack suite. Defaults to excluding
+            `exclude-from-incremental` queries.
         visibility: Visibility of the target.
         **kwargs: Passed to the underlying py_binary.
 
@@ -122,5 +125,6 @@ def codeql_analysis(
         tags = ["local", "manual"],
         target_compatible_with = [_LINUX],
         visibility = visibility,
+        deps = [_PYYAML] + kwargs.pop("deps", []),
         **kwargs
     )

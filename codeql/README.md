@@ -26,7 +26,8 @@ CodeQL and the [CodeQL Coding Standards](https://github.com/github/codeql-coding
 - **Coding standards workflow**: deviations from every `coding-standards.yml`
   in the workspace are applied, guideline recategorizations of the configured
   file are applied to the SARIF, and the compliance reports of the coding
-  standards (`analysis_report`) are written next to it.
+  standards (`analysis_report`) are written next to it, to
+  `analysis_reports/<output-prefix>/`.
 
 ## Usage
 
@@ -75,7 +76,7 @@ executable of the traced build, e.g. a wrapper that adds startup options).
 | `pack` | Pre-compiled coding-standards pack, currently `misra-cpp`. |
 | `suite` | Suite inside the pack, default `codeql-suites/misra-cpp-default.qls`. |
 | `coding_standards_config` | Workspace-relative `coding-standards.yml` whose guideline recategorizations are applied to the SARIF. |
-| `codescanning_config` | CodeQL code scanning config (query filters). |
+| `codescanning_config` | CodeQL code scanning config; its `query-filters` are applied to the pack suite. |
 
 The compiler of the traced build must be traceable by CodeQL. Statically
 linked compilers are not; use a config that selects a dynamically linked

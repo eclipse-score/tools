@@ -12,11 +12,13 @@
 # *******************************************************************************
 from __future__ import annotations
 
+import argparse
 import importlib.util
 from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 
 def _load_module():
@@ -49,6 +51,7 @@ def test_traced_build_bypasses_caches_and_forwards_tracer_environment():
         command.index("--config=codeql")
         < command.index("--config=qnx")
         < command.index("--keep_going")
+        < command.index("--remote_executor=")
     )
     assert command[-5:] == [
         "--action_env=LD_PRELOAD",
@@ -145,7 +148,10 @@ def test_sarif_is_normalized_in_place_without_leftovers(tmp_path: Path):
 def test_sarif_rules_and_artifacts_are_sorted_with_indices_remapped():
     run: dict[str, Any] = {
         "tool": {"driver": {"rules": [{"id": "b"}, {"id": "a"}]}},
-        "artifacts": [{"location": {"uri": "z.cpp"}}, {"location": {"uri": "a.cpp"}}],
+        "artifacts": [
+            {"location": {"uri": "z.cpp", "index": 0}},
+            {"location": {"uri": "a.cpp", "index": 1}, "parentIndex": 0},
+        ],
         "results": [
             {
                 "ruleIndex": 0,
@@ -167,10 +173,11 @@ def test_sarif_rules_and_artifacts_are_sorted_with_indices_remapped():
     codeql_analysis.normalize_sarif_run(run)
 
     assert [rule["id"] for rule in run["tool"]["driver"]["rules"]] == ["a", "b"]
-    assert [artifact["location"]["uri"] for artifact in run["artifacts"]] == [
-        "a.cpp",
-        "z.cpp",
+    assert [artifact["location"] for artifact in run["artifacts"]] == [
+        {"uri": "a.cpp", "index": 0},
+        {"uri": "z.cpp", "index": 1},
     ]
+    assert run["artifacts"][0]["parentIndex"] == 1
     first, second = run["results"]
     assert first["ruleIndex"] == 1 and first["rule"]["index"] == 1
     assert first["locations"][0]["physicalLocation"]["artifactLocation"] == {"index": 1}
@@ -178,3 +185,36 @@ def test_sarif_rules_and_artifacts_are_sorted_with_indices_remapped():
     assert second["locations"][0]["physicalLocation"]["artifactLocation"] == {
         "uri": "a.cpp"
     }
+
+
+def test_query_filters_of_the_config_wrap_the_pack_suite(tmp_path: Path):
+    config = tmp_path / "config.yaml"
+    config.write_text("query-filters:\n  - exclude:\n      tags contain: slow\n")
+    suite = codeql_analysis.query_suite(
+        "codeql/misra-cpp-coding-standards",
+        "2.63.0",
+        "s.qls",
+        config,
+        tmp_path / "x.qls",
+    )
+    assert suite is not None
+    assert yaml.safe_load(suite.read_text()) == [
+        {
+            "import": "s.qls",
+            "from": "codeql/misra-cpp-coding-standards",
+            "version": "2.63.0",
+        },
+        {"exclude": {"tags contain": "slow"}},
+    ]
+    config.write_text("paths-ignore: [gen]\n")
+    assert (
+        codeql_analysis.query_suite("p", "1", "s.qls", config, tmp_path / "y.qls")
+        is None
+    )
+
+
+def test_recategorization_needs_the_top_level_key(tmp_path: Path):
+    config = tmp_path / "coding-standards.yml"
+    config.write_text("# guideline-recategorizations: none yet\ndeviations: []\n")
+    args = argparse.Namespace(recategorize="/does/not/exist")
+    codeql_analysis.recategorize_sarif(args, config, tmp_path / "codeql.sarif")

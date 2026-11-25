@@ -32,6 +32,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 # Forces the traced build to execute every action, a cache hit would not be traced.
 CACHE_BYPASS_FLAGS = [
     "--nouse_action_cache",
@@ -109,6 +111,8 @@ def bazel_build_command(
         f"--sandbox_writable_path={database}",
         *(f"--config={config}" for config in build_configs),
         *bazel_args,
+        # Remote workers have neither the tracer nor the database.
+        "--remote_executor=",
         *(f"--action_env={key}" for key in sorted(tracer_env)),
         "--",
         *targets,
@@ -202,6 +206,23 @@ def create_database(args: argparse.Namespace, workspace: Path, database: Path) -
     )
 
 
+def read_yaml(path: Path) -> dict[str, Any]:
+    data: object = yaml.safe_load(path.read_text(encoding="utf-8"))
+    return data if isinstance(data, dict) else {}
+
+
+def query_suite(
+    name: str, version: str, suite: str, codescanning_config: Path, output: Path
+) -> Path | None:
+    """Suite of the pack with the config's query filters, which an explicit suite would bypass."""
+    filters: object = read_yaml(codescanning_config).get("query-filters")
+    if not isinstance(filters, list) or not filters:
+        return None
+    instructions = [{"import": suite, "from": name, "version": version}, *filters]
+    output.write_text(yaml.safe_dump(instructions, sort_keys=False), encoding="utf-8")
+    return output
+
+
 def analyze_database(
     args: argparse.Namespace, workspace: Path, database: Path, output_dir: Path
 ) -> Path:
@@ -214,7 +235,14 @@ def analyze_database(
         )
     else:
         name, version = read_pack_identity(root)
-        query = f"{name}@{version}:{args.suite}"
+        suite = query_suite(
+            name,
+            version,
+            args.suite,
+            Path(args.codescanning_config),
+            output_dir / f"{args.output_prefix}.qls",
+        )
+        query = str(suite) if suite else f"{name}@{version}:{args.suite}"
         packs = f"--search-path={root}"
     sarif = output_dir / f"{args.output_prefix}.sarif"
     subprocess.run(
@@ -243,7 +271,7 @@ def recategorize_sarif(args: argparse.Namespace, config: Path, sarif: Path) -> N
     if not config.is_file():
         raise RuntimeError(f"Coding standards config not found: {config}")
     # The recategorization script fails on configs that only contain deviations.
-    if "guideline-recategorizations" not in config.read_text(encoding="utf-8"):
+    if not read_yaml(config).get("guideline-recategorizations"):
         return
     recategorized = sarif.with_name(sarif.name + ".recategorized")
     subprocess.run(
@@ -277,7 +305,7 @@ def write_analysis_report(
     args: argparse.Namespace, root: Path, database: Path, sarif: Path, output_dir: Path
 ) -> None:
     """Compliance reports of the coding standards; a failure does not fail the analysis."""
-    reports = output_dir / "analysis_reports"
+    reports = output_dir / "analysis_reports" / args.output_prefix
     shutil.rmtree(reports, ignore_errors=True)
     home = output_dir / "codeql_home"
     prepare_offline_codeql_home(root / ".codeql" / "libraries", home)
@@ -325,6 +353,13 @@ def normalize_sarif_run(run: dict[str, Any]) -> None:
     artifact_index = {old: new for new, (old, _) in enumerate(artifacts)}
     if "artifacts" in run:
         run["artifacts"] = [artifact for _, artifact in artifacts]
+    for artifact in run.get("artifacts", []):
+        # Artifacts refer to themselves and their parent by index, too.
+        location = artifact.get("location", {})
+        if "index" in location:
+            location["index"] = artifact_index[location["index"]]
+        if "parentIndex" in artifact:
+            artifact["parentIndex"] = artifact_index[artifact["parentIndex"]]
 
     for result in run.get("results", []):
         if "ruleIndex" in result:
