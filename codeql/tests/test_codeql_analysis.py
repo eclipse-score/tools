@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -142,7 +143,7 @@ def test_sarif_is_normalized_in_place_without_leftovers(tmp_path: Path):
 
 
 def test_sarif_rules_and_artifacts_are_sorted_with_indices_remapped():
-    run = {
+    run: dict[str, Any] = {
         "tool": {"driver": {"rules": [{"id": "b"}, {"id": "a"}]}},
         "artifacts": [{"location": {"uri": "z.cpp"}}, {"location": {"uri": "a.cpp"}}],
         "results": [

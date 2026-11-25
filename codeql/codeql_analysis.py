@@ -30,6 +30,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 # Forces the traced build to execute every action, a cache hit would not be traced.
 CACHE_BYPASS_FLAGS = [
@@ -309,7 +310,7 @@ def normalize_sarif_rule_order(sarif: Path) -> None:
     os.replace(normalized, sarif)
 
 
-def normalize_sarif_run(run: dict) -> None:
+def normalize_sarif_run(run: dict[str, Any]) -> None:
     driver = run.get("tool", {}).get("driver", {})
     rules = sorted(
         enumerate(driver.get("rules", [])), key=lambda item: item[1].get("id", "")
