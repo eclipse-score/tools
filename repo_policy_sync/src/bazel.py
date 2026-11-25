@@ -34,7 +34,10 @@ def parse_bazel_version(value: str) -> BazelVersion | None:
     """Parse a strict major.minor.patch version."""
 
     match = _VERSION.fullmatch(value)
-    return tuple(int(component) for component in match.groups()) if match else None
+    if match is None:
+        return None
+    major, minor, patch = match.groups()
+    return int(major), int(minor), int(patch)
 
 
 def starlark_call_ranges(text: str, function_name: str) -> tuple[tuple[int, int], ...]:

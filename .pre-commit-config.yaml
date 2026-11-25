@@ -38,3 +38,9 @@ repos:
         entry: cr_checker/tool/cr_checker.py --exclusion-file copyright_exclusions.txt --fix
         language: script
         minimum_pre_commit_version: 3.2.0
+      - id: pyrefly
+        name: Pyrefly type check
+        entry: uv run --locked pyrefly check
+        language: system
+        files: '(\.pyi?|(^|/)pyproject\.toml|^(\.pre-commit-config\.yaml|\.python-version|pyrefly-baseline-FIXME\.json|uv\.lock))$'
+        pass_filenames: false

@@ -18,7 +18,9 @@ from repo_cache.src.github import ensure_authenticated, list_repositories
 from repo_cache.src.models import Repository
 
 
-def test_ensure_authenticated_runs_gh_auth_status(monkeypatch) -> None:
+def test_ensure_authenticated_runs_gh_auth_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
 
     def record(command: list[str]) -> str:
@@ -32,7 +34,9 @@ def test_ensure_authenticated_runs_gh_auth_status(monkeypatch) -> None:
     assert commands == [["gh", "auth", "status"]]
 
 
-def test_list_repositories_reads_all_paginated_results(monkeypatch) -> None:
+def test_list_repositories_reads_all_paginated_results(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     commands: list[list[str]] = []
 
     def record(command: list[str]) -> str:
@@ -67,7 +71,7 @@ def test_list_repositories_reads_all_paginated_results(monkeypatch) -> None:
     ],
 )
 def test_list_repositories_rejects_invalid_api_payloads(
-    monkeypatch, output: str, message: str
+    monkeypatch: pytest.MonkeyPatch, output: str, message: str
 ) -> None:
     monkeypatch.setattr("repo_cache.src.github.run_command", lambda _: output)
 

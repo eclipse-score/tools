@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import PolicyError, RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureOperation, ReplaceRegex
 from ._validation import (
     expect_keys,
@@ -59,7 +60,7 @@ class ReplaceRegexOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, ReplaceRegex)
         changes = []
@@ -83,7 +84,7 @@ class ReplaceRegexOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, ReplaceRegex)
         for path in _matching_paths(root, operation):

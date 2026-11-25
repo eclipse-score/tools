@@ -118,6 +118,11 @@ only if the policy changed that repository-relative path. This avoids
 regenerating derived files after unrelated policy changes. Forced follow-up
 commands still run when their conditional file exists.
 
+Follow-up commands inherit the runner's environment and home directory,
+including authentication and tool configuration. Interactive Git prompts are
+disabled. Commands can execute arbitrary repository code with the runner's
+permissions and credentials, so apply mode requires trusted target repositories.
+
 ## Conditions
 
 `when.file_exists` requires one repository-relative file to exist.

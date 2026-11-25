@@ -24,9 +24,11 @@ from ..bazel import (
     BAZEL_MODULE_NAME,
     BAZEL_NAME_ARGUMENT,
     mask_starlark_comments,
+    parse_bazel_version,
     starlark_call_ranges,
 )
 from ..errors import PolicyError, RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import Change, EnsureBazelDependency, EnsureOperation, ValueReference
 from ._validation import (
     expect_keys,
@@ -36,7 +38,6 @@ from ._validation import (
     validate_repository_path,
 )
 
-_NUMERIC_VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\Z")
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*([\"'])([^\"']*)\1")
 
 
@@ -77,7 +78,7 @@ class EnsureBazelDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependency)
         dependency = _module_dependency(root, operation)
@@ -98,7 +99,7 @@ class EnsureBazelDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, EnsureBazelDependency)
         if _module_dependency(root, operation) is not None:
@@ -118,7 +119,7 @@ class EnsureBazelDependencyOperation:
 
 
 def _parse_version_value(value: object, source: Path) -> str | ValueReference:
-    if isinstance(value, str) and _parse_version(value) is not None:
+    if isinstance(value, str) and parse_bazel_version(value) is not None:
         return value
     if (
         isinstance(value, dict)
@@ -184,13 +185,8 @@ def _module_dependency(
             f"{operation.module_file} bazel_dep for {operation.module_name!r} must declare version exactly once"
         )
     version = version_matches[0].group(2)
-    if _parse_version(version) is None:
+    if parse_bazel_version(version) is None:
         raise RepoPolicySyncError(
             f"{operation.module_file} bazel_dep for {operation.module_name!r} must use X.Y.Z, found {version!r}"
         )
     return _Dependency(version)
-
-
-def _parse_version(value: str) -> tuple[int, int, int] | None:
-    match = _NUMERIC_VERSION.fullmatch(value)
-    return tuple(int(component) for component in match.groups()) if match else None

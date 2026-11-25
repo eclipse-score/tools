@@ -1,0 +1,695 @@
+{
+  "min_severity": "error",
+  "errors": [
+    {
+      "column": 66,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 71,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 14,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 14,
+      "path": "cr_checker/tests/test_cr_checker.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 28,
+      "path": "repo_cache/src/sync.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 58,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 58,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 58,
+      "path": "repo_cache/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 69,
+      "path": "repo_cache/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 69,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 30,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 70,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 70,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 19,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 33,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 70,
+      "path": "repo_cache/tests/test_sync.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/src/cli.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 31,
+      "path": "repo_policy_sync/src/operations/__init__.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/src/reporting.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 13,
+      "path": "repo_policy_sync/src/reporting.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 27,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 26,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 43,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 39,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 15,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 36,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 61,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 36,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 35,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 39,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 35,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 34,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 27,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 22,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 23,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 26,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 25,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 60,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 14,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 14,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 8,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 63,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 27,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 31,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 30,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 23,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 26,
+      "path": "repo_policy_sync/src/runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 29,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 29,
+      "path": "repo_policy_sync/tests/operations/test_ensure_github_ref.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 55,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 18,
+      "path": "repo_policy_sync/tests/test_cli.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 17,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 48,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 48,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 48,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 29,
+      "path": "repo_policy_sync/tests/test_github.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 12,
+      "path": "repo_policy_sync/tests/test_policy_and_metrics.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 75,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 12,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 12,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "missing-attribute"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 54,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 20,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 38,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 45,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 19,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "implicit-any-lambda"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 25,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    },
+    {
+      "column": 16,
+      "path": "repo_policy_sync/tests/test_runner.py",
+      "name": "bad-argument-type"
+    }
+  ]
+}

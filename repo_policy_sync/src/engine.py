@@ -19,7 +19,6 @@ import os
 import re
 import shlex
 import subprocess
-import tempfile
 from pathlib import Path
 
 from .bazel import (
@@ -29,28 +28,15 @@ from .bazel import (
     parse_bazel_version,
     starlark_call_ranges,
 )
-from .cache import configure_bazel_cache
 from .errors import CommandError, RepoPolicySyncError, redact_sensitive_text
 from .github import GitHubResolver
-from .models import Change, EnsureOperation, Evaluation, Policy
+from .models import AfterApplyCommand, Change, EnsureOperation, Evaluation, Policy
 from .operations import apply as apply_operation
 from .operations import describe_changes, resolve_operation
 from .operations._validation import validate_repository_path
 from .values import resolve_values, value_source_exists
 
 _VERSION_ARGUMENT = re.compile(r"\bversion\s*=\s*[\"']([^\"']+)[\"']")
-_REDUCED_ENVIRONMENT_KEYS = {
-    "CI",
-    "LANG",
-    "PATH",
-    "SHELL",
-    "TERM",
-    "TMPDIR",
-    "TMP",
-    "TEMP",
-    "USER",
-    "LOGNAME",
-}
 
 
 def evaluate_policy(
@@ -157,36 +143,18 @@ def apply_policy(
 
 
 def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
-    # Policy commands execute repository-controlled code. Keep only the basic
-    # process environment and replace user configuration with temporary paths so
-    # credentials and host-specific settings are not inherited accidentally.
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key in _REDUCED_ENVIRONMENT_KEYS or key.startswith("LC_")
-    }
+    # Trusted repository commands need the same authentication and tool settings
+    # as the enclosing workflow. Disable interactive Git prompts in automation.
+    environment = {**os.environ, "GIT_TERMINAL_PROMPT": "0"}
     try:
-        with tempfile.TemporaryDirectory(
-            prefix="repo-policy-sync-after-apply-"
-        ) as home:
-            configure_bazel_cache(Path(home), environment)
-            environment.update(
-                {
-                    "HOME": home,
-                    "XDG_CONFIG_HOME": str(Path(home) / ".config"),
-                    "GH_CONFIG_DIR": str(Path(home) / ".gh"),
-                    "GIT_CONFIG_NOSYSTEM": "1",
-                    "GIT_TERMINAL_PROMPT": "0",
-                }
-            )
-            subprocess.run(
-                command,
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
+        subprocess.run(
+            command,
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
     except FileNotFoundError as exc:
         raise CommandError(f"required command is unavailable: {command[0]}") from exc
     except subprocess.CalledProcessError as exc:
@@ -200,7 +168,11 @@ def _run_after_apply_command(root: Path, command: tuple[str, ...]) -> None:
 
 
 def _should_run_after_apply(
-    root: Path, command, changed_paths: set[Path], *, force: bool = False
+    root: Path,
+    command: AfterApplyCommand,
+    changed_paths: set[Path],
+    *,
+    force: bool = False,
 ) -> bool:
     path = root / command.when_file_exists
     validate_repository_path(root, path)

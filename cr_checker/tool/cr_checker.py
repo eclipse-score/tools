@@ -23,8 +23,10 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
+from typing import override
 
 BYTES_TO_READ = 4 * 1024
 
@@ -72,7 +74,8 @@ class ColoredFormatter(logging.Formatter):
                         formats the record as per the superclass `Formatter`.
     """
 
-    def format(self, record):
+    @override
+    def format(self, record: logging.LogRecord) -> str:
         log_color = LOGGER_COLORS.get(record.levelname, "")
         record.levelname = f"{log_color}{record.levelname}:{COLORS['ENDC']}"
         return super().format(record)
@@ -137,7 +140,7 @@ def load_templates(path: Path):
             templates.setdefault(extension, []).append(template)
 
     templates: dict[str, list[str]] = {}
-    current_extensions = []
+    current_extensions: list[str] = []
 
     with open(path, "r", encoding="utf-8") as file:
         lines = file.readlines()
@@ -230,7 +233,7 @@ def load_exclusion(path: Path) -> tuple[set[str], bool]:
     return exclusion, valid
 
 
-def configure_logging(log_file_path=None, verbose=False):
+def configure_logging(log_file_path: str | Path | None = None, verbose: bool = False):
     """
     Configures logging to write messages to the specified log file.
 
@@ -254,7 +257,7 @@ def configure_logging(log_file_path=None, verbose=False):
     LOGGER.addHandler(handler)
 
 
-def detect_shebang_offset(path, encoding):
+def detect_shebang_offset(path: str | Path, encoding: str) -> int:
     """
     Detects if a file starts with a shebang (#!) and returns the byte offset
     to skip it (length of the first line including newline).
@@ -287,7 +290,9 @@ def detect_shebang_offset(path, encoding):
     return 0
 
 
-def load_text_from_file(path, header_length, encoding, offset):
+def load_text_from_file(
+    path: str | Path, header_length: int, encoding: str | None, offset: int
+):
     """
     Reads the first portion of a file, up to `header_length` characters
     plus an additional offset if provided.
@@ -313,7 +318,9 @@ def load_text_from_file(path, header_length, encoding, offset):
         return content[offset:] if offset else content
 
 
-def load_text_from_file_with_mmap(path, header_length, encoding, offset):
+def load_text_from_file_with_mmap(
+    path: str | Path, header_length: int, encoding: str, offset: int
+):
     """
     Maps the file and reads only the first `header_length` bytes plus
     an additional offset if provided.
@@ -346,7 +353,9 @@ def load_text_from_file_with_mmap(path, header_length, encoding, offset):
             return fmap[:length].decode(encoding)[offset:]
 
 
-def has_copyright(path, template, use_mmap, encoding, offset):
+def has_copyright(
+    path: str | Path, template: str, use_mmap: bool, encoding: str, offset: int
+):
     """
     Checks if the specified copyright text is present in the beginning of a file.
 
@@ -389,7 +398,7 @@ def has_copyright(path, template, use_mmap, encoding, offset):
     return False
 
 
-def has_any_copyright(path, use_mmap, encoding, offset):
+def has_any_copyright(path: str | Path, use_mmap: bool, encoding: str, offset: int):
     """
     Checks if any copyright notice is present in the file header, regardless of format.
 
@@ -411,7 +420,9 @@ def has_any_copyright(path, use_mmap, encoding, offset):
     )
 
 
-def has_duplicate_copyright(path, template, use_mmap, encoding, offset):
+def has_duplicate_copyright(
+    path: str | Path, template: str, use_mmap: bool, encoding: str, offset: int
+):
     """
     Checks if more than one copyright notice is present in the file header.
 
@@ -439,7 +450,7 @@ def has_duplicate_copyright(path, template, use_mmap, encoding, offset):
     return False
 
 
-def get_files_from_dir(directory, exts=None):
+def get_files_from_dir(directory: Path, exts: list[str] | None = None) -> list[Path]:
     """
     Finds files in the specified directories. Filters by extensions if provided.
 
@@ -464,7 +475,7 @@ def get_files_from_dir(directory, exts=None):
     return collected_files
 
 
-def collect_inputs(inputs: list[str], exts=None):
+def collect_inputs(inputs: list[str], exts: list[str] | None = None) -> list[Path]:
     """
     Collects files from a list of input paths, optionally filtering by file extensions.
 
@@ -519,7 +530,7 @@ COMMENT_DECORATION_PATTERN = re.compile(r"[\s/*#'\-=+]*")
 COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4}(?:\s*-\s*\d{4})?)")
 
 
-def extract_block_comment(lines, terminator):
+def extract_block_comment(lines: list[str], terminator: str) -> list[str] | None:
     """Return comment lines without the closing delimiter, or None if unsafe.
 
     The first terminator ends the comment regardless of its contents. Text after
@@ -536,7 +547,7 @@ def extract_block_comment(lines, terminator):
     return None
 
 
-def has_replaceable_block_tail(comment_lines, spdx_index):
+def has_replaceable_block_tail(comment_lines: list[str], spdx_index: int) -> bool:
     """Require a complete SPDX identifier followed only by header decoration.
 
     A closing delimiter may share the SPDX line, follow it on a decorated line,
@@ -561,7 +572,9 @@ def has_replaceable_block_tail(comment_lines, spdx_index):
     )
 
 
-def find_existing_header(path, encoding, offset, max_lines):
+def find_existing_header(
+    path: str | Path, encoding: str | None, offset: int, max_lines: int
+):
     """Locate a contiguous, safely replaceable copyright comment at the file top.
 
     ``offset`` preserves leading characters such as a shebang. SPDX must occur
@@ -651,7 +664,12 @@ def find_existing_header(path, encoding, offset, max_lines):
 
 
 def fix_wrong_copyright(
-    path, template, encoding, offset, *, max_header_lines=None
+    path: str | Path,
+    template: str,
+    encoding: str,
+    offset: int,
+    *,
+    max_header_lines: int | None = None,
 ) -> bool:
     """
     Replaces an existing header that does not match the template with the
@@ -700,7 +718,7 @@ def fix_wrong_copyright(
     return True
 
 
-def create_temp_file(path, encoding):
+def create_temp_file(path: str | Path, encoding: str | None) -> str:
     """
     Creates a temporary file with the provided content.
 
@@ -718,7 +736,7 @@ def create_temp_file(path, encoding):
     return temp.name
 
 
-def remove_old_header(file_path, encoding, num_of_chars):
+def remove_old_header(file_path: str | Path, encoding: str | None, num_of_chars: int):
     """
     Removes the first `num_of_chars` characters from a file and updates it in-place.
 
@@ -740,7 +758,9 @@ def remove_old_header(file_path, encoding, num_of_chars):
     shutil.move(temp_file.name, file_path)
 
 
-def fix_copyright(path, copyright_text, encoding, offset) -> bool:
+def fix_copyright(
+    path: str | Path, copyright_text: str, encoding: str, offset: int
+) -> bool:
     """
     Inserts a copyright header into the specified file, ensuring that existing
     content is preserved according to the provided offset.
@@ -783,13 +803,13 @@ def fix_copyright(path, copyright_text, encoding, offset) -> bool:
 
 def process_files(
     *,
-    files,
-    templates,
-    fix,
+    files: Iterable[str | Path],
+    templates: Mapping[str, str | Sequence[str]],
+    fix: bool,
     exclusion: set[str] | None = None,
-    use_mmap=False,
-    encoding="utf-8",
-):  # pylint: disable=too-many-arguments
+    use_mmap: bool = False,
+    encoding: str = "utf-8",
+) -> dict[str, int]:  # pylint: disable=too-many-arguments
     """
     Processes a list of files to check for the presence of copyright text.
 
@@ -894,7 +914,7 @@ def process_files(
     return results
 
 
-def parse_arguments(argv):
+def parse_arguments(argv: list[str] | None) -> argparse.Namespace:
     """
     Parses command-line arguments.
 
@@ -988,7 +1008,7 @@ def parse_arguments(argv):
     return parser.parse_args(argv)
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> int | None:
     """
     Entry point for processing files to check for the presence of required copyright text.
 

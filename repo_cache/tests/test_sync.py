@@ -21,12 +21,16 @@ from repo_cache.src.models import Repository
 from repo_cache.src.sync import SyncOutcome, sync_org
 
 
-def _stub_listing(monkeypatch, repositories: tuple[Repository, ...]) -> None:
+def _stub_listing(
+    monkeypatch: pytest.MonkeyPatch, repositories: tuple[Repository, ...]
+) -> None:
     monkeypatch.setattr(sync_module, "ensure_authenticated", lambda: None)
     monkeypatch.setattr(sync_module, "list_repositories", lambda *, org: repositories)
 
 
-def test_sync_org_syncs_every_active_repository(monkeypatch, tmp_path: Path) -> None:
+def test_sync_org_syncs_every_active_repository(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     repositories = (Repository("alpha", "main"), Repository("beta", "main"))
     _stub_listing(monkeypatch, repositories)
     synced: list[str] = []
@@ -45,7 +49,7 @@ def test_sync_org_syncs_every_active_repository(monkeypatch, tmp_path: Path) -> 
 
 @pytest.mark.parametrize("history", [False, True])
 def test_sync_org_passes_the_history_choice_to_every_checkout(
-    monkeypatch, tmp_path: Path, history: bool
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, history: bool
 ) -> None:
     _stub_listing(
         monkeypatch, (Repository("alpha", "main"), Repository("beta", "main"))
@@ -63,7 +67,7 @@ def test_sync_org_passes_the_history_choice_to_every_checkout(
 
 
 def test_sync_org_excludes_archived_repositories_by_default(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (
         Repository("alpha", "main"),
@@ -78,7 +82,7 @@ def test_sync_org_excludes_archived_repositories_by_default(
 
 
 def test_sync_org_includes_archived_repositories_when_requested(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (
         Repository("alpha", "main"),
@@ -96,7 +100,7 @@ def test_sync_org_includes_archived_repositories_when_requested(
 
 
 def test_sync_org_skips_repositories_without_a_default_branch(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (Repository("empty", None),)
     _stub_listing(monkeypatch, repositories)
@@ -116,7 +120,7 @@ def test_sync_org_skips_repositories_without_a_default_branch(
 
 
 def test_sync_org_reports_empty_checkout_without_marking_it_as_a_failure(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (Repository("empty", "main"), Repository("fine", "main"))
     _stub_listing(monkeypatch, repositories)
@@ -136,7 +140,7 @@ def test_sync_org_reports_empty_checkout_without_marking_it_as_a_failure(
 
 
 def test_sync_org_records_a_sync_failure_without_aborting_others(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (Repository("broken", "main"), Repository("fine", "main"))
     _stub_listing(monkeypatch, repositories)
@@ -155,7 +159,7 @@ def test_sync_org_records_a_sync_failure_without_aborting_others(
 
 
 def test_sync_org_rejects_an_unknown_repository_filter(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _stub_listing(monkeypatch, (Repository("alpha", "main"),))
 
@@ -166,7 +170,7 @@ def test_sync_org_rejects_an_unknown_repository_filter(
 
 
 def test_sync_org_expands_repository_patterns_before_checkout(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (
         Repository("score_tools", "main"),
@@ -191,7 +195,7 @@ def test_sync_org_expands_repository_patterns_before_checkout(
 
 
 def test_sync_org_supports_fnmatch_character_classes_in_repository_patterns(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (
         Repository("vsps_a", "main"),
@@ -212,7 +216,7 @@ def test_sync_org_supports_fnmatch_character_classes_in_repository_patterns(
 
 
 def test_sync_org_distinguishes_an_unmatched_pattern_from_an_unknown_exact_name(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _stub_listing(monkeypatch, (Repository("score_tools", "main", archived=True),))
 
@@ -232,7 +236,7 @@ def test_sync_org_distinguishes_an_unmatched_pattern_from_an_unknown_exact_name(
 
 
 def test_sync_org_checks_the_selection_limit_before_checkout(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (
         Repository("score_one", "main"),
@@ -261,7 +265,7 @@ def test_sync_org_checks_the_selection_limit_before_checkout(
 
 
 def test_sync_org_counts_archived_repositories_in_selection_limits(
-    monkeypatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     repositories = (
         Repository("score_one", "main"),
@@ -287,7 +291,9 @@ def test_sync_org_rejects_fewer_than_one_worker(tmp_path: Path) -> None:
         sync_org(org="acme", cache_dir=tmp_path, workers=0)
 
 
-def test_sync_org_reports_progress(monkeypatch, tmp_path: Path) -> None:
+def test_sync_org_reports_progress(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     _stub_listing(monkeypatch, (Repository("alpha", "main"),))
     monkeypatch.setattr(sync_module, "sync_default_branch", lambda **_: None)
     messages: list[str] = []

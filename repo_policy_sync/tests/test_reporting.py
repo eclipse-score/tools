@@ -15,6 +15,8 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from repo_policy_sync.src.models import Change, Policy
 from repo_policy_sync.src.reporting import render_json, render_markdown, render_table
 from repo_policy_sync.src.runner import RepositoryOutcome, RunReport, RunSummary
@@ -123,7 +125,9 @@ def test_render_table_groups_failure_causes() -> None:
     assert "example/second" in output
 
 
-def test_render_table_wraps_long_values_for_terminal_width(monkeypatch) -> None:
+def test_render_table_wraps_long_values_for_terminal_width(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("COLUMNS", "80")
     report = RunReport(
         summary=RunSummary(

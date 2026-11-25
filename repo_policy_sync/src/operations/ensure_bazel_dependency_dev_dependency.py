@@ -27,6 +27,7 @@ from ..bazel import (
     starlark_call_ranges,
 )
 from ..errors import PolicyError, RepoPolicySyncError
+from ..github import GitHubResolver
 from ..models import (
     Change,
     EnsureBazelDependencyDevDependency,
@@ -87,7 +88,7 @@ class EnsureBazelDependencyDevDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> tuple[Change, ...]:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
         _, dependency = _find_dependency(root, operation)
@@ -109,7 +110,7 @@ class EnsureBazelDependencyDevDependencyOperation:
         operation: EnsureOperation,
         *,
         organization: str | None = None,
-        github_resolver=None,
+        github_resolver: GitHubResolver | None = None,
     ) -> None:
         assert isinstance(operation, EnsureBazelDependencyDevDependency)
         path = root / _MODULE_FILE
