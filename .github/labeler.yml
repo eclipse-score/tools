@@ -1,0 +1,37 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+
+# The PR labels also serve as component prefixes for release tags.
+cr-checker:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "cr_checker/**"
+          - .pre-commit-hooks.yaml
+          - MODULE.bazel
+
+repo-cache:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "repo_cache/**"
+
+repo-policy-sync:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "repo_policy_sync/**"
+          - .github/workflows/repo-policy-sync.yml
+
+score-pytest:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "score_pytest/**"
+          - MODULE.bazel
