@@ -89,6 +89,58 @@ def test_pack_identity_and_missing_suite(tmp_path: Path):
         codeql_analysis.pack_root(tmp_path / "qlpack.yml", "codeql-suites/other.qls")
 
 
+def _parse(*extra: str):
+    tools = [
+        f"--{name}=/r/{name}"
+        for name in (
+            "codeql",
+            "pack",
+            "process-config",
+            "recategorize",
+            "analysis-report",
+            "coding-standards-schema",
+            "sarif-schema",
+            "coding-standards-sources",
+            "codescanning-config",
+        )
+    ]
+    return codeql_analysis.parse_args([*tools, "--suite=s.qls", *extra])
+
+
+def test_targets_accept_both_communication_and_repeated_flag_style():
+    args = _parse(
+        "--target=//a/...", "--target", "//b/...", "//c:x", "--target=-//a/gen/..."
+    )
+    assert args.target == ["//a/...", "//b/...", "//c:x", "-//a/gen/..."]
+
+
+def test_phases_work_on_a_kept_database():
+    assert _parse("--target=//a/...", "--database-path=db").database == "db"
+    args = _parse("--phase=analyze-database", "--database=db")
+    assert args.phase == "analyze-database" and args.target == []
+    with pytest.raises(SystemExit):
+        _parse("--target=//a/...", "--phase=create-database")
+    with pytest.raises(SystemExit):
+        _parse("--phase=create-database", "--database=db")
+
+
+def test_coding_standards_root_is_four_levels_above_the_common_pack(tmp_path: Path):
+    common = tmp_path / "cpp" / "common" / "src"
+    common.mkdir(parents=True)
+    (common / "qlpack.yml").write_text("")
+    assert codeql_analysis.coding_standards_root(common / "qlpack.yml") == tmp_path
+
+
+def test_sarif_is_normalized_in_place_without_leftovers(tmp_path: Path):
+    sarif = tmp_path / "codeql.sarif"
+    sarif.write_text(
+        '{"runs": [{"tool": {"driver": {"rules": [{"id": "b"}, {"id": "a"}]}}}]}'
+    )
+    codeql_analysis.normalize_sarif_rule_order(sarif)
+    assert [p.name for p in tmp_path.iterdir()] == ["codeql.sarif"]
+    assert '"id": "a"' in sarif.read_text().split('"id": "b"')[0]
+
+
 def test_sarif_rules_and_artifacts_are_sorted_with_indices_remapped():
     run = {
         "tool": {"driver": {"rules": [{"id": "b"}, {"id": "a"}]}},

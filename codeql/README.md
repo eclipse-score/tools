@@ -55,11 +55,15 @@ bazel run //:codeql -- --output-dir=/tmp/codeql --output-prefix=codeql-linux
 bazel run //:codeql -- --build-config=qnx --output-prefix=codeql-qnx
 ```
 
-Arguments after `--` are appended to the ones of the macro: `--target`,
+Arguments after `--` are appended to the ones of the macro: `--target`
+(several patterns per flag allowed, exclusions as `--target=-//pkg/...`),
 `--build-config` and `--bazel-arg` add to the configured lists, `--output-dir`
-(default: `bazel info output_path`), `--output-prefix`, `--database` (keep the
-database instead of using a temporary directory) and `--bazel` (Bazel executable
-of the traced build, e.g. a wrapper that adds startup options).
+(default: `bazel info output_path`), `--output-prefix`, `--database` /
+`--database-path` (keep the database instead of using a temporary directory),
+`--phase=create-database|analyze-database` (only one half, on the kept
+`--database`), `--query-spec` (analyse one query from the coding-standards
+sources instead of the pack suite, e.g. to debug a rule) and `--bazel` (Bazel
+executable of the traced build, e.g. a wrapper that adds startup options).
 
 | Attribute | Meaning |
 | --- | --- |

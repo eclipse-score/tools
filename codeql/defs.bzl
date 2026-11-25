@@ -23,6 +23,7 @@ _RECATEGORIZE = Label("@codeql_coding_standards//:guideline_recategorize")
 _ANALYSIS_REPORT = Label("@codeql_coding_standards//:analysis_report")
 _CODING_STANDARDS_SCHEMA = Label("@codeql_coding_standards//:schemas/coding-standards-schema-1.0.0.json")
 _SARIF_SCHEMA = Label("@codeql_coding_standards//:schemas/sarif-schema-2.1.0.json")
+_CODING_STANDARDS_SOURCES = Label("@codeql_coding_standards//:cpp/common/src/qlpack.yml")
 _SCRIPT = Label("//codeql:codeql_analysis.py")
 _DEFAULT_CODESCANNING_CONFIG = Label("//codeql:config.yaml")
 _LINUX = Label("@platforms//os:linux")
@@ -69,7 +70,8 @@ def codeql_analysis(
         **kwargs: Passed to the underlying py_binary.
 
     Command line arguments of `bazel run` are appended, e.g. `--output-dir`,
-    `--output-prefix`, `--database` or further `--target`/`--build-config`.
+    `--output-prefix`, `--database`, `--phase`, `--query-spec` or further
+    `--target`/`--build-config`.
     """
     if pack not in _PACKS:
         fail("Unsupported pack '{}', supported: {}".format(pack, ", ".join(_PACKS)))
@@ -85,6 +87,7 @@ def codeql_analysis(
         "--analysis-report=$(rootpath {})".format(_ANALYSIS_REPORT),
         "--coding-standards-schema=$(rootpath {})".format(_CODING_STANDARDS_SCHEMA),
         "--sarif-schema=$(rootpath {})".format(_SARIF_SCHEMA),
+        "--coding-standards-sources=$(rootpath {})".format(_CODING_STANDARDS_SOURCES),
         "--codescanning-config=$(rootpath {})".format(codescanning_config),
         "--suite={}".format(suite),
     ]
@@ -113,6 +116,7 @@ def codeql_analysis(
             _ANALYSIS_REPORT,
             _CODING_STANDARDS_SCHEMA,
             _SARIF_SCHEMA,
+            _CODING_STANDARDS_SOURCES,
             codescanning_config,
         ],
         tags = ["local", "manual"],

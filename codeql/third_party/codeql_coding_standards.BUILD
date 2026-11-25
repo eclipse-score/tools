@@ -14,6 +14,7 @@ load("@rules_python//python:defs.bzl", "py_binary")
 load("@score_tools_codeql_pip//:requirements.bzl", "requirement")
 
 exports_files([
+    "cpp/common/src/qlpack.yml",
     "schemas/coding-standards-schema-1.0.0.json",
     "schemas/sarif-schema-2.1.0.json",
 ])

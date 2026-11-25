@@ -58,6 +58,11 @@ def pack_root(qlpack: str | Path, suite: str) -> Path:
     return root
 
 
+def coding_standards_root(common_qlpack: str | Path) -> Path:
+    """Root of the coding-standards sources, given their `cpp/common/src/qlpack.yml`."""
+    return real_path(common_qlpack).parents[3]
+
+
 def read_pack_identity(root: Path) -> tuple[str, str]:
     """Return the (name, version) declared in the pack's qlpack.yml."""
     name = version = None
@@ -200,7 +205,16 @@ def analyze_database(
     args: argparse.Namespace, workspace: Path, database: Path, output_dir: Path
 ) -> Path:
     root = pack_root(args.pack, args.suite)
-    name, version = read_pack_identity(root)
+    if args.query_spec:
+        # A single query straight from the sources, e.g. to debug one rule.
+        query = args.query_spec
+        packs = (
+            f"--additional-packs={coding_standards_root(args.coding_standards_sources)}"
+        )
+    else:
+        name, version = read_pack_identity(root)
+        query = f"{name}@{version}:{args.suite}"
+        packs = f"--search-path={root}"
     sarif = output_dir / f"{args.output_prefix}.sarif"
     subprocess.run(
         [
@@ -209,8 +223,8 @@ def analyze_database(
             "analyze",
             "-j=0",
             database,
-            f"{name}@{version}:{args.suite}",
-            f"--search-path={root}",
+            query,
+            packs,
             "--format=sarifv2.1.0",
             f"--output={sarif}",
         ],
@@ -290,7 +304,9 @@ def normalize_sarif_rule_order(sarif: Path) -> None:
     document = json.loads(sarif.read_text(encoding="utf-8"))
     for run in document.get("runs", []):
         normalize_sarif_run(run)
-    sarif.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    normalized = sarif.with_name(sarif.name + ".normalized")
+    normalized.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    os.replace(normalized, sarif)
 
 
 def normalize_sarif_run(run: dict) -> None:
@@ -367,6 +383,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     tools.add_argument("--coding-standards-schema", required=True)
     tools.add_argument("--sarif-schema", required=True)
+    tools.add_argument(
+        "--coding-standards-sources",
+        required=True,
+        help="cpp/common/src/qlpack.yml of the coding-standards sources",
+    )
     parser.add_argument(
         "--codescanning-config",
         required=True,
@@ -383,9 +404,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--target",
-        action="append",
+        action="extend",
+        nargs="+",
         default=[],
-        help="Bazel target pattern to build (repeatable)",
+        help="Bazel target patterns to build (repeatable, several per flag; "
+        "exclusions as --target=-//pkg/...)",
     )
     parser.add_argument(
         "--build-config",
@@ -423,10 +446,24 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--database",
+        "--database-path",
+        dest="database",
         help="Keep the CodeQL database in this directory instead of a temporary one",
     )
+    parser.add_argument(
+        "--phase",
+        choices=["create-database", "analyze-database", "all"],
+        default="all",
+        help="Only create or only analyse the --database (default: both)",
+    )
+    parser.add_argument(
+        "--query-spec",
+        help="Analyse this query from the coding-standards sources instead of the pack suite",
+    )
     args = parser.parse_args(argv)
-    if not args.target:
+    if args.phase != "all" and not args.database:
+        parser.error(f"--phase={args.phase} needs --database")
+    if args.phase != "analyze-database" and not args.target:
         parser.error("at least one --target is required")
     args.codeql = str(real_path(args.codeql))
     # Helper binaries stay inside this runfiles tree, where they find their own runfiles.
@@ -450,7 +487,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.database:
         database = cwd / args.database
         database.parent.mkdir(parents=True, exist_ok=True)
-        create_database(args, workspace, database)
+        if args.phase != "analyze-database":
+            create_database(args, workspace, database)
+        if args.phase == "create-database":
+            print(f"CodeQL database written to {database}")
+            return 0
         sarif = analyze_database(args, workspace, database, output_dir)
     else:
         with tempfile.TemporaryDirectory(prefix="codeql_db_") as tmp:
