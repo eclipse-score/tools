@@ -47,6 +47,10 @@ Useful options: `--run ortho|other`, `--repo NAME` (repeatable), `--skip-sync`,
 `--skip-build`, `--jar FILE`, `--reuse` to keep the renders of an earlier
 run, `--jobs N`, `--timeout SECONDS`.
 
+The workflow `plantuml-compare.yml` runs the script on every push that
+touches it and on demand, always against the current head of the PlantUML
+branch, and publishes the page on GitHub Pages under `plantuml/`.
+
 ## Reports
 
 - `summary.md`: totals per variant and repository, diagrams that only

@@ -1,0 +1,74 @@
+# *******************************************************************************
+# Copyright (c) 2026 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
+name: PlantUML layout comparison
+on:
+  push:
+    paths:
+      - plantuml_compare/**
+      - .github/workflows/plantuml-compare.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+# A newer run replaces the page of an older one.
+concurrency:
+  group: plantuml-compare-pages
+  cancel-in-progress: true
+jobs:
+  compare:
+    runs-on: ubuntu-24.04
+    env:
+      # The repository cache lists and clones the repositories through gh.
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.0
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v7
+      - name: Setup Java
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Install Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends graphviz
+      # Builds the current head of the PlantUML branch on every run.
+      - name: Render and compare the diagrams
+        run: uv run plantuml_compare/compare.py --out "$RUNNER_TEMP/plantuml-compare"
+      - name: Assemble the site
+        run: |
+          mkdir -p site/plantuml
+          cp "$RUNNER_TEMP/plantuml-compare/index.html" site/plantuml/
+          for run in ortho other; do
+            mkdir -p "site/plantuml/$run"
+            cp "$RUNNER_TEMP/plantuml-compare/$run/summary.md" "$RUNNER_TEMP/plantuml-compare/$run/results.csv" "site/plantuml/$run/"
+            cat "$RUNNER_TEMP/plantuml-compare/$run/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+  deploy:
+    needs: compare
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}plantuml/
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
