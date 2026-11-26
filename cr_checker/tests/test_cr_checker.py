@@ -39,11 +39,11 @@ def load_cr_checker_module():
 
 
 # load the license template
-def load_template(extension: str) -> str:
+def load_template(extension: str, variant: int = 0) -> str:
     cr_checker = load_cr_checker_module()
     template_file = Path(__file__).resolve().parents[1] / "tool" / "templates.ini"
     templates = cr_checker.load_templates(template_file)
-    return templates[extension][0]
+    return templates[extension][variant]
 
 
 # test that offset matches the length of the shebang line including trailing newlines
@@ -886,7 +886,7 @@ def test_process_files_fix_replaces_wrong_copyright_after_shebang(tmp_path: Path
     )
 
 
-def test_process_files_fix_keeps_year_range(tmp_path: Path):
+def test_process_files_fix_keeps_first_year_of_range(tmp_path: Path):
     cr_checker = load_cr_checker_module()
     test_file = tmp_path / "file.py"
     header = wrong_wording_header("py").replace("2023", "2021-2023")
@@ -901,7 +901,7 @@ def test_process_files_fix_keeps_year_range(tmp_path: Path):
     )
 
     assert test_file.read_text(encoding="utf-8").startswith(
-        load_template("py").format(year="2021-2023")
+        load_template("py").format(year=2021)
     )
 
 
@@ -987,7 +987,7 @@ def test_existing_rst_headers_pass_without_migration(
         Title
         =====
         """)
-    original = templates["rst"][variant].format(year="2020-2026") + "\n" + document
+    original = templates["rst"][variant].format(year=2020) + "\n" + document
     source.write_text(original, encoding="utf-8")
 
     assert run_main(cr_checker, monkeypatch, *fix_args, str(source)) == 0
@@ -998,6 +998,45 @@ def test_existing_rst_headers_pass_without_migration(
     source.write_text(duplicate, encoding="utf-8")
     assert run_main(cr_checker, monkeypatch, *fix_args, str(source)) == 1
     assert source.read_text(encoding="utf-8") == duplicate
+
+
+@pytest.mark.parametrize("variant", [0, 1], ids=["preferred", "legacy"])
+def test_rst_header_year_range_is_rejected_and_repaired(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, variant: int
+):
+    cr_checker = load_cr_checker_module()
+    source = tmp_path / "index.rst"
+    document = "\nTitle\n=====\n"
+    original = load_template("rst", variant).format(year="2024-2026") + document
+    source.write_text(original, encoding="utf-8")
+
+    assert run_main(cr_checker, monkeypatch, str(source)) == 1
+    assert source.read_text(encoding="utf-8") == original
+    assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
+    assert (
+        source.read_text(encoding="utf-8")
+        == load_template("rst").format(year=2024) + document
+    )
+    assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 0
+
+
+def test_author_placeholder_does_not_accept_spaced_year_range(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    cr_checker = load_cr_checker_module()
+    config = tmp_path / "templates.ini"
+    template = (
+        "# Copyright (c) {year} {author}\n# SPDX-License-Identifier: Apache-2.0\n"
+    )
+    config.write_text("[py]\n" + template, encoding="utf-8")
+    source = tmp_path / "example.py"
+    original = template.format(year="2024 - 2026", author="Example") + "x = 1\n"
+    source.write_text(original, encoding="utf-8")
+    args = ("--template-file", str(config), str(source))
+
+    assert run_main(cr_checker, monkeypatch, *args) == 1
+    assert run_main(cr_checker, monkeypatch, "--fix", *args) == 1
+    assert source.read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize(
@@ -1124,7 +1163,7 @@ def test_complete_short_comments_can_still_be_repaired(
     opening: str,
     closing: str,
 ):
-    """A fully closed short header can be normalized while its years and following text survive."""
+    """A closed short header can be normalized while preserving the creation year and body."""
     cr_checker = load_cr_checker_module()
     source = tmp_path / f"example.{extension}"
     document = "preserved content\n"
@@ -1140,7 +1179,7 @@ def test_complete_short_comments_can_still_be_repaired(
     assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
     assert (
         source.read_text(encoding="utf-8")
-        == load_template(extension).format(year="2021-2024") + document
+        == load_template(extension).format(year=2021) + document
     )
     assert run_main(cr_checker, monkeypatch, str(source)) == 0
 
@@ -1188,16 +1227,19 @@ def block_comment_header(request: pytest.FixtureRequest):
     return extension, header, closing, document
 
 
-@pytest.mark.parametrize("year", ["2024", "2021-2024"])
+@pytest.mark.parametrize(
+    ("year", "creation_year"), [("2024", 2024), ("2021-2024", 2021)]
+)
 @pytest.mark.parametrize("separator", ["", "\n"])
 def test_block_comment_repair_preserves_year_and_following_content(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     block_comment_header: tuple[str, str, str, str],
     year: str,
+    creation_year: int,
     separator: str,
 ):
-    """Repair consumes the whole comment, preserving years and all following text."""
+    """Repair consumes the whole comment, preserving the creation year and all following text."""
     extension, header_template, _, document = block_comment_header
     header = header_template.format(year=year)
     following_content = separator + document
@@ -1211,7 +1253,7 @@ def test_block_comment_repair_preserves_year_and_following_content(
     assert run_main(cr_checker, monkeypatch, str(source)) == 1
     assert source.read_text(encoding="utf-8") == original
     assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 1
-    expected = load_template(extension).format(year=year) + following_content
+    expected = load_template(extension).format(year=creation_year) + following_content
     assert source.read_text(encoding="utf-8") == expected
     assert run_main(cr_checker, monkeypatch, str(source)) == 0
     assert run_main(cr_checker, monkeypatch, "--fix", str(source)) == 0
@@ -1371,7 +1413,7 @@ def test_block_comment_search_limit_applies_to_spdx_not_closing_lines(
         source, load_template(extension), "utf-8", 0, max_header_lines=max_lines
     ) == (max_lines == 3)
     expected_content = (
-        load_template(extension).format(year="2021-2024") if max_lines == 3 else header
+        load_template(extension).format(year=2021) if max_lines == 3 else header
     )
     assert source.read_text(encoding="utf-8") == expected_content
 

@@ -82,9 +82,10 @@ class ColoredFormatter(logging.Formatter):
 
 
 def convert_bre_to_regex(template: str) -> str:
-    """
-    Convert BRE-style template (literal by default) to standard regex.
-    In the template: * is literal, \\* is a metacharacter.
+    r"""Translate a BRE-style template to Python regex.
+
+    BRE stands for Basic Regular Expressions. In these templates, ``*`` means
+    a literal asterisk and ``\*`` means repeat the preceding item.
     """
     # First, escape all regex metacharacters to make them literal
     escaped = re.escape(template)
@@ -379,6 +380,17 @@ def has_copyright(
 
     load_text = load_text_from_file_with_mmap if use_mmap else load_text_from_file
 
+    # The Eclipse Project Handbook specifies the year of initial creation.
+    # https://www.eclipse.org/projects/handbook/#legaldoc-faq
+    single_year = r"\d{4}"
+    year_range = rf"{single_year}[ \t]*-[ \t]*{single_year}"
+    # (?!...) means "fail if this comes next". It stops the author field
+    # from treating "- 2026" as the author in "2024 - 2026".
+    reject_range = rf"(?!{year_range})"
+    year_pattern = reject_range + single_year
+
+    # Use a marker during BRE conversion so the year pattern keeps its Python syntax.
+    year_marker = "\0"
     lines = template.splitlines(keepends=True)
     regex_parts = []
     for line in lines:
@@ -386,8 +398,10 @@ def has_copyright(
         if BORDER_FILL_PATTERN.search(stripped_line):
             regex_parts.append(line_to_flexible_regex(line))
         else:
-            formatted = line.format(year=r"\\d\{4\}\(-\\d\{4\}\)\?", author=r"\.\*")
-            regex_parts.append(convert_bre_to_regex(formatted))
+            formatted = line.format(year=year_marker, author=r"\.\*")
+            regex_parts.append(
+                convert_bre_to_regex(formatted).replace(year_marker, year_pattern)
+            )
     template_regex = "".join(regex_parts) + "\n?"
 
     if re.match(template_regex, load_text(path, BYTES_TO_READ, encoding, offset)):
@@ -527,7 +541,7 @@ HEADER_START_PATTERN = re.compile(r"^\s*(#|//|/\*|/'|\*|'|<!--|\.\.)")
 BORDER_LINE_PATTERN = re.compile(r"^\s*(<!--)?[\s/*#'\-=+]*(-->)?\s*$")
 BLOCK_COMMENT_DELIMITERS = (("/*", "*/"), ("<!--", "-->"), ("/'", "'/"))
 COMMENT_DECORATION_PATTERN = re.compile(r"[\s/*#'\-=+]*")
-COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4}(?:\s*-\s*\d{4})?)")
+COPYRIGHT_YEAR_PATTERN = re.compile(r"Copyright\s+\(c\)\s+(\d{4})\b")
 
 
 def extract_block_comment(lines: list[str], terminator: str) -> list[str] | None:
@@ -676,9 +690,9 @@ def fix_wrong_copyright(
     template, if both use the same license.
 
     The license is compared via the ``SPDX-License-Identifier``. Headers with a
-    different license (e.g. third-party code) are never touched. The year (or
-    year range) of the old header is kept; if none is found, the current year
-    is used.
+    different license (e.g. third-party code) are never touched. The first year
+    in the old notice is kept as the creation year. If no year is found, the
+    current year is used.
 
     Args:
         path (Path): A `pathlib.Path` object pointing to the file.
@@ -707,12 +721,15 @@ def fix_wrong_copyright(
 
     year_match = COPYRIGHT_YEAR_PATTERN.search(header_text)
     year = year_match[1] if year_match else str(datetime.now().year)
+    try:
+        replacement = template.format(year=year)
+    except KeyError as err:
+        LOGGER.debug("No replacement value for %s in the template for %s", err, path)
+        return False
 
     with open(path, "r", encoding=encoding) as handle:
         content = handle.read()
-    new_content = (
-        content[:offset] + template.format(year=year) + content[offset + num_chars :]
-    )
+    new_content = content[:offset] + replacement + content[offset + num_chars :]
     with open(path, "w", encoding=encoding) as handle:
         handle.write(new_content)
     return True
@@ -895,7 +912,7 @@ def process_files(
                     LOGGER.error(
                         "Wrong copyright format in: %s, not replaced because its "
                         "license differs from the template or the header could not "
-                        "be located. Fix it by hand or add it to the exclusion file.",
+                        "be safely rewritten. Fix it by hand or add it to the exclusion file.",
                         item,
                     )
             elif fix:
