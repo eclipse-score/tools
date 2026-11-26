@@ -13,36 +13,55 @@
 
 # Monorepo Release
 
-Monorepo Release shows what has changed since the last release of each component
-and prepares a GitHub release draft for a selected component. It uses the
-component path rules in `.github/labeler.yml` to select the commits for both the
-release overview and the release notes. Each component has its own version and
-release tag.
+Review changes and prepare GitHub release drafts for independently versioned
+components in a monorepo. Monorepo Release uses the path rules in
+`.github/labeler.yml` to select the commits for both the release overview and
+the release notes.
 
-## Usage
+## Requirements
 
-From the tools checkout, run the CLI with `uv run --locked monorepo-release`.
-To use the CLI in another checkout, install it with
-`uv tool install ./monorepo_release` from the tools repository.
+- Git and Python 3.12 or newer.
+- A repository with at least one component defined in a committed
+  `.github/labeler.yml`. [Configuration reference](docs/reference.md#component-configuration)
+- An authenticated GitHub CLI (`gh`) with write access to the target repository
+  for creating drafts.
 
-Run these commands from a Git checkout with at least one component in
-`.github/labeler.yml`. Creating a draft requires an authenticated GitHub CLI
-with write access to the repository.
+## Install
+
+Run this from the tools repository to install the command with `uv`.
+
+```sh
+uv tool install ./monorepo_release
+```
+
+When working in the tools repository, you can also run the workspace copy
+with `uv run --locked monorepo-release status`.
+
+## Review pending changes
+
+Run `status` from the checkout you want to inspect.
 
 ```sh
 monorepo-release status
+```
+
+The report lists each component’s last release tag and its pending commits.
+In a GitHub Actions check, set `fetch-depth: 0` on the checkout step to make
+tags and commit history available. The report also appears in the job summary.
+
+## Prepare a release draft
+
+Confirm the target repository with `gh repo view`. In a fork checkout, use
+`gh repo set-default OWNER/REPO` to select the repository for the draft.
+Then run `draft` with the component name.
+
+```sh
 monorepo-release draft repo-policy-sync
 ```
 
-In this repository, `repo-policy-sync` includes `repo_policy_sync/**` and its
-GitHub Actions workflow. Changes to either path appear in the notes for a
-release such as `repo-policy-sync/v1.2.3`. [Path rules](../.github/labeler.yml)
+The command reads the target repository’s default branch and prints the link
+to the draft. Open the draft in GitHub to review or edit the notes and publish
+the release.
 
-`draft` prints the draft's GitHub link. Open the draft to review or edit its
-notes and publish it when ready. Run `status` locally or in a pull request check
-to review pending changes. For a PR check, use `fetch-depth: 0` so Git can find
-each component's tags and commit history. `draft` uses the repository selected
-by `gh repo view`, which can be set with `gh repo set-default` in a fork checkout.
-
-See the [design notes](DESIGN.md) for path matching, versioning, and how drafts
-are tied to a commit.
+See the [command and configuration reference](docs/reference.md) for tag
+selection, version bumps, and draft behavior.
