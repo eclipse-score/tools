@@ -23,18 +23,14 @@ from typing import cast
 from urllib.parse import quote
 
 from .github import draft_release
-from .releases import module_report, git, reachable_tags, read_modules
+from .releases import fetch, git, module_report, reachable_tags, read_modules
 from .reporting import status_summary, status_table
 
 
 def show_status(root: Path) -> None:
-    if git(root, "rev-parse", "--is-shallow-repository").strip() == "true":
-        raise ValueError(
-            "status requires full history and tags. Run git fetch --unshallow --tags "
-            "or set fetch-depth: 0 in GitHub Actions."
-        )
     head = git(root, "rev-parse", "--verify", "HEAD").strip()
     modules = read_modules(root, head)
+    fetch(root)
     tags = reachable_tags(root, head)
     reports = [
         module_report(root, head, tags, module, paths)

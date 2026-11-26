@@ -110,6 +110,22 @@ def git(root: Path, *arguments: str) -> str:
     ).stdout
 
 
+def fetch(root: Path, *target: str, config: tuple[str, ...] = ()) -> None:
+    shallow = git(root, "rev-parse", "--is-shallow-repository").strip() == "true"
+    git(
+        root,
+        *config,
+        "fetch",
+        "--tags",
+        "--no-prune",
+        "--no-recurse-submodules",
+        *(("--unshallow",) if shallow else ()),
+        *target,
+    )
+    if shallow and git(root, "rev-parse", "--is-shallow-repository").strip() == "true":
+        raise ValueError("Fetch the full Git history before comparing releases.")
+
+
 def single_labeler_rule(rules: object, key: str, label: str) -> object:
     if isinstance(rules, list) and len(cast(list[object], rules)) == 1:
         rule = cast(list[object], rules)[0]
@@ -229,8 +245,9 @@ def module_report(
         root,
         "log",
         "-z",
-        "--format=%x00%H%x00%P%x00%s",
+        "--format=%x00%H%x00%s",
         "--name-only",
+        "--no-merges",
         "--no-renames",
         "--no-notes",
         "--no-follow",
@@ -245,33 +262,12 @@ def module_report(
     # An empty field marks each header. Git prefixes the first path with a newline.
     fields = iter(history.split("\0")[1:])
     for sha in fields:
-        parents = next(fields).split()
         commit = Commit(sha, next(fields))
         path = next(fields).removeprefix("\n")
         matched = False
         while path:
             matched = matched or matcher.fullmatch(path) is not None
             path = next(fields)
-        if len(parents) > 1:
-            # git log omits merge diffs. Compare with the first parent so
-            # changes made in the merge itself contribute to the report.
-            merged_paths = git(
-                root,
-                "diff-tree",
-                "-r",
-                "-z",
-                "--name-only",
-                "--no-renames",
-                f"{sha}^1",
-                sha,
-                "--",
-                *pathspecs,
-            )
-            matched = any(
-                matcher.fullmatch(path) is not None
-                for path in merged_paths.split("\0")
-                if path
-            )
         if matched and commit.release_increment is not None:
             commits.append(commit)
     is_new = (

@@ -11,6 +11,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
+import os
 import subprocess
 from pathlib import Path
 
@@ -19,14 +20,23 @@ import pytest
 from monorepo_release.src import github
 from monorepo_release.src.cli import main
 from monorepo_release.src.releases import (
-    module_report,
     git,
+    module_report,
     reachable_tags,
     read_modules,
 )
 
 REPOSITORY_URL = "https://github.com/example/monorepo"
 DRAFT_URL = f"{REPOSITORY_URL}/releases/tag/bazel%2Fv1.3.0"
+
+
+@pytest.fixture(autouse=True)
+def isolate_git_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.delenv("GIT_CONFIG_COUNT", raising=False)
+    monkeypatch.delenv("GIT_CONFIG_PARAMETERS", raising=False)
+    monkeypatch.setenv("LC_ALL", "C")
 
 
 def commit(root: Path, subject: str, files: dict[str, str]) -> str:
@@ -176,24 +186,77 @@ formatter:
     assert "| formatter | — | v0.10.0 | New |" in summary
 
 
-def test_status_requires_full_history(
+def test_status_fetches_full_history_from_shallow_checkout(
     repository: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     git(repository, "tag", "bazel/v1.2.0")
-    commit(
+    head = commit(
         repository, "fix: adjust triggers", {".github/workflows/bazel.yml": "change"}
     )
     checkout = tmp_path / "checkout"
     git(tmp_path, "clone", "--quiet", "--depth=1", repository.as_uri(), str(checkout))
     monkeypatch.chdir(checkout)
 
+    assert main(["status"]) == 0
+    output = capsys.readouterr().out
+    assert "bazel bazel/v1.2.0 bazel/v1.2.0 Changed" in [
+        " ".join(line.split()) for line in output.splitlines()
+    ]
+    assert git(checkout, "rev-parse", "--is-shallow-repository").strip() == "false"
+    assert git(checkout, "rev-parse", "HEAD").strip() == head
+
+
+def test_status_fetches_missing_tags_from_the_tracking_remote(
+    repository: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    git(repository, "tag", "-a", "v0.0.5", "-m", "Repository release")
+    checkout = tmp_path / "checkout"
+    git(
+        tmp_path,
+        "clone",
+        "--quiet",
+        "--no-tags",
+        "-o",
+        "upstream",
+        repository.as_uri(),
+        str(checkout),
+    )
+    git(checkout, "remote", "add", "origin", str(tmp_path / "missing"))
+    head = git(checkout, "rev-parse", "HEAD")
+    git(repository, "tag", "docs/v1.0.0")
+    remote_head = commit(
+        repository, "fix: adjust triggers", {".github/workflows/bazel.yml": "change"}
+    )
+    assert not git(checkout, "tag", "--list")
+    monkeypatch.chdir(checkout)
+
+    assert main(["status"]) == 0
+    rows = [" ".join(line.split()) for line in capsys.readouterr().out.splitlines()]
+    assert "bazel — v0.0.5 Unchanged" in rows
+    assert "docs docs/v1.0.0 docs/v1.0.0 Unchanged" in rows
+    assert git(checkout, "rev-parse", "HEAD") == head
+    assert git(checkout, "rev-parse", "upstream/main").strip() == remote_head
+
+
+def test_status_aborts_if_tags_cannot_be_fetched(
+    repository: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    git(repository, "remote", "add", "origin", str(tmp_path / "missing"))
+    monkeypatch.chdir(repository)
+
     assert main(["status"]) == 1
     output = capsys.readouterr()
     assert not output.out
-    assert "git fetch --unshallow --tags" in output.err
+    assert "does not appear to be a git repository" in output.err
 
 
 def test_file_rule_excludes_descendants_of_a_former_file(repository: Path) -> None:
@@ -247,28 +310,6 @@ bazel.yml:
     assert [change.sha for change in report.commits] == [deep_path, shallow_path]
 
 
-def test_status_includes_merge_resolution_changes(repository: Path) -> None:
-    workflow = ".github/workflows/bazel.yml"
-    git(repository, "tag", "bazel/v1.2.0")
-    git(repository, "switch", "--quiet", "-c", "topic")
-    commit(repository, "fix: adjust workflow on topic", {workflow: "topic\n"})
-    git(repository, "switch", "--quiet", "main")
-    commit(repository, "fix: adjust workflow on main", {workflow: "main\n"})
-    with pytest.raises(subprocess.CalledProcessError):
-        git(repository, "merge", "--no-edit", "topic")
-    head = commit(repository, "fix: resolve workflow conflict", {workflow: "merged\n"})
-
-    report = module_report(
-        repository,
-        head,
-        reachable_tags(repository, head),
-        "bazel",
-        read_modules(repository, head)["bazel"],
-    )
-    assert report.commits[0].sha == head
-    assert report.next_tag == "bazel/v1.2.1"
-
-
 def test_duplicate_yaml_label_is_rejected(repository: Path) -> None:
     head = commit(
         repository,
@@ -313,21 +354,28 @@ def test_version_is_derived_from_selected_commits(
 
 
 @pytest.mark.parametrize("shallow", [False, True])
-@pytest.mark.parametrize("create_result", ["success", "response-lost", "lookup-failed"])
+@pytest.mark.parametrize("create_fails", [False, True], ids=["success", "error"])
 def test_draft_uses_remote_commit_and_preserves_existing_draft(
     github_remote: Path,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
     shallow: bool,
-    create_result: str,
+    create_fails: bool,
 ) -> None:
     git(github_remote, "tag", "bazel/v1.2.0")
+    commit(github_remote, "chore: prepare checkout", {"docs/index.md": "local"})
     checkout = tmp_path / "checkout"
     depth = ["--depth=1"] if shallow else []
-    git(tmp_path, "clone", "--quiet", *depth, github_remote.as_uri(), str(checkout))
-    git(checkout, "tag", "bazel/v10.0.0")
-    git(checkout, "tag", "bazel/v1.3.0")
+    git(
+        tmp_path,
+        "clone",
+        "--quiet",
+        "--no-tags",
+        *depth,
+        github_remote.as_uri(),
+        str(checkout),
+    )
     remote_head = commit(
         github_remote,
         "feat: add setup flag (#27)",
@@ -349,10 +397,7 @@ def test_draft_uses_remote_commit_and_preserves_existing_draft(
             return f"example/monorepo\tmain\t{REPOSITORY_URL}"
         if args[0] == "api":
             assert "--paginate" in args
-            if create_attempted and create_result == "lookup-failed":
-                raise subprocess.CalledProcessError(
-                    1, args, stderr="draft lookup failed"
-                )
+            assert not (create_attempted and create_fails)
             other_draft = f"docs/v1.3.0\t{REPOSITORY_URL}/releases/tag/docs%2Fv1.3.0"
             return (
                 f"{other_draft}\nbazel/v1.3.0\t{DRAFT_URL}" if created else other_draft
@@ -375,13 +420,15 @@ def test_draft_uses_remote_commit_and_preserves_existing_draft(
         )
         assert input_text == notes
         create_attempted = True
-        created = create_result != "lookup-failed"
-        if create_result != "success":
+        if create_fails:
             raise subprocess.CalledProcessError(1, args, stderr="draft creation failed")
+        created = True
         return DRAFT_URL
 
     monkeypatch.setattr(github, "gh", gh_stub)
     assert main(preview_args) == 0
+    assert git(checkout, "tag", "--list").splitlines() == ["bazel/v1.2.0"]
+    assert git(checkout, "rev-parse", "--is-shallow-repository").strip() == "false"
     assert repo_view_arguments[-1][-2:] == ("--", "example/monorepo")
     assert not create_attempted
     assert capsys.readouterr().out == (
@@ -389,17 +436,16 @@ def test_draft_uses_remote_commit_and_preserves_existing_draft(
         f"Comparison base: bazel/v1.2.0\n\n{notes}"
     )
 
-    existing = f"Existing draft for bazel: {DRAFT_URL}\n"
-    if create_result == "lookup-failed":
+    if create_fails:
         assert main(["draft", "bazel"]) == 1
         assert capsys.readouterr().err == "monorepo-release: draft creation failed\n"
     else:
         assert main(["draft", "bazel"]) == 0
-        expected = f"{DRAFT_URL}\n" if create_result == "success" else existing
-        assert capsys.readouterr().out == expected
+        assert capsys.readouterr().out == f"{DRAFT_URL}\n"
         assert main(["draft", "bazel"]) == 0
-        assert capsys.readouterr().out == existing
+        assert capsys.readouterr().out == f"Existing draft for bazel: {DRAFT_URL}\n"
     assert git(checkout, "rev-parse", "HEAD") == local_head
+    assert git(checkout, "rev-parse", "origin/main") == local_head
     assert not git(checkout, "status", "--porcelain")
 
 
@@ -413,7 +459,6 @@ def test_draft_compares_first_release_with_remote_repository_tag(
 ) -> None:
     checkout = tmp_path / "checkout"
     git(tmp_path, "clone", "--quiet", github_remote.as_uri(), str(checkout))
-    git(checkout, "tag", "v99.0.0")
     commit(
         github_remote,
         "fix: update released workflow",
@@ -452,5 +497,40 @@ def test_draft_compares_first_release_with_remote_repository_tag(
     assert capsys.readouterr().out == (
         f"Repository: {REPOSITORY_URL}\nTag: bazel/v0.0.1\nTarget: main @ {head}\n"
         f"Comparison base: v51.0.0\n\n"
-        "- feat\\!: add setup flag\n"
+        "- feat!: add setup flag\n"
     )
+
+    git(checkout, "tag", "v99.0.0", head)
+    assert main(["draft", "bazel", "--dry-run"]) == 0
+    assert capsys.readouterr().out == (
+        "No changes to draft for bazel.\nComparison base: v99.0.0\n"
+    )
+
+
+def test_draft_aborts_on_conflicting_local_tag(
+    github_remote: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    checkout = tmp_path / "checkout"
+    git(tmp_path, "clone", "--quiet", github_remote.as_uri(), str(checkout))
+    git(checkout, "tag", "v0.0.5")
+    original_tag = git(checkout, "rev-parse", "v0.0.5")
+    commit(
+        github_remote,
+        "fix: update the workflow",
+        {".github/workflows/bazel.yml": "update"},
+    )
+    git(github_remote, "tag", "v0.0.5")
+    monkeypatch.chdir(checkout)
+
+    def gh_stub(root: Path, *args: str, input_text: str | None = None) -> str:
+        assert root == checkout and args[:2] == ("repo", "view")
+        assert input_text is None
+        return f"example/monorepo\tmain\t{REPOSITORY_URL}"
+
+    monkeypatch.setattr(github, "gh", gh_stub)
+    assert main(["draft", "bazel"]) == 1
+    assert "would clobber existing tag" in capsys.readouterr().err
+    assert git(checkout, "rev-parse", "v0.0.5") == original_tag

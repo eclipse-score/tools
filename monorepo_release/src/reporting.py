@@ -22,7 +22,7 @@ PR_REFERENCE = re.compile(r"\(#([1-9][0-9]*)\)$")
 
 
 def markdown_text(value: str) -> str:
-    return re.sub(r"([\\`*_[\]<>!~|@])", r"\\\1", value)
+    return re.sub(r"([\\`*_[\]<>~|@])", r"\\\1", value)
 
 
 def commit_list(
@@ -30,11 +30,12 @@ def commit_list(
 ) -> str:
     lines: list[str] = []
     for commit in commits:
-        subject = markdown_text(commit.subject)
-        if match := PR_REFERENCE.search(commit.subject):
-            number = match[1]
-            subject = markdown_text(commit.subject[: match.start()])
-            subject += f"([#{number}]({repository_url}/pull/{number}))"
+        match = PR_REFERENCE.search(commit.subject)
+        subject = markdown_text(
+            commit.subject[: match.start()] if match else commit.subject
+        )
+        if match:
+            subject += f"([#{match[1]}]({repository_url}/pull/{match[1]}))"
         if link_commits:
             subject = (
                 f"[{commit.sha[:7]}]({repository_url}/commit/{commit.sha}) {subject}"

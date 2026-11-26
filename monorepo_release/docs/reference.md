@@ -47,9 +47,10 @@ module release tag, comparison base, and pending commits for each module.
 Uncommitted and untracked changes produce a warning and are excluded from the
 report.
 
-The checkout must have full commit history and up-to-date tags. For a shallow
-checkout, run `git fetch --unshallow --tags` or use `fetch-depth: 0` in GitHub
-Actions.
+Both commands run `git fetch --tags` in the current checkout and retrieve
+full history when the checkout is shallow. A failed fetch aborts either
+command. For `status`, Git selects the remote and updates its remote-tracking
+refs. A full checkout without a remote uses its local tags.
 
 | Status | Meaning |
 | --- | --- |
@@ -58,6 +59,9 @@ Actions.
 | `Changed` | The module has relevant commits after the comparison tag. |
 | `Unchanged` | The comparison tag covers every relevant commit. |
 
+A module introduced only by maintenance commits can appear as `New`. A draft
+requires at least one relevant commit.
+
 In GitHub Actions, `status` appends a Markdown report when
 `GITHUB_STEP_SUMMARY` and `GITHUB_REPOSITORY` are set.
 
@@ -65,10 +69,10 @@ In GitHub Actions, `status` appends a Markdown report when
 
 Reads the configuration and commit history from the default branch of the
 target repository and fetches its module and repository tags. By default,
-the target is the repository selected by `gh repo view`. The command fetches the
-release history separately from the working checkout, so it also works from a
-shallow checkout. The draft targets the exact commit SHA used to generate the
-notes.
+the target is the repository selected by `gh repo view`. The command fetches
+the target branch and tags into the current checkout. It uses the fetched
+branch commit and all reachable tags available locally, including local-only
+tags. The draft targets the exact commit SHA used for the notes.
 
 - If a draft already exists for the module, the command prints its link and
   preserves the maintainer’s edits.
@@ -94,6 +98,9 @@ reachable from the target commit, and versions are compared numerically.
 The first module release uses `0.0.1` when there are relevant changes.
 The repository tag sets the start of the comparison. Each module uses
 its own version sequence.
+
+The comparison is designed for squash-merged pull requests. It includes
+the resulting commits and skips merge commits.
 
 For existing releases, the largest applicable bump among the selected commits
 determines the next version.

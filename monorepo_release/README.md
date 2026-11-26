@@ -23,8 +23,8 @@ the release notes.
 - Git and `uv`. The tool requires Python 3.12 or newer.
 - A repository with at least one module defined in a committed
   `.github/labeler.yml`. [Configuration reference](docs/reference.md#module-configuration)
-- An authenticated GitHub CLI (`gh`) with write access to the target repository
-  for creating drafts.
+- An authenticated GitHub CLI (`gh`) for `draft`, including dry runs. Creating
+  a draft requires write access to the target repository.
 
 ## Review pending changes
 
@@ -39,11 +39,12 @@ uvx --from 'git+https://github.com/eclipse-score/tools.git#subdirectory=monorepo
 When developing the tool, run the workspace copy with
 `uv run --locked monorepo-release status`.
 
-The report lists each module’s last release tag, comparison base, and
-pending commits. Until a module has its own release tag, the latest
-reachable stable repository tag serves as the comparison base.
-In a GitHub Actions check, set `fetch-depth: 0` on the checkout step to make
-tags and commit history available. The report also appears in the job summary.
+The command fetches tags from the checkout's Git remote, then lists each
+module’s last release tag, comparison base, and pending commits. Until a module
+has its own release tag, the comparison uses the reachable stable repository
+tag with the highest version.
+For shallow checkouts, the fetch also retrieves the full commit history.
+In GitHub Actions, the report also appears in the job summary.
 
 ## Prepare a release draft
 
