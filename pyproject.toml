@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 [tool.uv.workspace]
 members = [
     "cr_checker",
+    "monorepo_release",
     "repo_cache",
     "repo_policy_sync",
 ]
@@ -18,6 +19,7 @@ package = false
 [dependency-groups]
 dev = [
     "cr-checker",
+    "monorepo-release",
     "pyfakefs>=6.1.6",
     "pyrefly==1.5.0",
     "pytest>=9.1.1",
@@ -28,6 +30,7 @@ dev = [
 
 [tool.uv.sources]
 cr-checker = { workspace = true }
+monorepo-release = { workspace = true }
 repo-cache = { workspace = true }
 repo-policy-sync = { workspace = true }
 

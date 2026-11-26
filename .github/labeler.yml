@@ -19,6 +19,11 @@ cr-checker:
           - .pre-commit-hooks.yaml
           - MODULE.bazel
 
+monorepo-release:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "monorepo_release/**"
+
 repo-cache:
   - changed-files:
       - any-glob-to-any-file:
