@@ -11,4 +11,4 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
-"""Monorepo Release reports changes and prepares component release drafts."""
+"""Monorepo Release reports changes and prepares module release drafts."""

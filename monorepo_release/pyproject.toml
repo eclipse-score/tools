@@ -1,7 +1,7 @@
 [project]
 name = "monorepo-release"
 version = "0.1.0"
-description = "Review independently versioned components and draft GitHub releases"
+description = "Review independently versioned modules and draft GitHub releases"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["pyyaml>=6.0"]

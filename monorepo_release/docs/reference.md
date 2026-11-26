@@ -13,10 +13,10 @@
 
 # Monorepo Release reference
 
-## Component configuration
+## Module configuration
 
-Each label in `.github/labeler.yml` defines a release component. Give each
-component one `changed-files` rule with `any-glob-to-any-file`. Use a single
+Each label in `.github/labeler.yml` defines a release module. Give each
+module one `changed-files` rule with `any-glob-to-any-file`. Use a single
 path or a list of paths relative to the repository root.
 
 ```yaml
@@ -29,49 +29,71 @@ bazel.yml:
 
 The supported patterns are exact file paths, `*` within one path segment,
 and `**` as a complete path segment for zero or more directory levels.
-A commit that matches several components is included in each one.
+Patterns include dotfiles and dot directories. A commit that matches several
+modules is included in each one.
 
-Tags use `<component>/vMAJOR.MINOR.PATCH`. A final dot suffix of one to three
-characters is dropped from the component name. The example above uses `bazel`
-as the argument to `draft` and `bazel/v1.2.3` as a release tag. Component names
-must be unique after normalization and valid as Git tag prefixes.
+Tags use `<module>/vMAJOR.MINOR.PATCH`. A final dot suffix of one to three
+characters is dropped from the module name. The example above uses `bazel`
+as the argument to `draft` and `bazel/v1.2.3` as a release tag. Module names
+must be unique after normalization and valid as Git tag prefixes. Duplicate
+YAML keys are configuration errors.
 
 ## Commands
 
 ### `monorepo-release status`
 
 Reads the configuration committed at local `HEAD` and reports the latest
-release tag and pending commits for each component. Uncommitted and untracked
-changes produce a warning and are excluded from the report.
+module release tag, comparison base, and pending commits for each module.
+Uncommitted and untracked changes produce a warning and are excluded from the
+report.
+
+The checkout must have full commit history and up-to-date tags. For a shallow
+checkout, run `git fetch --unshallow --tags` or use `fetch-depth: 0` in GitHub
+Actions.
 
 | Status | Meaning |
 | --- | --- |
-| `Unreleased` | The component has no reachable stable tag. |
-| `Changes need review` | The component has relevant commits after its latest stable tag. |
-| `Unchanged` | The latest stable tag covers every relevant commit. |
+| `Unreleased` | The module has no reachable comparison tag. |
+| `New` | The module has no release tag of its own, and its paths match files at `HEAD` but none at the repository comparison tag. |
+| `Changed` | The module has relevant commits after the comparison tag. |
+| `Unchanged` | The comparison tag covers every relevant commit. |
 
 In GitHub Actions, `status` appends a Markdown report when
 `GITHUB_STEP_SUMMARY` and `GITHUB_REPOSITORY` are set.
 
-### `monorepo-release draft COMPONENT`
+### `monorepo-release draft MODULE [--repo [HOST/]OWNER/REPO] [--dry-run]`
 
-Reads the configuration, commit history, and component tags from the default
-branch of the GitHub repository selected by `gh repo view`. The draft targets
-the exact commit SHA used to generate the notes.
+Reads the configuration and commit history from the default branch of the
+target repository and fetches its module and repository tags. By default,
+the target is the repository selected by `gh repo view`. The command fetches the
+release history separately from the working checkout, so it also works from a
+shallow checkout. The draft targets the exact commit SHA used to generate the
+notes.
 
-- If a draft already exists for the component, the command prints its link and
+- If a draft already exists for the module, the command prints its link and
   preserves the maintainer’s edits.
-- If the component has no relevant changes, the command reports that there is
+- If the module has no relevant changes, the command reports that there is
   nothing to draft.
+- With `--dry-run`, the command previews the repository, proposed tag, target
+  commit, comparison base, and release notes without creating a draft. A later
+  invocation calculates the proposal again from the then-current default
+  branch and tags.
 - Otherwise, the command creates a GitHub draft and prints its link. A
   maintainer publishes the release in GitHub.
 
 ## Release selection and versioning
 
-Both commands compare with the highest stable component tag by version that
-is reachable from the target commit. For a component without a matching tag,
-the comparison covers its full matching history and the first draft uses
-`0.1.0`.
+Both commands select the comparison base in this order. A tag must be
+reachable from the target commit, and versions are compared numerically.
+
+1. The highest stable tag for the module, such as `bazel/v1.2.3`.
+2. The highest stable repository tag in the format `vMAJOR.MINOR.PATCH`,
+   such as `v0.0.5`.
+3. The full matching history when neither tag exists.
+
+The first module release uses `0.0.1` when there are relevant changes.
+The repository tag sets the start of the comparison. Each module uses
+its own version sequence.
 
 For existing releases, the largest applicable bump among the selected commits
 determines the next version.
@@ -83,8 +105,8 @@ determines the next version.
 | `chore:`, `test:`, or `ci:`, including scoped forms | Excluded as maintenance |
 | Other matching commits, including fixes and performance changes | Patch bump |
 
-The release notes list the selected commit subjects with links to the commits.
-A trailing PR reference such as `(#123)` also links to the pull request.
+The release notes list the selected commit subjects. A trailing PR reference
+such as `(#123)` links to the pull request.
 
 ## Exit status
 

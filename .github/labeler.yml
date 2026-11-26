@@ -11,7 +11,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # *******************************************************************************
 
-# The PR labels also serve as component prefixes for release tags.
+# The PR labels also serve as module prefixes for release tags.
 cr-checker:
   - changed-files:
       - any-glob-to-any-file:

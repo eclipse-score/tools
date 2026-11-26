@@ -23,23 +23,31 @@ from typing import cast
 from urllib.parse import quote
 
 from .github import draft_release
-from .releases import component_report, git, reachable_tags, read_components
+from .releases import module_report, git, reachable_tags, read_modules
 from .reporting import status_summary, status_table
 
 
 def show_status(root: Path) -> None:
+    if git(root, "rev-parse", "--is-shallow-repository").strip() == "true":
+        raise ValueError(
+            "status requires full history and tags. Run git fetch --unshallow --tags "
+            "or set fetch-depth: 0 in GitHub Actions."
+        )
     head = git(root, "rev-parse", "--verify", "HEAD").strip()
-    components = read_components(root, head)
+    modules = read_modules(root, head)
     tags = reachable_tags(root, head)
     reports = [
-        component_report(root, head, tags, component, paths)
-        for component, paths in components.items()
+        module_report(root, head, tags, module, paths)
+        for module, paths in modules.items()
     ]
     rows = status_table(reports)
-    component_width = max(len(component) for component, _, _ in rows)
-    tag_width = max(len(tag) for _, tag, _ in rows)
-    for component, tag, status in rows:
-        print(f"{component:<{component_width}}  {tag:<{tag_width}}  {status}")
+    widths = [max(map(len, column)) for column in zip(*rows, strict=True)]
+    for row in rows:
+        print(
+            "  ".join(
+                value.ljust(width) for value, width in zip(row, widths, strict=True)
+            ).rstrip()
+        )
 
     print(f"\nCommits through {head[:7]}.")
     warning = ""
@@ -48,7 +56,7 @@ def show_status(root: Path) -> None:
         print(warning)
     for report in reports:
         if report.commits:
-            print(f"\n{report.component}")
+            print(f"\n{report.module}")
             for commit in report.commits:
                 print(f"  {commit.sha[:7]} {commit.subject}")
 
@@ -64,9 +72,19 @@ def show_status(root: Path) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="monorepo-release")
     commands = parser.add_subparsers(dest="command", required=True)
-    _ = commands.add_parser("status", help="Show unreleased changes by component.")
+    _ = commands.add_parser("status", help="Show unreleased changes by module.")
     draft = commands.add_parser("draft", help="Create a GitHub release draft.")
-    _ = draft.add_argument("component", help="Component name used in release tags.")
+    _ = draft.add_argument("module", help="Module name used in release tags.")
+    _ = draft.add_argument(
+        "--repo",
+        metavar="[HOST/]OWNER/REPO",
+        help="Target repository (defaults to the GitHub CLI selection for this checkout).",
+    )
+    _ = draft.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show the proposed tag, target commit, and release notes without creating a draft.",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -74,7 +92,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "status":
             show_status(root)
         else:
-            print(draft_release(root, cast(str, args.component)))
+            print(
+                draft_release(
+                    root,
+                    cast(str, args.module),
+                    repo=cast(str | None, args.repo),
+                    dry_run=cast(bool, args.dry_run),
+                )
+            )
     except subprocess.CalledProcessError as error:
         detail = cast(str, error.stderr).strip()
         print(f"monorepo-release: {detail or error}", file=sys.stderr)

@@ -20,12 +20,12 @@ from tempfile import TemporaryDirectory
 from urllib.parse import urlsplit
 
 from .releases import (
-    component_report,
+    module_report,
     git,
     reachable_tags,
-    read_components,
+    read_modules,
     tag_version,
-    validate_component,
+    validate_module,
 )
 from .reporting import commit_list
 
@@ -55,7 +55,7 @@ def gh(root: Path, *arguments: str, input_text: str | None = None) -> str:
     ).stdout.rstrip("\n")
 
 
-def github_repository(root: Path) -> Repository:
+def github_repository(root: Path, repo: str | None = None) -> Repository:
     # GitHub CLI resolves the default repository from the checkout and its gh settings.
     name, branch, url = gh(
         root,
@@ -65,6 +65,7 @@ def github_repository(root: Path) -> Repository:
         "nameWithOwner,defaultBranchRef,url",
         "--jq",
         "[.nameWithOwner, .defaultBranchRef.name, .url] | @tsv",
+        *(("--", repo) if repo is not None else ()),
     ).split("\t")
     parsed_url = urlsplit(url)
     if not branch or parsed_url.scheme != "https" or not parsed_url.netloc:
@@ -72,7 +73,7 @@ def github_repository(root: Path) -> Repository:
     return Repository(name, branch, url)
 
 
-def existing_draft(root: Path, repository: Repository, component: str) -> str | None:
+def existing_draft(root: Path, repository: Repository, module: str) -> str | None:
     rows = gh(
         root,
         "api",
@@ -85,13 +86,13 @@ def existing_draft(root: Path, repository: Repository, component: str) -> str | 
     )
     for row in rows.splitlines():
         tag, url = row.split("\t")
-        if tag_version(component, tag) is not None:
+        if tag_version(tag, module=module) is not None:
             return url
     return None
 
 
 def fetch_snapshot(
-    root: Path, snapshot: Path, repository: Repository, component: str
+    root: Path, snapshot: Path, repository: Repository, module: str
 ) -> str:
     # Borrow existing objects when a full checkout is available. Fetch fresh refs
     # into the temporary bare repository so local branches and tags play no role.
@@ -109,7 +110,7 @@ def fetch_snapshot(
             ".",
             str(snapshot),
         )
-    tags = f"refs/tags/{component}/v*"
+    module_tags = f"refs/tags/{module}/v*"
     git(
         snapshot,
         "-c",
@@ -121,41 +122,56 @@ def fetch_snapshot(
         "--no-tags",
         f"{repository.url}.git",
         f"+refs/heads/{repository.branch}:{TARGET_REF}",
-        f"{tags}:{tags}",
+        f"{module_tags}:{module_tags}",
+        "refs/tags/v*:refs/tags/v*",
     )
     return git(snapshot, "rev-parse", "--verify", TARGET_REF).strip()
 
 
-def draft_release(root: Path, component: str) -> str:
-    validate_component(root, component)
-    repository = github_repository(root)
+def draft_release(
+    root: Path, module: str, *, repo: str | None = None, dry_run: bool = False
+) -> str:
+    validate_module(root, module)
+    repository = github_repository(root, repo)
 
     with TemporaryDirectory(prefix="monorepo-release-") as temp:
         snapshot = Path(temp) / "repo.git"
-        head = fetch_snapshot(root, snapshot, repository, component)
-        components = read_components(snapshot, head)
-        if component not in components:
+        head = fetch_snapshot(root, snapshot, repository, module)
+        modules = read_modules(snapshot, head)
+        if module not in modules:
             raise ValueError(
-                f"Unknown component {component!r}. Choose from: {', '.join(components)}"
+                f"Unknown module {module!r}. Choose from: {', '.join(modules)}"
             )
 
-        if url := existing_draft(root, repository, component):
-            return f"Existing draft for {component}: {url}"
-        report = component_report(
+        if url := existing_draft(root, repository, module):
+            return f"Existing draft for {module}: {url}"
+        report = module_report(
             snapshot,
             head,
             reachable_tags(snapshot, head),
-            component,
-            components[component],
+            module,
+            modules[module],
         )
+        comparison_base = f"Comparison base: {report.comparison_tag or 'full history'}"
         next_tag = report.next_tag
         if next_tag is None:
-            return f"No changes to draft for {component}."
+            message = f"No changes to draft for {module}."
+            return f"{message}\n{comparison_base}" if dry_run else message
         # An existing tag would cause GitHub to ignore --target.
         if git(snapshot, "tag", "--list", next_tag).strip():
             raise ValueError(
                 f"Tag {next_tag} already exists outside the release history"
             )
+
+    notes = commit_list(report.commits, repository.url, link_commits=False)
+    if dry_run:
+        return (
+            f"Repository: {repository.url}\n"
+            f"Tag: {next_tag}\n"
+            f"Target: {repository.branch} @ {head}\n"
+            f"{comparison_base}\n\n"
+            f"{notes.rstrip()}"
+        )
 
     try:
         return gh(
@@ -173,10 +189,14 @@ def draft_release(root: Path, component: str) -> str:
             "-",
             "--",
             next_tag,
-            input_text=commit_list(report.commits, repository.url),
+            input_text=notes,
         )
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as error:
         # The request may have reached GitHub, or another invocation won the race.
-        if url := existing_draft(root, repository, component):
-            return f"Existing draft for {component}: {url}"
+        try:
+            url = existing_draft(root, repository, module)
+        except (OSError, ValueError, subprocess.CalledProcessError):
+            raise error from None
+        if url:
+            return f"Existing draft for {module}: {url}"
         raise
