@@ -45,13 +45,16 @@ jobs:
       - name: Build the Python wheels
         run: |
           uv build --package cr-checker --wheel
+          uv build --package monorepo-release --wheel
           uv build --package repo-cache --wheel
           uv build --package repo-policy-sync --wheel
       - name: Smoke-test the installed CLIs
         run: |
           cr_checker_wheel=$(find dist -maxdepth 1 -name 'cr_checker-*.whl' -print -quit)
+          monorepo_release_wheel=$(find dist -maxdepth 1 -name 'monorepo_release-*.whl' -print -quit)
           repo_cache_wheel=$(find dist -maxdepth 1 -name 'repo_cache-*.whl' -print -quit)
           repo_policy_sync_wheel=$(find dist -maxdepth 1 -name 'repo_policy_sync-*.whl' -print -quit)
           uv run --no-project --with "$cr_checker_wheel" score-copyright --help
+          uv run --no-project --with "$monorepo_release_wheel" monorepo-release draft --help
           uv run --no-project --with "$repo_cache_wheel" score-repo-cache --help
           uv run --no-project --with "$repo_policy_sync_wheel" --with "$repo_cache_wheel" score-repo-policy-sync --help
