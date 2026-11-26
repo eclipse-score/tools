@@ -22,6 +22,7 @@ projects. Choose a component below to find its setup and usage instructions.
 | [Repository Policy Sync](repo_policy_sync/README.md) | Evaluates repository policies across a GitHub organization and can open reviewable pull requests to apply them. |
 | [SCORE pytest](score_pytest/README.md) | Provides a Bazel rule for pytest and a plugin that adds structured metadata to JUnit reports. |
 | [Copyright Checker](cr_checker/README.md) | Checks copyright headers and supports pre-commit and Bazel integrations. |
+| [CodeQL analysis](codeql/README.md) | Bazel macro for a CodeQL C/C++ analysis of a traced build against the CodeQL Coding Standards (MISRA C++). |
 
 ## Contributing
 
